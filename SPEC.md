@@ -47,10 +47,10 @@ NES/SNES/GB are **not** P0 (future expansion only if scope changes).
 
 | System | Default core (bundled) | JIT note | Evidence |
 |--------|------------------------|----------|----------|
-| **Game Boy Advance** | **mGBA** | Not named by libretro as JIT-required. Prefer for accuracy + active maintenance; MPL 2.0. | [mGBA](https://mgba.io/); [libretro mGBA](https://docs.libretro.com/library/mgba/); [mGBA license](https://github.com/mgba-emu/mgba/blob/master/LICENSE) |
+| **Game Boy Advance** | **mGBA** | Interpreter path; no dynarec required for playable GBA. Prefer for accuracy + active maintenance; MPL 2.0. | [mGBA](https://mgba.io/); [libretro mGBA](https://docs.libretro.com/library/mgba/); [mGBA license](https://github.com/mgba-emu/mgba/blob/master/LICENSE) |
 | **Nintendo 64** | **mupen64plus-next** + GLideN64 (HLE) | Store-viable JIT-less: use `cached_interpreter` + OpenGL ES 3.0; **not** paraLLEl-RDP (Vulkan LLE). | [libretro Mupen64Plus-Next](https://docs.libretro.com/library/mupen64plus/) (`cached_interpreter` when dynarec off) |
 | **Nintendo DS** | **melonDS** | Store-viable interpreter path; BIOS optional for many titles. | [melonDS](https://melonds.kuribo64.net/); [libretro melonDS](https://docs.libretro.com/library/melonds/) |
-| **Sony PSP** | **PPSSPP** (IR caching interpreter; **no dynarec**) | Official: JIT **speeds up**, not required. App Store build uses IR interpreter; nearly all PSP games full speed on modern iOS without JIT. **App Store P0 — not sideload-only.** | [PPSSPP 2024-05-15](https://www.ppsspp.org/news/live-on-app-store/); [PPSSPP iOS](https://www.ppsspp.org/docs/reference/ios-support/); [libretro iOS](https://docs.libretro.com/guides/install-ios/); `CPUCore::IR_INTERPRETER = 2` in [ConfigValues.h](https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h) |
+| **Sony PSP** | **PPSSPP** (IR caching interpreter; **no dynarec**) | Official: JIT **speeds up**, not required. App Store build uses IR interpreter; nearly all PSP games full speed on modern iOS without JIT. **App Store P0 — not sideload-only.** | [PPSSPP 2024-05-15](https://www.ppsspp.org/news/live-on-app-store/); [PPSSPP iOS](https://www.ppsspp.org/docs/reference/ios-support/); `CPUCore::IR_INTERPRETER = 2` in [ConfigValues.h](https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h) |
 
 #### Core pick rationale (locked)
 
@@ -74,7 +74,7 @@ NES (Nestopia), SNES (Snes9x), GB/GBC (Gambatte) — RetroPlay locked P0 does **
 | **PlayStation 2** | Same class: needs dynarec for usable store play | same |
 | **3DS / Switch** | Outside practical App Store JIT-less scope for v1 | Product scope |
 
-**App Store JIT rule:** Apple does not allow general JIT in App Store apps. Prefer interpreter / IR paths. Cores must be **bundled** in the signed binary (no downloading new executable cores after install). Sources: [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/); [PPSSPP App Store note](https://www.ppsspp.org/news/live-on-app-store/); [libretro iOS install guide — JIT section](https://docs.libretro.com/guides/install-ios/) (platform constraint docs for cores we may integrate).
+**App Store JIT rule:** Apple does not allow JIT on App Store apps. Prefer interpreter / IR paths. Cores must be **bundled** in the signed binary (no downloading new executable cores after install). Sources: [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/); [PPSSPP App Store](https://www.ppsspp.org/news/live-on-app-store/) (retrieved 2026-09-04).
 
 ---
 
@@ -156,11 +156,11 @@ Scaffold lives under `App/` (see `App/README.md`). No bulky emulator repos clone
 |------------|-------------|--------|
 | Guideline **4.7** (5 Apr 2024; PC wording 1 Aug 2024) | Retro console (and PC) emulator apps may offer downloadable games; developer is responsible for compliance and law | [Apple News 2024-04-05](https://developer.apple.com/news/?id=0kjli9o1); [Guidelines](https://developer.apple.com/app-store/review/guidelines/) |
 | 4.7.1–4.7.5 | Privacy, filtering/reporting, payments if selling content, no exposing native APIs to downloaded software without permission, software index + universal links, age gating | same Guidelines page |
-| **No JIT** on App Store | Do not ship dynarec-required systems; use interpreter/IR paths only (PPSSPP IR for PSP) | [libretro iOS](https://docs.libretro.com/guides/install-ios/); [PPSSPP](https://www.ppsspp.org/news/live-on-app-store/) |
-| Cores **bundled** | No post-install core downloads as executable plugins | [libretro iOS](https://docs.libretro.com/guides/install-ios/) |
+| **No JIT** on App Store | Do not ship dynarec-required systems; use interpreter/IR paths only (PPSSPP IR for PSP) | [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/); [PPSSPP](https://www.ppsspp.org/news/live-on-app-store/) |
+| Cores **bundled** | No post-install core downloads as executable plugins | Guideline **2.5.2**; platform signing model |
 | Guideline **2.5.2** | Do not download/execute code that changes app features | [Guidelines](https://developer.apple.com/app-store/review/guidelines/) |
 | Copyright | User supplies ROMs via Files; we do not distribute game dumps; document ToS clearly | 4.7 responsibility language |
-| Redistribution | Prefer cores with clear licenses / upstream marketplace approval | [libretro iOS — App Store vs Sideloading](https://docs.libretro.com/guides/install-ios/) |
+| Redistribution | Prefer cores with clear OSS licenses (e.g. mGBA MPL 2.0) | Upstream project licenses |
 
 **Policy timeline:** Guideline 4.7 published 5 Apr 2024; PPSSPP App Store announcement 15 May 2024 confirms IR interpreter as a store-viable PSP path.
 
@@ -280,8 +280,8 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 - PPSSPP iOS support: https://www.ppsspp.org/docs/reference/ios-support/
 - PPSSPP ConfigValues.h (CPUCore): https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h
 - PPSSPP IR issues tracker: https://github.com/hrydgard/ppsspp/issues/15670
-- mGBA: https://mgba.io/ · https://github.com/mgba-emu/mgba
-- mupen64plus-next: https://docs.libretro.com/library/mupen64plus/
-- melonDS: https://melonds.kuribo64.net/ · https://docs.libretro.com/library/melonds_ds/
+- mGBA: https://mgba.io/ · https://docs.libretro.com/library/mgba/
+- mupen64plus-next options (`cached_interpreter`): https://docs.libretro.com/library/mupen64plus/
+- melonDS: https://melonds.kuribo64.net/
 - Dolphin / no App Store JIT (2024-04-19): https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/
 - Liquid Glass guide: https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views
