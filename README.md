@@ -11,4 +11,4 @@ Native iPhone SwiftUI emulator with a Delta-simple library UX (tap a game to pla
 
 Agent / planning notes for Daniel’s bots live in [grok-things `Projects/retroplay/`](https://github.com/daniel-zn/grok-things/tree/main/Projects/retroplay) as a thin pointer to this repo. **This repository is the source of truth for the app.**
 
-See `SPEC.md` for product and engineering detail.
+See `SPEC.md` for product and engineering detail. Swift M0 scaffold: `App/` (no core binaries).

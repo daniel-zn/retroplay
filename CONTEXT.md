@@ -1,0 +1,50 @@
+# CONTEXT.md — RetroPlay
+
+**Read this first.** Product/engineering detail: `SPEC.md`. App scaffold: `App/`.
+
+**Owner:** Engineer / RetroPlay bots. **Source of truth:** this public repo (`daniel-zn/retroplay`). Thin agent pointer also in `grok-things/Projects/retroplay/`.
+
+Do **not** invent that a binary, IPA, or App Store listing exists. Do **not** distribute ROMs.
+
+---
+
+## Identity
+
+| Field | Value |
+|-------|--------|
+| **Project** | `retroplay` |
+| **Working title** | RetroPlay |
+| **Repo** | https://github.com/daniel-zn/retroplay |
+| **Area** | native iPhone SwiftUI emulator (App Store–viable) |
+| **Started** | 2026-09-04 |
+| **Renamed from** | GlassPlay (`Projects/glassplay/` retired in grok-things) |
+
+### Purpose
+
+Native iPhone **SwiftUI** emulator with **Delta-simple UX**, **Liquid Glass** (iOS 26), **locked P0 only**: GBA, N64, NDS, **PSP** (App Store via PPSSPP IR — not sideload-only).
+
+---
+
+## Locked P0 cores
+
+| System | Default core | Rationale |
+|--------|--------------|-----------|
+| GBA | **mGBA** | MPL 2.0; accuracy/maintenance over VBA-M; on RA App Store set |
+| N64 | **mupen64plus** | Delta App Store precedent |
+| NDS | **melonDS** | Delta App Store precedent |
+| PSP | **PPSSPP** IR (`CPUCore=2`) | Official App Store 2024-05-15; JIT speeds up only |
+
+---
+
+## Constraints
+
+1. App Store first — no JIT; **PSP stays App Store P0**.
+2. Library UX; auto ROM → system → one default core.
+3. Bundle cores; no runtime core install.
+4. User-imported ROMs via Files only; no invented ROM paths.
+5. Do not revive NES/SNES/GB as P0 without scope change.
+6. Commit with author **Daniel Nadeem** `<daniel@danielzn.com>` via with-github.sh when landing.
+
+## Next build step
+
+Wire M0: Liquid Glass library + Settings legal copy + `ROMImporter` file picker → library rows. Then **M1 = mGBA**.
