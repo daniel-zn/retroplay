@@ -69,12 +69,12 @@ NES (Nestopia), SNES (Snes9x), GB/GBC (Gambatte) — RetroPlay locked P0 does **
 
 | System | Why blocked | Evidence |
 |--------|-------------|----------|
-| **GameCube / Wii (Dolphin)** | Dolphin/DolphiniOS: interpreter unplayable; will not ship App Store without JIT | [OatmealDome 2024-04-19](https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/); [DolphiniOS FAQ](https://dolphinios.oatmealdome.me/faq) |
-| **Dreamcast (Flycast)** | Libretro iOS docs: JIT **enables** Flycast; `#flycast` commented out of iOS App Store cores | [libretro iOS](https://docs.libretro.com/guides/install-ios/); [update-cores.sh](https://github.com/libretro/RetroArch/blob/master/pkg/apple/update-cores.sh) |
-| **PlayStation 2** | `#play` commented out of iOS App Store cores; not a JIT-less App Store path | [libretro iOS](https://docs.libretro.com/guides/install-ios/); [update-cores.sh](https://github.com/libretro/RetroArch/blob/master/pkg/apple/update-cores.sh) |
-| **3DS / Switch** | No credible App Store JIT-less path for RetroPlay v1 | [libretro iOS](https://docs.libretro.com/guides/install-ios/) |
+| **GameCube / Wii (Dolphin)** | Maintainers: interpreter many times slower; App Store without JIT described as basically unplayable | [OatmealDome 2024-04-19](https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/) |
+| **Dreamcast** | Usable play typically needs dynarec; not an App Store product target for RetroPlay | Apple App Store JIT ban; core dynarec dependency |
+| **PlayStation 2** | Same class: needs dynarec for usable store play | same |
+| **3DS / Switch** | Outside practical App Store JIT-less scope for v1 | Product scope |
 
-**Libretro JIT summary (official):** App Store builds have **no JIT**. Dynarec **speeds up** some cores (e.g. **ppsspp**) and **enables** others (e.g. **flycast**). Cores are signed into the binary; no runtime core install. Source: [https://docs.libretro.com/guides/install-ios/](https://docs.libretro.com/guides/install-ios/) (retrieved 2026-09-04).
+**App Store JIT rule:** Apple does not allow general JIT in App Store apps. Prefer interpreter / IR paths. Cores must be **bundled** in the signed binary (no downloading new executable cores after install). Sources: [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/); [PPSSPP App Store note](https://www.ppsspp.org/news/live-on-app-store/); [libretro iOS install guide — JIT section](https://docs.libretro.com/guides/install-ios/) (platform constraint docs for cores we may integrate).
 
 ---
 
@@ -267,14 +267,12 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 
 ## 11. Next build step
 
-**M0 UI wired** (library `fileImporter`, `LibraryStore`, Liquid Glass chrome, Settings legal, stub tap alert). Next: start **M1 mGBA** integration when ready to vendor/build the core (without cloning bulky trees into git until asked).
+**M0 UI wired.** **M1 scaffolding started:** `MGBACore` + `App/Vendor/mGBA.md`. Next on Mac/Xcode: build/link libmgba and replace the notImplemented path with real frames.
 
 ---
 
 ## 12. References (retrieved 2026-09-04 unless dated)
 
-- Libretro iOS install / JIT: https://docs.libretro.com/guides/install-ios/
-- Libretro Apple `appstore_cores` export script: https://github.com/libretro/RetroArch/blob/master/pkg/apple/update-cores.sh
 - Apple 4.7 news (2024-04-05): https://developer.apple.com/news/?id=0kjli9o1
 - Apple 4.7 PC clarification (2024-08-01): https://developer.apple.com/news/?id=ty0avr2s
 - App Review Guidelines: https://developer.apple.com/app-store/review/guidelines/
@@ -282,8 +280,8 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 - PPSSPP iOS support: https://www.ppsspp.org/docs/reference/ios-support/
 - PPSSPP ConfigValues.h (CPUCore): https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h
 - PPSSPP IR issues tracker: https://github.com/hrydgard/ppsspp/issues/15670
-- mGBA: https://mgba.io/ · https://docs.libretro.com/library/mgba/
+- mGBA: https://mgba.io/ · https://github.com/mgba-emu/mgba
 - mupen64plus-next: https://docs.libretro.com/library/mupen64plus/
-- melonDS: https://melonds.kuribo64.net/ · https://docs.libretro.com/library/melonds/
+- melonDS: https://melonds.kuribo64.net/ · https://docs.libretro.com/library/melonds_ds/
 - Dolphin / no App Store JIT (2024-04-19): https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/
 - Liquid Glass guide: https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views
