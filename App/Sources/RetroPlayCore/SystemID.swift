@@ -22,7 +22,7 @@ public enum SystemID: String, CaseIterable, Codable, Sendable, Identifiable {
     public var defaultCoreName: String {
         switch self {
         case .gba: return "mGBA"
-        case .n64: return "mupen64plus"
+        case .n64: return "mupen64plus-next"
         case .nds: return "melonDS"
         case .psp: return "PPSSPP"
         }

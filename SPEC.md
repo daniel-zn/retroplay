@@ -48,7 +48,7 @@ NES/SNES/GB are **not** P0 even though Delta ships them.
 | System | Default core (bundled) | JIT note | Evidence |
 |--------|------------------------|----------|----------|
 | **Game Boy Advance** | **mGBA** | Not named by libretro as JIT-required. Prefer over Delta’s visualboyadvance-m for accuracy + active maintenance; MPL 2.0; on RetroArch App Store core set. | [mGBA](https://mgba.io/); [libretro mGBA](https://docs.libretro.com/library/mgba/); [Delta README](https://github.com/rileytestut/Delta) (ships VBA-M — store precedent for GBA UX, different core); [RA listing](https://apps.apple.com/us/app/retroarch/id6499539433) |
-| **Nintendo 64** | **mupen64plus** / mupen64plus-next class | Store-viable; Delta ships mupen64plus on App Store. | [Delta README](https://github.com/rileytestut/Delta); [Delta App Store](https://apps.apple.com/us/app/delta-game-emulator/id1048524688) |
+| **Nintendo 64** | **mupen64plus-next** + GLideN64 (HLE) | Store-viable JIT-less: use `cached_interpreter` + OpenGL ES 3.0; **not** paraLLEl-RDP (Vulkan LLE). Delta ships mupen64plus family on App Store. | [libretro Mupen64Plus-Next](https://docs.libretro.com/library/mupen64plus/); [Delta README](https://github.com/rileytestut/Delta); [Delta App Store](https://apps.apple.com/us/app/delta-game-emulator/id1048524688) |
 | **Nintendo DS** | **melonDS** | Store-viable; Delta ships melonDS; BIOS optional per Delta 1.6 notes. | same |
 | **Sony PSP** | **PPSSPP** (IR caching interpreter; **no dynarec**) | Official: JIT **speeds up**, not required. App Store build uses IR interpreter; nearly all PSP games full speed on modern iOS without JIT. **App Store P0 — not sideload-only.** | [PPSSPP 2024-05-15](https://www.ppsspp.org/news/live-on-app-store/); [PPSSPP iOS](https://www.ppsspp.org/docs/reference/ios-support/); [libretro iOS](https://docs.libretro.com/guides/install-ios/); `CPUCore::IR_INTERPRETER = 2` in [ConfigValues.h](https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h) |
 
@@ -57,7 +57,7 @@ NES/SNES/GB are **not** P0 even though Delta ships them.
 | System | Pick | Why this one |
 |--------|------|--------------|
 | GBA | mGBA | Clearer long-term accuracy/maintenance than VBA-M; redistributable (MPL 2.0); already shipped in RetroArch marketplace builds. Delta’s VBA-M proves GBA-on-store UX, not that VBA-M is mandatory. |
-| N64 | mupen64plus | Direct Delta App Store precedent; no competing store-proven alternative needed for v1. |
+| N64 | mupen64plus-next + GLideN64 | Delta-class store precedent; `cached_interpreter` when dynarec off; avoid paraLLEl-RDP as iPhone default. |
 | NDS | melonDS | Direct Delta App Store precedent. |
 | PSP | PPSSPP | Only credible App Store–proven PSP path; standalone listing + RA `ppsspp` core; IR path documented by upstream. |
 
@@ -115,7 +115,7 @@ flowchart TB
   end
 
   subgraph Bundled["Bundled cores (App Store binary)"]
-    P0Cores["P0: mGBA · mupen64plus\nmelonDS · PPSSPP IR"]
+    P0Cores["P0: mGBA · mupen64plus-next\nmelonDS · PPSSPP IR"]
   end
 
   Import --> Classifier
@@ -239,7 +239,7 @@ Upstream tracks IR-specific instability separately from JIT ([issue #15670](http
 - Touch skin + MFi basics; save SRAM; pause overlay.
 - Auto-detect `.gba` / related; reject unknown with clear UI.
 
-### M2 — **N64 (mupen64plus)** + **NDS (melonDS)**
+### M2 — **N64 (mupen64plus-next)** + **NDS (melonDS)**
 
 - Second and third P0 systems.
 - Box art hook (user art + optional open DB — no piracy catalog).

@@ -30,7 +30,7 @@ Native iPhone **SwiftUI** emulator with **Delta-simple UX**, **Liquid Glass** (i
 | System | Default core | Rationale |
 |--------|--------------|-----------|
 | GBA | **mGBA** | MPL 2.0; accuracy/maintenance over VBA-M; on RA App Store set |
-| N64 | **mupen64plus** | Delta App Store precedent |
+| N64 | **mupen64plus-next** + GLideN64 | Delta-class JIT-less path; `cached_interpreter` + GLES3 HLE; not paraLLEl-RDP |
 | NDS | **melonDS** | Delta App Store precedent |
 | PSP | **PPSSPP** IR (`CPUCore=2`) | Official App Store 2024-05-15; JIT speeds up only |
 
