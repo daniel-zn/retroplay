@@ -267,7 +267,7 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 
 ## 11. Next build step
 
-**M0 UI wired.** **M1 docs + stubs:** `MGBACore`, `App/Vendor/mGBA.md`, `App/Vendor/build-mgba-ios.sh` (Mac-only). Next: run build on miniMac, link XCFramework, replace notImplemented with real frames.
+**M0 + non-binary M1 ready for home Mac.** Docs: `App/Vendor/mGBA.md` (checklist), `build-mgba-ios.sh`, `XCODE.md`, bridging + `RETROPLAY_HAS_MGBA`. Daniel builds XCFramework at home; then fill `MGBACore` native TODOs.
 
 ---
 

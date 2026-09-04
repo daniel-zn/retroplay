@@ -14,3 +14,8 @@ First systems:
 Agent planning notes live in [grok-things `Projects/retroplay/`](https://github.com/daniel-zn/grok-things/tree/main/Projects/retroplay) as a thin pointer. **This repository is the source of truth for the app.**
 
 See `SPEC.md` for product and engineering detail. Swift M0 scaffold: `App/` (no core binaries yet).
+
+### GBA / mGBA (M1)
+
+When you are on a Mac, follow the checklist in [`App/Vendor/mGBA.md`](App/Vendor/mGBA.md) (one-shot script + Xcode drop-in). Do not commit bulky mGBA trees unless you choose to.
+
