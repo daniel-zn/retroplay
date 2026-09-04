@@ -1,6 +1,7 @@
 import Foundation
 
-/// DeltaCore-style bridge contract. Implementations will wrap bundled cores later.
+/// Bridge contract for audio/video/input frames and save states.
+/// Implementations will wrap bundled cores later.
 /// No core binaries are included in this scaffold.
 public protocol EmulatorCore: AnyObject, Sendable {
     var systemID: SystemID { get }

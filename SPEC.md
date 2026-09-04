@@ -6,13 +6,13 @@
 **Agent pointer:** https://github.com/daniel-zn/grok-things/tree/main/Projects/retroplay  
 **Fact-check:** Grok Build + primary sources, 2026-09-04 (migrated from GlassPlay research; **P0 locked** to GBA / N64 / NDS / PSP)
 
-Claims below that depend on external products cite sources. Listing on RetroArch’s App Store page means **marketplace inclusion**, not a measured JIT-less FPS guarantee.
+Claims below that depend on external tech cite upstream or Apple sources. Marketplace inclusion of a core elsewhere means **availability under App Store rules**, not a measured JIT-less FPS guarantee for RetroPlay.
 
 ---
 
 ## 1. Goals
 
-1. Ship a **native iPhone SwiftUI** emulator app with **Delta-simple UX**: a library of games, one tap to play, **automatic ROM → system → core** mapping (no RetroArch-style core picker in the main path).
+1. Ship a **native iPhone SwiftUI** emulator with a **library-first UX**: import games, one tap to play, **automatic ROM → system → core** mapping (**no core picker** in the main path).
 2. Use **Liquid Glass** (iOS 26) as the visual language for chrome (library bars, sheets, play overlays) via SwiftUI `glassEffect` / `GlassEffectContainer` / `glassEffectID`.
 3. Target the **App Store**: bundled, redistributable cores only; **no JIT**.
 4. **Locked P0 only:** Game Boy Advance, Nintendo 64, Nintendo DS, and **Sony PSP** — all as App Store features. PSP uses PPSSPP’s IR caching interpreter (official 2024-05-15: nearly all games full speed on modern iOS without JIT). Do **not** park PSP as sideload-only.
@@ -24,8 +24,8 @@ Claims below that depend on external products cite sources. Listing on RetroArch
 
 ## 2. Non-goals
 
-- Not a RetroArch frontend, skin, or core-updater UI.
-- Not “every libretro core” or parity with sideload RetroArch.
+- Not a multi-core frontend with a user-facing core picker, deep emulator menu tree, or online core updater.
+- Not “every libretro core” or sideload-only parity.
 - Not NES / SNES / GB/GBC as P0 (explicitly out of locked matrix; future expansion only if scope changes).
 - Not GameCube / Wii / Dreamcast / PS2 as App Store features (JIT / dynarec constraints — see matrix).
 - Not distributing ROMs, BIOS packs, or copyrighted game dumps.
@@ -40,41 +40,41 @@ Claims below that depend on external products cite sources. Listing on RetroArch
 
 **Defaults used (proceed without asking Daniel):**  
 P0 = **only** GBA, N64, NDS, PSP — Daniel-locked.  
-NES/SNES/GB are **not** P0 even though Delta ships them.  
+NES/SNES/GB are **not** P0 (future expansion only if scope changes).  
 **Out of scope (store):** systems that require JIT to enable or that maintainers say are unplayable without JIT.
 
 ### P0 — ship these (ordered milestones GBA → N64 → NDS → PSP)
 
 | System | Default core (bundled) | JIT note | Evidence |
 |--------|------------------------|----------|----------|
-| **Game Boy Advance** | **mGBA** | Not named by libretro as JIT-required. Prefer over Delta’s visualboyadvance-m for accuracy + active maintenance; MPL 2.0; on RetroArch App Store core set. | [mGBA](https://mgba.io/); [libretro mGBA](https://docs.libretro.com/library/mgba/); [Delta README](https://github.com/rileytestut/Delta) (ships VBA-M — store precedent for GBA UX, different core); [RA listing](https://apps.apple.com/us/app/retroarch/id6499539433) |
-| **Nintendo 64** | **mupen64plus-next** + GLideN64 (HLE) | Store-viable JIT-less: use `cached_interpreter` + OpenGL ES 3.0; **not** paraLLEl-RDP (Vulkan LLE). Delta ships mupen64plus family on App Store. | [libretro Mupen64Plus-Next](https://docs.libretro.com/library/mupen64plus/); [Delta README](https://github.com/rileytestut/Delta); [Delta App Store](https://apps.apple.com/us/app/delta-game-emulator/id1048524688) |
-| **Nintendo DS** | **melonDS** | Store-viable; Delta ships melonDS; BIOS optional per Delta 1.6 notes. | same |
+| **Game Boy Advance** | **mGBA** | Not named by libretro as JIT-required. Prefer for accuracy + active maintenance; MPL 2.0. | [mGBA](https://mgba.io/); [libretro mGBA](https://docs.libretro.com/library/mgba/); [mGBA license](https://github.com/mgba-emu/mgba/blob/master/LICENSE) |
+| **Nintendo 64** | **mupen64plus-next** + GLideN64 (HLE) | Store-viable JIT-less: use `cached_interpreter` + OpenGL ES 3.0; **not** paraLLEl-RDP (Vulkan LLE). | [libretro Mupen64Plus-Next](https://docs.libretro.com/library/mupen64plus/) (`cached_interpreter` when dynarec off) |
+| **Nintendo DS** | **melonDS** | Store-viable interpreter path; BIOS optional for many titles. | [melonDS](https://melonds.kuribo64.net/); [libretro melonDS](https://docs.libretro.com/library/melonds/) |
 | **Sony PSP** | **PPSSPP** (IR caching interpreter; **no dynarec**) | Official: JIT **speeds up**, not required. App Store build uses IR interpreter; nearly all PSP games full speed on modern iOS without JIT. **App Store P0 — not sideload-only.** | [PPSSPP 2024-05-15](https://www.ppsspp.org/news/live-on-app-store/); [PPSSPP iOS](https://www.ppsspp.org/docs/reference/ios-support/); [libretro iOS](https://docs.libretro.com/guides/install-ios/); `CPUCore::IR_INTERPRETER = 2` in [ConfigValues.h](https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h) |
 
 #### Core pick rationale (locked)
 
 | System | Pick | Why this one |
 |--------|------|--------------|
-| GBA | mGBA | Clearer long-term accuracy/maintenance than VBA-M; redistributable (MPL 2.0); already shipped in RetroArch marketplace builds. Delta’s VBA-M proves GBA-on-store UX, not that VBA-M is mandatory. |
-| N64 | mupen64plus-next + GLideN64 | Delta-class store precedent; `cached_interpreter` when dynarec off; avoid paraLLEl-RDP as iPhone default. |
-| NDS | melonDS | Direct Delta App Store precedent. |
-| PSP | PPSSPP | Only credible App Store–proven PSP path; standalone listing + RA `ppsspp` core; IR path documented by upstream. |
+| GBA | mGBA | Accuracy and active maintenance; redistributable (MPL 2.0). |
+| N64 | mupen64plus-next + GLideN64 | Documented `cached_interpreter` when dynarec off; avoid paraLLEl-RDP as iPhone default. |
+| NDS | melonDS | Mature, redistributable DS core with a viable interpreter path. |
+| PSP | PPSSPP | App Store–proven PSP path; IR interpreter documented by upstream (`CPUCore::IR_INTERPRETER`). |
 
 ### Explicitly not P0 (do not revive without scope change)
 
-NES (Nestopia), SNES (Snes9x), GB/GBC (Gambatte) — Delta ships them; RetroPlay locked P0 does **not**. Treat as future expansion candidates only.
+NES (Nestopia), SNES (Snes9x), GB/GBC (Gambatte) — RetroPlay locked P0 does **not** include these. Treat as future expansion candidates only.
 
 ### Out of scope for App Store JIT-less RetroPlay
 
 | System | Why blocked | Evidence |
 |--------|-------------|----------|
-| **GameCube / Wii (Dolphin)** | Not on live RA iOS systems list; not in RA iOS `appstore_cores`; Dolphin/DolphiniOS: interpreter unplayable; will not ship App Store without JIT | [RA listing](https://apps.apple.com/us/app/retroarch/id6499539433); [update-cores.sh](https://github.com/libretro/RetroArch/blob/master/pkg/apple/update-cores.sh); [OatmealDome 2024-04-19](https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/); [DolphiniOS FAQ](https://dolphinios.oatmealdome.me/faq) |
+| **GameCube / Wii (Dolphin)** | Dolphin/DolphiniOS: interpreter unplayable; will not ship App Store without JIT | [OatmealDome 2024-04-19](https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/); [DolphiniOS FAQ](https://dolphinios.oatmealdome.me/faq) |
 | **Dreamcast (Flycast)** | Libretro iOS docs: JIT **enables** Flycast; `#flycast` commented out of iOS App Store cores | [libretro iOS](https://docs.libretro.com/guides/install-ios/); [update-cores.sh](https://github.com/libretro/RetroArch/blob/master/pkg/apple/update-cores.sh) |
-| **PlayStation 2** | `#play` commented out of iOS App Store cores; not on live RA iOS systems list | same |
-| **3DS / Switch** | Not in live RetroArch App Store systems list retrieved 2026-09-04 | [RA listing](https://apps.apple.com/us/app/retroarch/id6499539433) |
+| **PlayStation 2** | `#play` commented out of iOS App Store cores; not a JIT-less App Store path | [libretro iOS](https://docs.libretro.com/guides/install-ios/); [update-cores.sh](https://github.com/libretro/RetroArch/blob/master/pkg/apple/update-cores.sh) |
+| **3DS / Switch** | No credible App Store JIT-less path for RetroPlay v1 | [libretro iOS](https://docs.libretro.com/guides/install-ios/) |
 
-**Libretro JIT summary (official):** App Store RetroArch has **no JIT**. Dynarec **speeds up** some cores (e.g. **ppsspp**) and **enables** others (e.g. **flycast**). Cores are signed into the binary; no runtime core install. Source: [https://docs.libretro.com/guides/install-ios/](https://docs.libretro.com/guides/install-ios/) (retrieved 2026-09-04).
+**Libretro JIT summary (official):** App Store builds have **no JIT**. Dynarec **speeds up** some cores (e.g. **ppsspp**) and **enables** others (e.g. **flycast**). Cores are signed into the binary; no runtime core install. Source: [https://docs.libretro.com/guides/install-ios/](https://docs.libretro.com/guides/install-ios/) (retrieved 2026-09-04).
 
 ---
 
@@ -83,11 +83,11 @@ NES (Nestopia), SNES (Snes9x), GB/GBC (Gambatte) — Delta ships them; RetroPlay
 ### 4.1 Principles
 
 - **SwiftUI app shell** owns library, import, settings, Liquid Glass chrome.
-- **EmulatorCore bridge** (DeltaCore-style protocol) owns audio/video/input frames and save states.
+- **EmulatorCore bridge** (protocol) owns audio/video/input frames and save states.
 - **One bundled core plugin per system**. Hide core choice from users; optional advanced override later.
 - **ROM classifier** maps extension + header/magic → `SystemID` → default core.
 - ROM import via **Files / UIDocumentPicker** only — copy into app sandbox; never invent sample ROM paths in source.
-- No RetroArch menu tree; no online core updater.
+- No deep emulator menu tree; no online core updater.
 
 ### 4.2 Diagram
 
@@ -162,7 +162,7 @@ Scaffold lives under `App/` (see `App/README.md`). No bulky emulator repos clone
 | Copyright | User supplies ROMs via Files; we do not distribute game dumps; document ToS clearly | 4.7 responsibility language |
 | Redistribution | Prefer cores with clear licenses / upstream marketplace approval | [libretro iOS — App Store vs Sideloading](https://docs.libretro.com/guides/install-ios/) |
 
-**Precedents (store live after 4.7):** Delta (~17 Apr 2024), RetroArch (~15 May 2024), PPSSPP (~15 May 2024).
+**Policy timeline:** Guideline 4.7 published 5 Apr 2024; PPSSPP App Store announcement 15 May 2024 confirms IR interpreter as a store-viable PSP path.
 
 ---
 
@@ -274,9 +274,7 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 ## 12. References (retrieved 2026-09-04 unless dated)
 
 - Libretro iOS install / JIT: https://docs.libretro.com/guides/install-ios/
-- RetroArch App Store: https://apps.apple.com/us/app/retroarch/id6499539433
-- RetroArch Apple core export script: https://github.com/libretro/RetroArch/blob/master/pkg/apple/update-cores.sh
-- Delta: https://github.com/rileytestut/Delta · https://apps.apple.com/us/app/delta-game-emulator/id1048524688
+- Libretro Apple `appstore_cores` export script: https://github.com/libretro/RetroArch/blob/master/pkg/apple/update-cores.sh
 - Apple 4.7 news (2024-04-05): https://developer.apple.com/news/?id=0kjli9o1
 - Apple 4.7 PC clarification (2024-08-01): https://developer.apple.com/news/?id=ty0avr2s
 - App Review Guidelines: https://developer.apple.com/app-store/review/guidelines/
@@ -285,5 +283,7 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 - PPSSPP ConfigValues.h (CPUCore): https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h
 - PPSSPP IR issues tracker: https://github.com/hrydgard/ppsspp/issues/15670
 - mGBA: https://mgba.io/ · https://docs.libretro.com/library/mgba/
-- DolphiniOS / no App Store JIT (2024-04-19): https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/
+- mupen64plus-next: https://docs.libretro.com/library/mupen64plus/
+- melonDS: https://melonds.kuribo64.net/ · https://docs.libretro.com/library/melonds/
+- Dolphin / no App Store JIT (2024-04-19): https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/
 - Liquid Glass guide: https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views

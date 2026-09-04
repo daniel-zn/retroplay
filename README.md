@@ -5,7 +5,7 @@ Native iPhone SwiftUI emulator with a library-first UX: import games, tap to pla
 First systems:
 
 - Game Boy Advance (mGBA)
-- Nintendo 64 (mupen64plus)
+- Nintendo 64 (mupen64plus-next)
 - Nintendo DS (melonDS)
 - PSP (PPSSPP, IR interpreter / no JIT)
 

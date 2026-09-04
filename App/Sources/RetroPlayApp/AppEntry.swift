@@ -101,8 +101,11 @@ public struct RetroPlayRootView: View {
     }
 
     private func stubMessage(for game: LibraryGame) -> String {
-        let core = StubEmulatorCore(systemID: game.systemID)
-        return "\(game.displayName) is in your library, but \(core.coreName) is still a stub (StubEmulatorCore). Emulation lands in M1+ — nothing is playable yet."
+        let core = CoreFactory.makeCore(for: game.systemID)
+        if game.systemID == .gba {
+            return "\(game.displayName) is queued for M1 (mGBA). The native library is not linked yet — see App/Vendor/mGBA.md. Nothing is playable until that build lands."
+        }
+        return "\(game.displayName) is in your library, but \(core.coreName) is not playable yet (\(String(describing: type(of: core)))). Later milestones add this system."
     }
 
     private func handleImport(_ result: Result<[URL], Error>) {

@@ -31,3 +31,10 @@ App/
 **M1:** vendor/build **mGBA** behind `EmulatorCore` (still do not commit ROM dumps).
 
 See `../SPEC.md` for architecture and milestones.
+
+## M1 — mGBA
+
+- `Sources/RetroPlayCore/Cores/mGBA/MGBACore.swift` — GBA `EmulatorCore` host (native lib not linked yet)
+- `CoreFactory.makeCore(for:)` — returns `MGBACore` for `.gba`
+- Vendoring notes: `../Vendor/mGBA.md` (do not clone bulky trees into git until asked)
+
