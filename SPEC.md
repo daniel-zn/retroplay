@@ -267,7 +267,7 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 
 ## 11. Next build step
 
-**M0 UI wired.** **M1 scaffolding started:** `MGBACore` + `App/Vendor/mGBA.md`. Next on Mac/Xcode: build/link libmgba and replace the notImplemented path with real frames.
+**M0 UI wired.** **M1 docs + stubs:** `MGBACore`, `App/Vendor/mGBA.md`, `App/Vendor/build-mgba-ios.sh` (Mac-only). Next: run build on miniMac, link XCFramework, replace notImplemented with real frames.
 
 ---
 

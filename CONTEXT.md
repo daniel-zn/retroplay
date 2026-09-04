@@ -48,4 +48,4 @@ Native iPhone **SwiftUI** emulator with a **library-first** UX (import â†’ tap â
 
 ## Next build step
 
-M0 landed. M1 scaffolding: `MGBACore` + `App/Vendor/mGBA.md`. Next: link libmgba on Mac/Xcode for playable GBA.
+M0 landed. M1 scaffolding + exact Mac build docs: `App/Vendor/mGBA.md`, `App/Vendor/build-mgba-ios.sh`. Next: run the script on miniMac / Mac, link XCFramework, implement MGBACore frames.
