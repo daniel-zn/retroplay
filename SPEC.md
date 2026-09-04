@@ -225,12 +225,12 @@ Upstream tracks IR-specific instability separately from JIT ([issue #15670](http
 
 ## 9. Milestones M0–M3 (ordered GBA → N64 → NDS → PSP)
 
-### M0 — Skeleton (current / next)
+### M0 — Skeleton (**landed** in App/)
 
 - Swift package / Xcode-friendly tree under `App/`.
-- Library shell with Liquid Glass chrome; empty state; Settings with legal / “no ROMs included” copy.
-- `SystemID` + `SystemRegistry` + stub `ROMImporter` / classifier (extension map for four P0 systems).
-- Document picker import → library row (no emulation yet).
+- Library shell with Liquid Glass chrome (`#available(iOS 26, *)` + material fallback); empty state; Settings with Guideline 4.7 / “no ROMs included” copy.
+- `SystemID` + `SystemRegistry` + `ROMImporter` / classifier (extension map for four P0 systems).
+- `.fileImporter` → copy into `Documents/ROMs` → `LibraryStore` JSON (`Documents/library.json`); tap row → honest `StubEmulatorCore` alert (no fake play).
 - README pointing at SPEC.
 
 ### M1 — First playable: **GBA (mGBA)**
@@ -267,7 +267,7 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 
 ## 11. Next build step
 
-**Wire M0 UI:** Liquid Glass library shell + Settings legal copy + connect `ROMImporter` document picker to persistent library rows (still stub cores). Then start **M1 mGBA** integration when ready to vendor/build the core (without cloning bulky trees into git until asked).
+**M0 UI wired** (library `fileImporter`, `LibraryStore`, Liquid Glass chrome, Settings legal, stub tap alert). Next: start **M1 mGBA** integration when ready to vendor/build the core (without cloning bulky trees into git until asked).
 
 ---
 

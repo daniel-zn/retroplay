@@ -47,4 +47,4 @@ Native iPhone **SwiftUI** emulator with **Delta-simple UX**, **Liquid Glass** (i
 
 ## Next build step
 
-Wire M0: Liquid Glass library + Settings legal copy + `ROMImporter` file picker → library rows. Then **M1 = mGBA**.
+M0 library shell landed (`fileImporter`, `LibraryStore`, Liquid Glass, Settings, stub alert). Next: **M1 = mGBA**.
