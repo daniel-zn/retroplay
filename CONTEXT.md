@@ -48,4 +48,4 @@ Native iPhone **SwiftUI** emulator with a **library-first** UX (import → tap �
 
 ## Next build step
 
-M0 landed. M1 scaffolding + exact Mac build docs: `App/Vendor/mGBA.md`, `App/Vendor/build-mgba-ios.sh`. Next: run the script on miniMac / Mac, link XCFramework, implement MGBACore frames.
+M0 landed. M1 scaffolding + exact Mac build docs: `App/Vendor/mGBA.md`, `App/Vendor/build-mgba-ios.sh`. miniMac blocked on local-execution connect. Non-binary M1 continues (play shell, run loop, frame/save helpers, tests). When Mac is connected: run build-mgba-ios.sh → link XCFramework → fill MGBACore native calls.

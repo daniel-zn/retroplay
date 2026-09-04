@@ -46,3 +46,11 @@ See `../SPEC.md` for architecture and milestones.
 - `PlayView.swift` — play shell + on-screen GBA pad
 - `Vendor/Bridging/` — bridging header template for when XCFramework arrives
 - Define `RETROPLAY_HAS_MGBA` on the app target after linking `mGBA.xcframework`
+
+
+## More M1 host pieces (no XCFramework required)
+
+- `Play/CoreRunLoop.swift` — 60 Hz GCD tick host for future `runFrame`
+- `Play/FrameBitmap.swift` — RGBA frame → `CGImage`
+- `Play/SavePaths.swift` — Documents/Saves + States layout
+- `Tests/RetroPlayCoreTests` — SystemID / GBAInput / SavePaths

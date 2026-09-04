@@ -1,5 +1,4 @@
 import Foundation
-import CoreGraphics
 
 /// One rendered video frame from a core (RGBA8888 or RGB565 expanded by the host).
 public struct EmulatorVideoFrame: Sendable {
@@ -43,4 +42,10 @@ public extension EmulatorCore {
     /// Optional hook; default no-op so stubs stay simple.
     func setGBAInput(_ input: GBAInput) {}
     func attachFrameSink(_ sink: EmulatorFrameSink?) {}
+}
+
+
+public extension GBAInput {
+    static let dpad: GBAInput = [.up, .down, .left, .right]
+    static let face: GBAInput = [.a, .b, .start, .select, .l, .r]
 }

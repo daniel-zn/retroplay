@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "RetroPlay",
     platforms: [
-        .iOS(.v18) // Raise to iOS 26 when Xcode SDK available; Liquid Glass requires 26 at runtime
+        .iOS(.v18)
     ],
     products: [
         .library(name: "RetroPlayCore", targets: ["RetroPlayCore"]),
@@ -18,6 +18,11 @@ let package = Package(
             name: "RetroPlayApp",
             dependencies: ["RetroPlayCore"],
             path: "Sources/RetroPlayApp"
+        ),
+        .testTarget(
+            name: "RetroPlayCoreTests",
+            dependencies: ["RetroPlayCore"],
+            path: "Tests/RetroPlayCoreTests"
         ),
     ]
 )
