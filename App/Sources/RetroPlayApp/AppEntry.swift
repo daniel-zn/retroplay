@@ -9,7 +9,7 @@ public struct RetroPlayRootView: View {
     @StateObject private var store = LibraryStore()
     @State private var showImporter = false
     @State private var showSettings = false
-    @State private var selectedGame: LibraryGame?
+    @State private var playGame: LibraryGame?
     @State private var importErrorMessage: String?
     @State private var showImportError = false
 
@@ -27,7 +27,7 @@ public struct RetroPlayRootView: View {
                 } else {
                     List(store.games) { game in
                         Button {
-                            selectedGame = game
+                            playGame = game
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(game.displayName)
@@ -78,19 +78,8 @@ public struct RetroPlayRootView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
-            .alert(
-                "Core not ready",
-                isPresented: Binding(
-                    get: { selectedGame != nil },
-                    set: { if !$0 { selectedGame = nil } }
-                ),
-                presenting: selectedGame
-            ) { _ in
-                Button("OK", role: .cancel) {
-                    selectedGame = nil
-                }
-            } message: { game in
-                Text(stubMessage(for: game))
+            .navigationDestination(item: $playGame) { game in
+                PlayView(game: game, romURL: store.absoluteURL(for: game))
             }
             .alert("Import failed", isPresented: $showImportError) {
                 Button("OK", role: .cancel) {}
@@ -100,13 +89,6 @@ public struct RetroPlayRootView: View {
         }
     }
 
-    private func stubMessage(for game: LibraryGame) -> String {
-        let core = CoreFactory.makeCore(for: game.systemID)
-        if game.systemID == .gba {
-            return "\(game.displayName) is queued for M1 (mGBA). The native library is not linked yet — see App/Vendor/mGBA.md. Nothing is playable until that build lands."
-        }
-        return "\(game.displayName) is in your library, but \(core.coreName) is not playable yet (\(String(describing: type(of: core)))). Later milestones add this system."
-    }
 
     private func handleImport(_ result: Result<[URL], Error>) {
         switch result {

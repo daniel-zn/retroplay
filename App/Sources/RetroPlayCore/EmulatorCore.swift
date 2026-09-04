@@ -17,10 +17,18 @@ public protocol EmulatorCore: AnyObject, Sendable {
     func loadState(from url: URL) async throws
 }
 
-public enum EmulatorCoreError: Error, Sendable {
+public enum EmulatorCoreError: Error, Sendable, LocalizedError {
     case notImplemented(String)
     case unsupportedSystem(SystemID)
     case romLoadFailed(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .notImplemented(let message): return message
+        case .unsupportedSystem(let system): return "Unsupported system: \(system.displayName)"
+        case .romLoadFailed(let message): return message
+        }
+    }
 }
 
 /// Registry of default core names per system. Actual plugin loading comes in M1+.

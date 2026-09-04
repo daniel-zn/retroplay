@@ -1,7 +1,7 @@
 import Foundation
 
 /// User-imported library entry. Paths are always inside the app sandbox after import.
-public struct LibraryGame: Identifiable, Codable, Sendable, Equatable {
+public struct LibraryGame: Identifiable, Codable, Sendable, Equatable, Hashable {
     public let id: UUID
     public var displayName: String
     public var systemID: SystemID

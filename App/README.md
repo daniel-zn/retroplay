@@ -38,3 +38,11 @@ See `../SPEC.md` for architecture and milestones.
 - `CoreFactory.makeCore(for:)` — returns `MGBACore` for `.gba`
 - Vendoring notes: `../Vendor/mGBA.md` (do not clone bulky trees into git until asked)
 
+
+
+## M1 wiring (no binary required yet)
+
+- `Play/EmulatorSession.swift` — video frame + `GBAInput`
+- `PlayView.swift` — play shell + on-screen GBA pad
+- `Vendor/Bridging/` — bridging header template for when XCFramework arrives
+- Define `RETROPLAY_HAS_MGBA` on the app target after linking `mGBA.xcframework`
