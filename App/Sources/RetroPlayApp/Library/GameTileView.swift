@@ -53,9 +53,11 @@ struct GameTileView: View {
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading)
             Text(game.systemID.defaultCoreName)
                 .font(.caption2)
                 .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
+                .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(game.displayName), \(game.systemID.displayName)")

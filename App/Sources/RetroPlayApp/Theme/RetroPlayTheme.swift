@@ -4,7 +4,7 @@ import SwiftUI
 /// Adaptive chrome: true black sections in dark; light system backgrounds in light.
 @available(iOS 18.0, *)
 enum RetroPlayTheme {
-    static let accent = Color.cyan.opacity(0.85)
+    static let accent = Color(red: 0.48, green: 0.56, blue: 0.28)
 
     static func canvas(for scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.black : Color(uiColor: .systemGroupedBackground)
