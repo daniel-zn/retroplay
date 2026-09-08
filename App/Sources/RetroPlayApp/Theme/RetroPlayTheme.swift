@@ -1,3 +1,4 @@
+import RetroPlayCore
 import SwiftUI
 
 /// Dark-first chrome: true black sections, near-black cards.
