@@ -16,6 +16,9 @@ public final class MGBACore: EmulatorCore, CoreRunLoopDriving, @unchecked Sendab
     private var currentInput: GBAInput = []
     private var native: MGBANativeDriving?
     private let runLoop = CoreRunLoop(label: "RetroPlay.MGBACore")
+    private var fastForward = false
+    public var supportsSaveState: Bool { true }
+    public var supportsFastForward: Bool { true }
 
     public init() {}
 
@@ -26,6 +29,10 @@ public final class MGBACore: EmulatorCore, CoreRunLoopDriving, @unchecked Sendab
     public func setGBAInput(_ input: GBAInput) {
         currentInput = input
         native?.setKeys(UInt32(input.rawValue))
+    }
+
+    public func setFastForward(_ enabled: Bool) {
+        fastForward = enabled
     }
 
     public func loadROM(at url: URL) async throws {
@@ -99,7 +106,11 @@ public final class MGBACore: EmulatorCore, CoreRunLoopDriving, @unchecked Sendab
     public func runLoopDidTick(_ loop: CoreRunLoop) {
         guard isRunning, !isPaused, let native else { return }
         native.setKeys(UInt32(currentInput.rawValue))
-        native.runFrame()
+        // Turbo: run several emulated frames per host tick, present the last.
+        let steps = fastForward ? 3 : 1
+        for _ in 0..<steps {
+            native.runFrame()
+        }
         if let frame = native.copyRGBAFrame() {
             frameSink?.coreDidProduceVideoFrame(frame)
         }

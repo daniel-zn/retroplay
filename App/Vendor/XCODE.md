@@ -27,3 +27,10 @@ That installs XcodeGen if needed, writes `RetroPlay.xcodeproj`, and opens it. Se
 ## If the simulator build fails
 
 Paste the compiler error to the RetroPlay product bot (via Engineer). Do not ask Daniel for intermediate steps — fix on `main`, then `git pull` and rebuild.
+
+## Save states + fast-forward (Play)
+
+- Quick Save / Quick Load write `Documents/Saves/<system>/<gameUUID>/quick.state` (sandbox only; never git).
+- mGBA: `mCoreSaveStateNamed` / `mCoreLoadStateNamed` via `VFileOpen`.
+- PPSSPP: synchronous `SaveState::SaveToRam` / `LoadFromRam` through `RetroPlayPPSSPPBridge`.
+- Fast-forward runs 3 emulated frames per host tick when toggled (GBA + PSP). N64/NDS stay stubs with honest UI.

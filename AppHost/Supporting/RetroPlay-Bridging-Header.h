@@ -10,7 +10,9 @@
 #import <mgba/core/core.h>
 #import <mgba/core/interface.h>
 #import <mgba/core/config.h>
+#import <mgba/core/serialize.h>
 #import <mgba-util/common.h>
 #import <mgba-util/image.h>
+#import <mgba-util/vfs.h>
 
 #import "RetroPlayPPSSPPBridge.h"

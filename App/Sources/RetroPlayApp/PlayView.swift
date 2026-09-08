@@ -20,6 +20,8 @@ public struct PlayView: View {
     @State private var frameImage: CGImage?
     @State private var frameSink = FrameSinkStore()
     @State private var sawFirstFrame = false
+    @State private var fastForward = false
+    @State private var saveBusy = false
 
     public init(game: LibraryGame, romURL: URL) {
         self.game = game
@@ -57,7 +59,7 @@ public struct PlayView: View {
             core?.stop()
             core = nil
         }
-        .alert("Could not play", isPresented: $showError) {
+        .alert("Play", isPresented: $showError) {
             Button("OK", role: .cancel) { dismiss() }
         } message: {
             Text(errorMessage ?? "Unknown error")
@@ -180,19 +182,100 @@ public struct PlayView: View {
     }
 
     private var transportBar: some View {
-        HStack(spacing: 12) {
-            Button("Pause") { core?.pause(); statusLine = "Paused" }
-            Button("Resume") {
-                core?.resume()
-                if sawFirstFrame { statusLine = "Running" }
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Button("Pause") { core?.pause(); statusLine = "Paused" }
+                Button("Resume") {
+                    core?.resume()
+                    if sawFirstFrame { statusLine = "Running" }
+                }
+                Button("Stop") {
+                    core?.stop()
+                    dismiss()
+                }
             }
-            Button("Stop") {
-                core?.stop()
-                dismiss()
+
+            HStack(spacing: 10) {
+                Button("Quick Save") {
+                    Task { await quickSave() }
+                }
+                .disabled(saveBusy || !(core?.supportsSaveState ?? false))
+
+                Button("Quick Load") {
+                    Task { await quickLoad() }
+                }
+                .disabled(
+                    saveBusy
+                        || !(core?.supportsSaveState ?? false)
+                        || !SaveStateStore.quickSaveExists(system: game.systemID, gameID: game.id)
+                )
+
+                if core?.supportsFastForward == true {
+                    Button(fastForward ? "FF On" : "FF Off") {
+                        fastForward.toggle()
+                        core?.setFastForward(fastForward)
+                        statusLine = fastForward ? "Fast-forward ×3" : "Running"
+                    }
+                    .tint(fastForward ? .orange : nil)
+                }
+            }
+
+            if core?.supportsSaveState != true {
+                Text("Save states not available for this core yet.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
+    }
+
+    @MainActor
+    private func quickSave() async {
+        guard let core, core.supportsSaveState else {
+            statusLine = "Save states not available"
+            return
+        }
+        saveBusy = true
+        defer { saveBusy = false }
+        core.pause()
+        do {
+            let url = try SaveStateStore.quickSaveURL(system: game.systemID, gameID: game.id)
+            try await core.saveState(to: url)
+            core.resume()
+            statusLine = fastForward ? "Fast-forward ×3" : "Quick save OK"
+        } catch {
+            statusLine = "Quick save failed"
+            errorMessage = error.localizedDescription
+            showError = true
+            core.resume()
+        }
+    }
+
+    @MainActor
+    private func quickLoad() async {
+        guard let core, core.supportsSaveState else {
+            statusLine = "Save states not available"
+            return
+        }
+        saveBusy = true
+        defer { saveBusy = false }
+        core.pause()
+        do {
+            let url = try SaveStateStore.quickSaveURL(system: game.systemID, gameID: game.id)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                throw EmulatorCoreError.romLoadFailed("No quick save yet")
+            }
+            try await core.loadState(from: url)
+            core.resume()
+            statusLine = fastForward ? "Fast-forward ×3" : "Quick load OK"
+        } catch {
+            statusLine = "Quick load failed"
+            errorMessage = error.localizedDescription
+            showError = true
+            core.resume()
+        }
     }
 
     @MainActor

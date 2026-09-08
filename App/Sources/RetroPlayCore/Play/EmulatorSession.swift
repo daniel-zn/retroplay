@@ -44,6 +44,9 @@ public extension EmulatorCore {
     func setGBAInput(_ input: GBAInput) {}
     func setPSPInput(_ input: PSPInput) {}
     func attachFrameSink(_ sink: EmulatorFrameSink?) {}
+    var supportsSaveState: Bool { false }
+    var supportsFastForward: Bool { false }
+    func setFastForward(_ enabled: Bool) { _ = enabled }
 }
 
 

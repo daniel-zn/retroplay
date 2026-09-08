@@ -18,6 +18,9 @@
 #include "Core/Screenshot.h"
 #include "Core/System.h"
 #include "Core/HLE/sceCtrl.h"
+#include "Core/SaveState.h"
+#include <fstream>
+#include <vector>
 #include "GPU/Common/GPUDebugInterface.h"
 #include "GPU/GPUCommon.h"
 #include "GPU/GPUState.h"
@@ -218,6 +221,68 @@ bool rp_ppsspp_copy_rgba(void *bridgePtr, uint8_t **outBytes, int *outWidth, int
     return copyFromGStateVRAM(outBytes, outWidth, outHeight, outStrideBytes);
 }
 
+
+bool rp_ppsspp_save_state(void *bridgePtr, const char *path, char *errorOut, size_t errorOutLen) {
+    auto *bridge = asBridge(bridgePtr);
+    if (!bridge || !bridge->inited || !path) {
+        setError(errorOut, errorOutLen, "null bridge/path or not inited");
+        return false;
+    }
+    std::vector<u8> data;
+    auto err = SaveState::SaveToRam(data);
+    if (err != CChunkFileReader::ERROR_NONE || data.empty()) {
+        setError(errorOut, errorOutLen, "SaveState::SaveToRam failed");
+        return false;
+    }
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+        setError(errorOut, errorOutLen, "could not open save path");
+        return false;
+    }
+    out.write(reinterpret_cast<const char *>(data.data()), (std::streamsize)data.size());
+    if (!out.good()) {
+        setError(errorOut, errorOutLen, "write failed");
+        return false;
+    }
+    return true;
+}
+
+bool rp_ppsspp_load_state(void *bridgePtr, const char *path, char *errorOut, size_t errorOutLen) {
+    auto *bridge = asBridge(bridgePtr);
+    if (!bridge || !bridge->inited || !path) {
+        setError(errorOut, errorOutLen, "null bridge/path or not inited");
+        return false;
+    }
+    std::ifstream in(path, std::ios::binary | std::ios::ate);
+    if (!in) {
+        setError(errorOut, errorOutLen, "save state file missing");
+        return false;
+    }
+    const auto sz = in.tellg();
+    if (sz <= 0) {
+        setError(errorOut, errorOutLen, "empty save state");
+        return false;
+    }
+    std::vector<u8> data((size_t)sz);
+    in.seekg(0, std::ios::beg);
+    in.read(reinterpret_cast<char *>(data.data()), sz);
+    if (!in) {
+        setError(errorOut, errorOutLen, "read failed");
+        return false;
+    }
+    std::string errStr;
+    auto err = SaveState::LoadFromRam(data, &errStr);
+    if (err != CChunkFileReader::ERROR_NONE) {
+        setError(errorOut, errorOutLen, errStr.empty() ? "LoadFromRam failed" : errStr);
+        return false;
+    }
+    // Ensure CPU keeps running after load.
+    if (coreState == CORE_NEXTFRAME || coreState == CORE_POWERDOWN) {
+        coreState = CORE_RUNNING_CPU;
+    }
+    return true;
+}
+
 void rp_ppsspp_pause(void *bridgePtr) {
     if (auto *bridge = asBridge(bridgePtr)) bridge->paused = true;
 }
@@ -242,6 +307,14 @@ bool rp_ppsspp_load(void *, const char *, char *errorOut, size_t errorOutLen) {
 void rp_ppsspp_set_buttons(void *, uint32_t) {}
 void rp_ppsspp_run_frame(void *) {}
 bool rp_ppsspp_copy_rgba(void *, uint8_t **, int *, int *, int *) { return false; }
+bool rp_ppsspp_save_state(void *, const char *, char *errorOut, size_t errorOutLen) {
+    if (errorOut && errorOutLen) std::snprintf(errorOut, errorOutLen, "RETROPLAY_HAS_PPSSPP not set");
+    return false;
+}
+bool rp_ppsspp_load_state(void *, const char *, char *errorOut, size_t errorOutLen) {
+    if (errorOut && errorOutLen) std::snprintf(errorOut, errorOutLen, "RETROPLAY_HAS_PPSSPP not set");
+    return false;
+}
 void rp_ppsspp_pause(void *) {}
 void rp_ppsspp_resume(void *) {}
 

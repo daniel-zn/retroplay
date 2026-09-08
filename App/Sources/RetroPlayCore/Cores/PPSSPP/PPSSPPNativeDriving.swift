@@ -9,6 +9,8 @@ public protocol PPSSPPNativeDriving: AnyObject {
     func resumeAudioVideo()
     func tearDown()
     func copyRGBAFrame() -> EmulatorVideoFrame?
+    func saveState(to url: URL) throws
+    func loadState(from url: URL) throws
 }
 
 public enum PPSSPPNativeRegistry {

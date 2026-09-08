@@ -20,6 +20,13 @@ public protocol EmulatorCore: AnyObject, Sendable {
     func setGBAInput(_ input: GBAInput)
     func setPSPInput(_ input: PSPInput)
     func attachFrameSink(_ sink: EmulatorFrameSink?)
+
+    /// When true, Play may show Quick Save / Quick Load.
+    var supportsSaveState: Bool { get }
+
+    /// When true, Play may show a Fast-forward control.
+    var supportsFastForward: Bool { get }
+    func setFastForward(_ enabled: Bool)
 }
 
 public enum EmulatorCoreError: Error, Sendable, LocalizedError {
@@ -69,10 +76,14 @@ public final class StubEmulatorCore: EmulatorCore, @unchecked Sendable {
     public func stop() {}
 
     public func saveState(to url: URL) async throws {
-        throw EmulatorCoreError.notImplemented("saveState")
+        throw EmulatorCoreError.notImplemented(
+            "\(coreName) does not support save states yet"
+        )
     }
 
     public func loadState(from url: URL) async throws {
-        throw EmulatorCoreError.notImplemented("loadState")
+        throw EmulatorCoreError.notImplemented(
+            "\(coreName) does not support save states yet"
+        )
     }
 }

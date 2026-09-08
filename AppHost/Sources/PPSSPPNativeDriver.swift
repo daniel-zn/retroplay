@@ -66,6 +66,34 @@ public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
         return EmulatorVideoFrame(width: Int(w), height: Int(h), bytes: data, bytesPerRow: Int(stride))
     }
 
+    public func saveState(to url: URL) throws {
+        guard let bridge else { throw EmulatorCoreError.notImplemented("no bridge") }
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        var err = [CChar](repeating: 0, count: 1024)
+        let ok = url.path.withCString { pathPtr in
+            rp_ppsspp_save_state(UnsafeMutableRawPointer(bridge), pathPtr, &err, err.count)
+        }
+        if !ok {
+            let message = String(cString: err)
+            throw EmulatorCoreError.romLoadFailed(message.isEmpty ? "PPSSPP save state failed" : message)
+        }
+    }
+
+    public func loadState(from url: URL) throws {
+        guard let bridge else { throw EmulatorCoreError.notImplemented("no bridge") }
+        var err = [CChar](repeating: 0, count: 1024)
+        let ok = url.path.withCString { pathPtr in
+            rp_ppsspp_load_state(UnsafeMutableRawPointer(bridge), pathPtr, &err, err.count)
+        }
+        if !ok {
+            let message = String(cString: err)
+            throw EmulatorCoreError.romLoadFailed(message.isEmpty ? "PPSSPP load state failed" : message)
+        }
+    }
+
     public func tearDown() {
         if let bridge {
             rp_ppsspp_destroy(UnsafeMutableRawPointer(bridge))
@@ -90,6 +118,12 @@ public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
     public func pauseAudioVideo() {}
     public func resumeAudioVideo() {}
     public func copyRGBAFrame() -> EmulatorVideoFrame? { nil }
+    public func saveState(to url: URL) throws {
+        throw EmulatorCoreError.notImplemented("needs RETROPLAY_HAS_PPSSPP")
+    }
+    public func loadState(from url: URL) throws {
+        throw EmulatorCoreError.notImplemented("needs RETROPLAY_HAS_PPSSPP")
+    }
     public func tearDown() {}
 }
 

@@ -88,17 +88,34 @@ public final class MGBANativeDriver: MGBANativeDriving {
 
     public func saveState(to url: URL) throws {
         guard let core else { throw EmulatorCoreError.notImplemented("no core") }
-        _ = url
-        if !mCoreSaveState(core, 1, 0) {
-            throw EmulatorCoreError.romLoadFailed("mCoreSaveState(slot 1) failed")
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        // SAVESTATE_ALL == 31 (screenshot|savedata|cheats|rtc|metadata)
+        let flags: Int32 = 31
+        let path = url.path
+        guard let vf = VFileOpen(path, O_CREAT | O_TRUNC | O_RDWR) else {
+            throw EmulatorCoreError.romLoadFailed("VFileOpen failed for save state")
+        }
+        defer { _ = vf.pointee.close(vf) }
+        if !mCoreSaveStateNamed(core, vf, flags) {
+            throw EmulatorCoreError.romLoadFailed("mCoreSaveStateNamed failed")
         }
     }
 
     public func loadState(from url: URL) throws {
         guard let core else { throw EmulatorCoreError.notImplemented("no core") }
-        _ = url
-        if !mCoreLoadState(core, 1, 0) {
-            throw EmulatorCoreError.romLoadFailed("mCoreLoadState(slot 1) failed")
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw EmulatorCoreError.romLoadFailed("No save state at \(url.lastPathComponent)")
+        }
+        let flags: Int32 = 31
+        guard let vf = VFileOpen(url.path, O_RDONLY) else {
+            throw EmulatorCoreError.romLoadFailed("VFileOpen failed for load state")
+        }
+        defer { _ = vf.pointee.close(vf) }
+        if !mCoreLoadStateNamed(core, vf, flags) {
+            throw EmulatorCoreError.romLoadFailed("mCoreLoadStateNamed failed")
         }
     }
 

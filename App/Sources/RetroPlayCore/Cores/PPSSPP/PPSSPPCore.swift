@@ -12,6 +12,9 @@ public final class PPSSPPCore: EmulatorCore, CoreRunLoopDriving, @unchecked Send
     private weak var frameSink: EmulatorFrameSink?
     private var native: PPSSPPNativeDriving?
     private let runLoop = CoreRunLoop(label: "RetroPlay.PPSSPPCore")
+    private var fastForward = false
+    public var supportsSaveState: Bool { true }
+    public var supportsFastForward: Bool { true }
 
     public init() {}
 
@@ -25,6 +28,10 @@ public final class PPSSPPCore: EmulatorCore, CoreRunLoopDriving, @unchecked Send
 
     public func setPSPInput(_ input: PSPInput) {
         native?.setKeys(input.rawValue)
+    }
+
+    public func setFastForward(_ enabled: Bool) {
+        fastForward = enabled
     }
 
     public func loadROM(at url: URL) async throws {
@@ -85,16 +92,25 @@ public final class PPSSPPCore: EmulatorCore, CoreRunLoopDriving, @unchecked Send
     }
 
     public func saveState(to url: URL) async throws {
-        throw EmulatorCoreError.notImplemented("PPSSPP saveState — pending native bridge")
+        guard let native else {
+            throw EmulatorCoreError.notImplemented("PPSSPP saveState — no native driver")
+        }
+        try native.saveState(to: url)
     }
 
     public func loadState(from url: URL) async throws {
-        throw EmulatorCoreError.notImplemented("PPSSPP loadState — pending native bridge")
+        guard let native else {
+            throw EmulatorCoreError.notImplemented("PPSSPP loadState — no native driver")
+        }
+        try native.loadState(from: url)
     }
 
     public func runLoopDidTick(_ loop: CoreRunLoop) {
         guard isRunning, !isPaused, let native else { return }
-        native.runFrame()
+        let steps = fastForward ? 3 : 1
+        for _ in 0..<steps {
+            native.runFrame()
+        }
         if let frame = native.copyRGBAFrame() {
             frameSink?.coreDidProduceVideoFrame(frame)
         }
