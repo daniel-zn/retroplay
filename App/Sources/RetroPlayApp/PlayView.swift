@@ -1,7 +1,7 @@
 import SwiftUI
 import RetroPlayCore
 
-/// Play shell for a library game. GBA uses MGBACore; other systems stay stubs until later milestones.
+/// Play shell for a library game. GBA and PSP use native cores; other systems stay stubs.
 @available(iOS 18.0, *)
 public struct PlayView: View {
     let game: LibraryGame
@@ -15,7 +15,8 @@ public struct PlayView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var statusLine = "Starting…"
-    @State private var held: GBAInput = []
+    @State private var gbaHeld: GBAInput = []
+    @State private var pspHeld: PSPInput = []
     @State private var frameImage: CGImage?
     @State private var frameSink = FrameSinkStore()
     @State private var sawFirstFrame = false
@@ -29,6 +30,11 @@ public struct PlayView: View {
         verticalSizeClass == .compact
     }
 
+    /// GBA ~3:2; PSP native 480×272 ≈ 16:9.
+    private var screenAspect: CGFloat {
+        game.systemID == .psp ? (480.0 / 272.0) : (3.0 / 2.0)
+    }
+
     public var body: some View {
         Group {
             if isLandscapeCompactHeight {
@@ -40,7 +46,7 @@ public struct PlayView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(RetroPlayTheme.canvas(for: colorScheme).ignoresSafeArea())
         .preferredColorScheme((AppearancePreference(rawValue: appearanceRaw) ?? .dark).colorScheme)
-                .navigationTitle(game.displayName)
+        .navigationTitle(game.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -57,7 +63,7 @@ public struct PlayView: View {
         }
     }
 
-    // MARK: - Portrait (Game Boy–style: screen above, pad below)
+    // MARK: - Portrait
 
     private var portraitBody: some View {
         VStack(spacing: 12) {
@@ -66,15 +72,17 @@ public struct PlayView: View {
                 .foregroundStyle(.secondary)
 
             gameScreen
-                .aspectRatio(3 / 2, contentMode: .fit)
-                .frame(maxHeight: 320)
+                .aspectRatio(screenAspect, contentMode: .fit)
+                .frame(maxHeight: game.systemID == .psp ? 280 : 320)
 
-            if game.systemID == .gba {
+            if game.systemID == .gba || game.systemID == .psp {
                 ConsolePadHost(
-                    systemID: .gba,
+                    systemID: game.systemID,
                     orientation: .portrait,
-                    held: held,
-                    setHeld: setHeld
+                    gbaHeld: gbaHeld,
+                    setGBAHeld: setGBAHeld,
+                    pspHeld: pspHeld,
+                    setPSPHeld: setPSPHeld
                 )
             }
 
@@ -84,27 +92,33 @@ public struct PlayView: View {
         .padding(.bottom, 8)
     }
 
-    // MARK: - Landscape (GBA slab–style: D-pad left, face right)
+    // MARK: - Landscape
 
     private var landscapeBody: some View {
         VStack(spacing: 6) {
             HStack(alignment: .center, spacing: 8) {
                 if game.systemID == .gba {
-                    GBAPadLeftColumn(held: held, setHeld: setHeld)
+                    GBAPadLeftColumn(held: gbaHeld, setHeld: setGBAHeld)
+                } else if game.systemID == .psp {
+                    PSPPadLeftColumn(held: pspHeld, setHeld: setPSPHeld)
                 }
 
                 gameScreen
-                    .aspectRatio(3 / 2, contentMode: .fit)
+                    .aspectRatio(screenAspect, contentMode: .fit)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 if game.systemID == .gba {
-                    GBAPadRightColumn(held: held, setHeld: setHeld)
+                    GBAPadRightColumn(held: gbaHeld, setHeld: setGBAHeld)
+                } else if game.systemID == .psp {
+                    PSPPadRightColumn(held: pspHeld, setHeld: setPSPHeld)
                 }
             }
             .padding(.horizontal, 8)
 
             if game.systemID == .gba {
-                GBAPadStartSelectRow(held: held, setHeld: setHeld)
+                GBAPadStartSelectRow(held: gbaHeld, setHeld: setGBAHeld)
+            } else if game.systemID == .psp {
+                PSPPadStartSelectRow(held: pspHeld, setHeld: setPSPHeld)
             }
 
             transportBar
@@ -135,7 +149,10 @@ public struct PlayView: View {
     private var transportBar: some View {
         HStack(spacing: 12) {
             Button("Pause") { core?.pause(); statusLine = "Paused" }
-            Button("Resume") { core?.resume(); statusLine = "Running" }
+            Button("Resume") {
+                core?.resume()
+                if sawFirstFrame { statusLine = "Running" }
+            }
             Button("Stop") {
                 core?.stop()
                 dismiss()
@@ -146,10 +163,15 @@ public struct PlayView: View {
     }
 
     @MainActor
-    private func setHeld(_ bit: GBAInput, _ down: Bool) {
-        if down { held.insert(bit) } else { held.remove(bit) }
-        // Must hit MGBACore via protocol requirement (not extension-only) for dynamic dispatch.
-        core?.setGBAInput(held)
+    private func setGBAHeld(_ bit: GBAInput, _ down: Bool) {
+        if down { gbaHeld.insert(bit) } else { gbaHeld.remove(bit) }
+        core?.setGBAInput(gbaHeld)
+    }
+
+    @MainActor
+    private func setPSPHeld(_ bit: PSPInput, _ down: Bool) {
+        if down { pspHeld.insert(bit) } else { pspHeld.remove(bit) }
+        core?.setPSPInput(pspHeld)
     }
 
     private func boot() async {
@@ -160,17 +182,12 @@ public struct PlayView: View {
             sawFirstFrame = true
             statusLine = "Running"
         }
-        if let mgba = instance as? MGBACore {
-            mgba.attachFrameSink(frameSink)
-        } else if let psp = instance as? PPSSPPCore {
-            psp.attachFrameSink(frameSink)
-        }
+        instance.attachFrameSink(frameSink)
         core = instance
         do {
             try await instance.loadROM(at: romURL)
             instance.start()
             statusLine = "Waiting for first frame…"
-            // Honest timeout: "Running" without pixels is a stuck state, not success.
             let system = game.systemID
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
@@ -178,7 +195,10 @@ public struct PlayView: View {
                 let message: String
                 if system == .psp {
                     message = """
-                    PPSSPP produced no video frames after 10 seconds.                     The ISO may have loaded, but the display buffer never became readable                     (common on Simulator if MemMap/graphics init is incomplete).                     Try a physical device, or check the console for MemMap / GetOutputFramebuffer errors.
+                    PPSSPP produced no video frames after 10 seconds. \
+                    The ISO may have loaded, but the display buffer never became readable \
+                    (common on Simulator if MemMap/graphics init is incomplete). \
+                    Try a physical device, or check the console for MemMap / GetOutputFramebuffer errors.
                     """
                 } else {
                     message = "No video frames after 10 seconds. The core may be stuck or not emitting frames."

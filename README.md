@@ -15,7 +15,7 @@ Agent planning notes live in [grok-things `Projects/retroplay/`](https://github.
 
 See `SPEC.md` for product and engineering detail. Swift M0 scaffold: `App/` (no core binaries yet).
 
-On-screen GBA control layouts: [`docs/CONTROLS-GBA.md`](docs/CONTROLS-GBA.md).
+On-screen controls: [`docs/CONTROLS-GBA.md`](docs/CONTROLS-GBA.md) (GBA), [`docs/CONTROLS-PSP.md`](docs/CONTROLS-PSP.md) (PSP).
 
 PSP / PPSSPP (IR) scaffold: [`App/Vendor/PPSSPP.md`](App/Vendor/PPSSPP.md).
 

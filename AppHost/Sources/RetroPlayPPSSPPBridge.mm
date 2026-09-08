@@ -17,6 +17,7 @@
 #include "Core/MemMap.h"
 #include "Core/Screenshot.h"
 #include "Core/System.h"
+#include "Core/HLE/sceCtrl.h"
 #include "GPU/Common/GPUDebugInterface.h"
 #include "GPU/GPUCommon.h"
 #include "GPU/GPUState.h"
@@ -172,9 +173,17 @@ bool rp_ppsspp_load(void *bridgePtr, const char *gamePath, char *errorOut, size_
 
 void rp_ppsspp_set_buttons(void *bridgePtr, uint32_t ctrlBits) {
     auto *bridge = asBridge(bridgePtr);
-    if (!bridge) return;
+    if (!bridge || !bridge->inited) {
+        if (bridge) bridge->buttons = ctrlBits;
+        return;
+    }
+    const uint32_t prev = bridge->buttons;
+    const uint32_t bitsToSet = ctrlBits & ~prev;
+    const uint32_t bitsToClear = prev & ~ctrlBits;
     bridge->buttons = ctrlBits;
-    (void)ctrlBits;
+    if (bitsToSet || bitsToClear) {
+        __CtrlUpdateButtons(bitsToSet, bitsToClear);
+    }
 }
 
 void rp_ppsspp_run_frame(void *bridgePtr) {

@@ -20,8 +20,11 @@ public final class PPSSPPCore: EmulatorCore, CoreRunLoopDriving, @unchecked Send
     }
 
     public func setGBAInput(_ input: GBAInput) {
-        // PSP uses its own pad later; ignore GBA bits for now.
         _ = input
+    }
+
+    public func setPSPInput(_ input: PSPInput) {
+        native?.setKeys(input.rawValue)
     }
 
     public func loadROM(at url: URL) async throws {

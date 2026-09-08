@@ -18,6 +18,7 @@ public protocol EmulatorCore: AnyObject, Sendable {
 
     /// Optional; default no-op. Declared on the protocol so `any EmulatorCore` uses dynamic dispatch.
     func setGBAInput(_ input: GBAInput)
+    func setPSPInput(_ input: PSPInput)
     func attachFrameSink(_ sink: EmulatorFrameSink?)
 }
 
