@@ -190,6 +190,13 @@ Apple DTS note: no back-deployed equivalent before iOS 26 ([forums thread](https
 | Game artwork grid | Content stays opaque; glass only on chrome (performance) |
 | Fallback | v1 min = **iOS 26** so Liquid Glass is first-class |
 
+### On-screen controls (GBA family)
+
+Layout principles and portrait/landscape rules: [`docs/CONTROLS-GBA.md`](docs/CONTROLS-GBA.md).
+
+Play uses `ConsolePadHost` (per-`SystemID`) with `GBAFamilyPadView` for GBA — portrait Game Boy–style under the screen, landscape GBA slab–style (D-pad left, face right, L/R toward top, Start/Select bottom center). N64/NDS/PSP pads are stubbed until later. Layout/hit targets first; colors/skins later.
+
+
 ---
 
 ## 7. PPSSPP IR defaults + heavy-title edge cases
@@ -236,7 +243,7 @@ Upstream tracks IR-specific instability separately from JIT ([issue #15670](http
 ### M1 — First playable: **GBA (mGBA)**
 
 - Bridge + **mGBA** end-to-end.
-- Touch skin + MFi basics; save SRAM; pause overlay.
+- Orientation-aware GBA on-screen pad (see `docs/CONTROLS-GBA.md`); MFi later; save SRAM; pause overlay.
 - Auto-detect `.gba` / related; reject unknown with clear UI.
 
 ### M2 — **N64 (mupen64plus-next)** + **NDS (melonDS)**
@@ -267,7 +274,7 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 
 ## 11. Next build step
 
-**M0 + non-binary M1 ready for home Mac.** Docs: `App/Vendor/mGBA.md` (checklist), `build-mgba-ios.sh`, `XCODE.md`, bridging + `RETROPLAY_HAS_MGBA`. Daniel builds XCFramework at home; then fill `MGBACore` native TODOs.
+**GBA play path works on Simulator (frames OK).** Next: polish GBA pad (colors/skins later), then N64/NDS pads. Docs: `docs/CONTROLS-GBA.md`, `App/Vendor/mGBA.md`, `XCODE.md`.
 
 ---
 

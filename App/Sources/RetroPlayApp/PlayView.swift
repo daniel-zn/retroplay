@@ -8,6 +8,7 @@ public struct PlayView: View {
     let romURL: URL
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var core: (any EmulatorCore)?
     @State private var errorMessage: String?
     @State private var showError = false
@@ -21,49 +22,19 @@ public struct PlayView: View {
         self.romURL = romURL
     }
 
+    private var isLandscapeCompactHeight: Bool {
+        verticalSizeClass == .compact
+    }
+
     public var body: some View {
-        VStack(spacing: 16) {
-            Text(game.displayName)
-                .font(.headline)
-            Text("\(game.systemID.displayName) · \(game.systemID.defaultCoreName)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.black.opacity(0.85))
-                if let frameImage {
-                    Image(decorative: frameImage, scale: 1, orientation: .up)
-                        .resizable()
-                        .interpolation(.none)
-                        .aspectRatio(contentMode: .fit)
-                        .padding(8)
-                } else {
-                    Text(statusLine)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                        .padding()
-                }
+        Group {
+            if isLandscapeCompactHeight {
+                landscapeBody
+            } else {
+                portraitBody
             }
-            .aspectRatio(3 / 2, contentMode: .fit)
-
-            if game.systemID == .gba {
-                gbaPad
-            }
-
-            HStack {
-                Button("Pause") { core?.pause(); statusLine = "Paused" }
-                Button("Resume") { core?.resume(); statusLine = "Running" }
-                Button("Stop") {
-                    core?.stop()
-                    dismiss()
-                }
-            }
-            .buttonStyle(.bordered)
         }
-        .padding()
-        .navigationTitle("Play")
+        .navigationTitle(game.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await boot() }
         .onDisappear {
@@ -77,34 +48,92 @@ public struct PlayView: View {
         }
     }
 
-    private var gbaPad: some View {
-        VStack(spacing: 8) {
-            HStack { padButton("↑", .up) }
-            HStack(spacing: 24) {
-                padButton("←", .left)
-                padButton("→", .right)
+    // MARK: - Portrait (Game Boy–style: screen above, pad below)
+
+    private var portraitBody: some View {
+        VStack(spacing: 12) {
+            Text("\(game.systemID.displayName) · \(game.systemID.defaultCoreName)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            gameScreen
+                .aspectRatio(3 / 2, contentMode: .fit)
+                .frame(maxHeight: 320)
+
+            if game.systemID == .gba {
+                ConsolePadHost(
+                    systemID: .gba,
+                    orientation: .portrait,
+                    held: held,
+                    setHeld: setHeld
+                )
             }
-            HStack { padButton("↓", .down) }
-            HStack(spacing: 16) {
-                padButton("A", .a)
-                padButton("B", .b)
-                padButton("L", .l)
-                padButton("R", .r)
-                padButton("Start", .start)
-                padButton("Select", .select)
+
+            transportBar
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 8)
+    }
+
+    // MARK: - Landscape (GBA slab–style: D-pad left, face right)
+
+    private var landscapeBody: some View {
+        VStack(spacing: 6) {
+            HStack(alignment: .center, spacing: 8) {
+                if game.systemID == .gba {
+                    GBAFamilyPadParts.leftColumn(held: held, setHeld: setHeld)
+                }
+
+                gameScreen
+                    .aspectRatio(3 / 2, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if game.systemID == .gba {
+                    GBAFamilyPadParts.rightColumn(held: held, setHeld: setHeld)
+                }
             }
-            .font(.caption)
+            .padding(.horizontal, 8)
+
+            if game.systemID == .gba {
+                GBAFamilyPadParts.startSelectRow(held: held, setHeld: setHeld)
+            }
+
+            transportBar
+        }
+        .padding(.bottom, 4)
+    }
+
+    private var gameScreen: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.black.opacity(0.85))
+            if let frameImage {
+                Image(decorative: frameImage, scale: 1, orientation: .up)
+                    .resizable()
+                    .interpolation(.none)
+                    .aspectRatio(contentMode: .fit)
+                    .padding(6)
+            } else {
+                Text(statusLine)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .padding()
+            }
         }
     }
 
-    private func padButton(_ title: String, _ bit: GBAInput) -> some View {
-        Button(title) {}
-            .buttonStyle(.bordered)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in setHeld(bit, true) }
-                    .onEnded { _ in setHeld(bit, false) }
-            )
+    private var transportBar: some View {
+        HStack(spacing: 12) {
+            Button("Pause") { core?.pause(); statusLine = "Paused" }
+            Button("Resume") { core?.resume(); statusLine = "Running" }
+            Button("Stop") {
+                core?.stop()
+                dismiss()
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
     }
 
     private func setHeld(_ bit: GBAInput, _ down: Bool) {
