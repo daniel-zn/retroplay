@@ -125,8 +125,8 @@ struct PSPPadRightColumn: View {
             PSPFaceCluster(held: held, diameter: 42, setHeld: setHeld)
             Spacer(minLength: 0)
         }
-        .frame(minWidth: 160, maxWidth: 188)
-        .padding(.trailing, 4)
+        .frame(minWidth: 168, maxWidth: 200)
+        .padding(.trailing, 10)
     }
 }
 
