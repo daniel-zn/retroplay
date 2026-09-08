@@ -11,8 +11,9 @@ enum RetroPlayTheme {
     }
 
     static func section(for scheme: ColorScheme) -> Color {
+        // Dark UI matches Apple Music: full black chrome, not a grey nav band.
         scheme == .dark
-            ? Color(red: 0.07, green: 0.07, blue: 0.08)
+            ? Color.black
             : Color(uiColor: .secondarySystemGroupedBackground)
     }
 

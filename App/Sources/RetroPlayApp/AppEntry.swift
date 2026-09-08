@@ -15,6 +15,7 @@ public struct RetroPlayRootView: View {
     @State private var playGame: LibraryGame?
     @State private var searchPlayGame: LibraryGame?
     @State private var searchQuery = ""
+    @State private var isSearchPresented = false
     @State private var importErrorMessage: String?
     @State private var showImportError = false
     @Environment(\.colorScheme) private var colorScheme
@@ -51,7 +52,22 @@ public struct RetroPlayRootView: View {
                 .tag(RootTab.search)
         }
         .tint(RetroPlayTheme.accent)
+        .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .background {
+            TabBarReselectHandler { index in
+                if index == RootTab.search.rawValue {
+                    isSearchPresented = true
+                }
+            }
+        }
         .preferredColorScheme(appearance.colorScheme)
+        .onChange(of: selectedTab) { _, tab in
+            if tab == .search {
+                // First land on Search: show the field; re-tap still forces focus via TabBarReselectHandler.
+                isSearchPresented = true
+            }
+        }
         .fileImporter(
             isPresented: $showImporter,
             allowedContentTypes: ImportContentTypes.allowedContentTypes,
@@ -103,8 +119,8 @@ public struct RetroPlayRootView: View {
             }
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("RetroPlay")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .toolbar {
@@ -168,11 +184,16 @@ public struct RetroPlayRootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("Search")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
-            .searchable(text: $searchQuery, prompt: "Search imported games")
+            .searchable(
+                text: $searchQuery,
+                isPresented: $isSearchPresented,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Games"
+            )
             .navigationDestination(item: $searchPlayGame) { game in
                 PlayView(game: game, romURL: store.absoluteURL(for: game))
             }
@@ -247,9 +268,9 @@ public struct RetroPlayRootView: View {
 }
 
 @available(iOS 18.0, *)
-private enum RootTab: Hashable {
-    case library
-    case search
+private enum RootTab: Int, Hashable {
+    case library = 0
+    case search = 1
 }
 
 @available(iOS 18.0, *)
@@ -331,7 +352,7 @@ struct SettingsView: View {
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
+            .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .toolbar {
