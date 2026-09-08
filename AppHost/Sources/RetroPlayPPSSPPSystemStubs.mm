@@ -56,7 +56,7 @@ void NativeFrame(GraphicsContext *) {}
 void NativeResized() {}
 
 // iOS ViewController glue referenced by linked PPSSPP UI bits.
-extern "C" void bindDefaultFBO() {}
+void bindDefaultFBO() {}
 void *sharedViewController = nullptr;  // typed as id in upstream; unused in headless path
 void copyDeepLinkForPath(std::string_view) {}
 
