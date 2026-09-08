@@ -62,6 +62,10 @@ public struct RetroPlayRootView: View {
             }
         }
         .preferredColorScheme(appearance.colorScheme)
+        .onAppear { RetroPlayNavigationBarChrome.apply(colorScheme: colorScheme) }
+        .onChange(of: colorScheme) { _, scheme in
+            RetroPlayNavigationBarChrome.apply(colorScheme: scheme)
+        }
         .onChange(of: selectedTab) { _, tab in
             if tab == .search {
                 // First land on Search: show the field; re-tap still forces focus via TabBarReselectHandler.
@@ -123,8 +127,7 @@ public struct RetroPlayRootView: View {
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("RetroPlay")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .retroPlayNavigationTitleChrome(for: colorScheme)
             .toolbar {
@@ -189,8 +192,7 @@ public struct RetroPlayRootView: View {
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .retroPlayNavigationTitleChrome(for: colorScheme)
             .searchable(
@@ -357,8 +359,7 @@ struct SettingsView: View {
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .retroPlayNavigationTitleChrome(for: colorScheme)
             .toolbar {
