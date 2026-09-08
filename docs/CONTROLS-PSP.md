@@ -1,21 +1,16 @@
 # PSP on-screen controls
 
 ## Portrait
-1. Game frame (16:9) on top.
-2. L · R on the shoulders row.
-3. D-pad left · △○✕□ face right (diamond with non-overlapping hit targets).
-4. Select · Start centered under the pad.
-5. Pause / Resume / Stop under that.
+1. Game frame uses the **full screen width** (16:9).
+2. All controls sit **below** the frame: L/R, D-pad + △○✕□, Select/Start, then Pause/Resume/Stop.
 
-## Landscape (phone landscape)
-1. **Left third (thumb):** L above D-pad.
-2. **Center:** game screen, then Select · Start, then transport.
-3. **Right third (thumb):** R above △○✕□ face diamond.
+## Landscape (like a real PSP)
+1. **Left:** L + D-pad (thumb zone).
+2. **Center:** game screen (as wide as remaining space), Select/Start under it, small transport.
+3. **Right:** R + △○✕□ face diamond (thumb zone).
 
 ## Face order
-Sony diamond: △ top, ○ right, ✕ bottom, □ left.
-
-Face buttons use a center-to-center reach of about `0.72 × diameter` so circles do not overlap.
+Sony diamond: △ top, ○ right, ✕ bottom, □ left. Center-to-center reach ≈ `0.82 × diameter` so circles do not overlap.
 
 ## Bits
-`PSPInput` raw values match PPSSPP `CTRL_*` (`sceCtrl.h`). The bridge calls `__CtrlUpdateButtons` on change.
+`PSPInput` matches PPSSPP `CTRL_*`. Bridge calls `__CtrlUpdateButtons` on change.

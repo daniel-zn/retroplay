@@ -63,83 +63,101 @@ public struct PlayView: View {
         }
     }
 
-    // MARK: - Portrait
+    // MARK: - Portrait (screen full width; all controls below)
 
     private var portraitBody: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 0) {
             Text("\(game.systemID.displayName) · \(game.systemID.defaultCoreName)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
+                .padding(.bottom, 6)
 
+            // Edge-to-edge game bezel (no side padding).
             gameScreen
                 .aspectRatio(screenAspect, contentMode: .fit)
-                .frame(maxHeight: game.systemID == .psp ? 280 : 320)
+                .frame(maxWidth: .infinity)
+                .layoutPriority(1)
 
-            if game.systemID == .gba || game.systemID == .psp {
-                ConsolePadHost(
-                    systemID: game.systemID,
-                    orientation: .portrait,
-                    gbaHeld: gbaHeld,
-                    setGBAHeld: setGBAHeld,
-                    pspHeld: pspHeld,
-                    setPSPHeld: setPSPHeld
-                )
+            VStack(spacing: 10) {
+                if game.systemID == .gba || game.systemID == .psp {
+                    ConsolePadHost(
+                        systemID: game.systemID,
+                        orientation: .portrait,
+                        gbaHeld: gbaHeld,
+                        setGBAHeld: setGBAHeld,
+                        pspHeld: pspHeld,
+                        setPSPHeld: setPSPHeld
+                    )
+                }
+                transportBar
             }
-
-            transportBar
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
         }
-        .padding(.horizontal)
-        .padding(.bottom, 8)
     }
 
-    // MARK: - Landscape
+    // MARK: - Landscape (PSP-style: controls left | screen | controls right)
 
     private var landscapeBody: some View {
-        VStack(spacing: 4) {
-            HStack(alignment: .center, spacing: 6) {
+        HStack(alignment: .center, spacing: 0) {
+            // Left thumb zone
+            Group {
                 if game.systemID == .gba {
                     GBAPadLeftColumn(held: gbaHeld, setHeld: setGBAHeld)
                 } else if game.systemID == .psp {
                     PSPPadLeftColumn(held: pspHeld, setHeld: setPSPHeld)
+                } else {
+                    Color.clear.frame(width: 8)
+                }
+            }
+            .padding(.leading, 6)
+
+            // Screen takes remaining width; chrome under it stays in the center column.
+            VStack(spacing: 4) {
+                gameScreen
+                    .aspectRatio(screenAspect, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .layoutPriority(1)
+
+                if game.systemID == .gba {
+                    GBAPadStartSelectRow(held: gbaHeld, setHeld: setGBAHeld)
+                } else if game.systemID == .psp {
+                    PSPPadStartSelectRow(held: pspHeld, setHeld: setPSPHeld)
                 }
 
-                VStack(spacing: 6) {
-                    gameScreen
-                        .aspectRatio(screenAspect, contentMode: .fit)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                transportBar
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 4)
 
-                    if game.systemID == .gba {
-                        GBAPadStartSelectRow(held: gbaHeld, setHeld: setGBAHeld)
-                    } else if game.systemID == .psp {
-                        PSPPadStartSelectRow(held: pspHeld, setHeld: setPSPHeld)
-                    }
-
-                    transportBar
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
+            // Right thumb zone
+            Group {
                 if game.systemID == .gba {
                     GBAPadRightColumn(held: gbaHeld, setHeld: setGBAHeld)
                 } else if game.systemID == .psp {
                     PSPPadRightColumn(held: pspHeld, setHeld: setPSPHeld)
+                } else {
+                    Color.clear.frame(width: 8)
                 }
             }
-            .padding(.horizontal, 6)
-            .padding(.top, 2)
+            .padding(.trailing, 6)
         }
-        .padding(.bottom, 2)
+        .padding(.vertical, 4)
     }
 
     private var gameScreen: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.black.opacity(0.85))
+            Rectangle()
+                .fill(.black)
             if let frameImage {
                 Image(decorative: frameImage, scale: 1, orientation: .up)
                     .resizable()
                     .interpolation(.none)
                     .aspectRatio(contentMode: .fit)
-                    .padding(6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Text(statusLine)
                     .font(.caption)
@@ -148,6 +166,7 @@ public struct PlayView: View {
                     .padding()
             }
         }
+        .clipShape(RoundedRectangle(cornerRadius: isLandscapeCompactHeight ? 6 : 10, style: .continuous))
     }
 
     private var transportBar: some View {
