@@ -1,19 +1,24 @@
 # RetroPlay app icon
 
-Flat source art for Xcode App Icon (light / dark) and Apple Icon Composer (Liquid Glass).
-
-- `AppIcon-Light.png` — olive `#7A8F47` background, white PSP silhouette
-- `AppIcon-Dark.png` — black background, olive PSP silhouette
-
+## Flat catalog (ships now)
+- `AppIcon-Light.png` — olive `#7A8F47` + white wide PSP
+- `AppIcon-Dark.png` — black + olive PSP  
 Asset catalog: `AppHost/Supporting/Assets.xcassets/AppIcon.appiconset`
 
-## Liquid Glass (Icon Composer)
+PSP proportions match a UMD-era handheld (wide grips), not a square GBA.
 
-On Mac with Xcode 26 / Icon Composer:
+## Liquid Glass — Apple Icon Composer (required for real glass)
+Apple’s tool: **Icon Composer** (ships with Xcode 26; also https://developer.apple.com/icon-composer/).
 
-1. Open Icon Composer.
-2. Import the light PNG as the default layer (or separate glyph + fill layers).
-3. Add dark appearance override using the dark PNG (or recolor fills).
-4. Enable Liquid Glass on the glyph layer; export `RetroPlay.icon` into the Xcode project.
+Docs: https://developer.apple.com/documentation/xcode/creating-your-app-icon-using-icon-composer  
+WWDC: https://developer.apple.com/videos/play/wwdc2025/361/
 
-Xcode uses the `.icon` for iOS 26+ and can synthesize older appearances from it.
+### Steps on Mac
+1. Xcode → Open Developer Tool → **Icon Composer** (or open `/Applications/Xcode.app/Contents/Applications/Icon Composer.app`).
+2. New icon → set canvas iOS → background olive `#7A8F47` for Default; black for Dark appearance.
+3. Drag in `layers/01-psp-glyph.svg` (or `.png`). Icon Composer applies Liquid Glass automatically.
+4. Tune specular / translucency / shadow if needed. Preview Default + Dark.
+5. File → Save as `AppIcon.icon` into the RetroPlay repo (e.g. project root or `AppHost/`).
+6. In Xcode target → General → App Icons → set App Icon to `AppIcon` (the `.icon` name). Xcode uses `.icon` for iOS 26+ Liquid Glass and synthesizes older assets.
+
+Do **not** bake fake glass into the PNGs — glass is applied by Icon Composer / the system.
