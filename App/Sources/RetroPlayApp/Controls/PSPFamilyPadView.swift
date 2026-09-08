@@ -1,7 +1,7 @@
 import SwiftUI
 import RetroPlayCore
 
-/// Portrait and landscape PSP layouts: L/R, analog nub stub, D-pad, △○✕□, Home/Select/Start.
+/// Portrait and landscape PSP layouts: L/R, D-pad above analog nub stub, △○✕□, Home/Select/Start.
 @available(iOS 18.0, *)
 struct PSPFamilyPadView: View {
     enum Orientation {
@@ -48,6 +48,8 @@ struct PSPFamilyPadView: View {
 
                 HStack(alignment: .center, spacing: 12) {
                     VStack(spacing: 8) {
+                        // Real PSP: D-pad above, analog nub below on the left.
+                        PSPDPadView(held: held, arm: 44, setHeld: setHeld)
                         AnalogStickWell(
                             wellSize: 56,
                             x: 0,
@@ -58,7 +60,6 @@ struct PSPFamilyPadView: View {
                             accessibilityName: "Analog nub",
                             onChange: { _, _ in }
                         )
-                        PSPDPadView(held: held, arm: 44, setHeld: setHeld)
                     }
                     Spacer(minLength: 4)
                     PSPFaceCluster(held: held, diameter: 44, setHeld: setHeld)
@@ -161,6 +162,8 @@ struct PSPPadLeftColumn: View {
                 ink: PadPalette.PSP.ink,
                 onHeld: { setHeld(.l, $0) }
             )
+            // Real PSP: D-pad above, analog nub below on the left.
+            PSPDPadView(held: held, arm: 42, setHeld: setHeld)
             AnalogStickWell(
                 wellSize: 48,
                 x: 0,
@@ -171,7 +174,6 @@ struct PSPPadLeftColumn: View {
                 accessibilityName: "Analog nub",
                 onChange: { _, _ in }
             )
-            PSPDPadView(held: held, arm: 42, setHeld: setHeld)
             Spacer(minLength: 0)
         }
         .frame(minWidth: 148, maxWidth: 168)
