@@ -1,7 +1,8 @@
 import Foundation
 
 /// Optional user cover art beside Documents/ROMs. No bundled game art.
-public struct CoverArtStore: Sendable {
+/// Not marked Sendable: holds FileManager and is used from the main-actor UI / LibraryStore.
+public struct CoverArtStore {
     private let fileManager: FileManager
 
     public init(fileManager: FileManager = .default) {
