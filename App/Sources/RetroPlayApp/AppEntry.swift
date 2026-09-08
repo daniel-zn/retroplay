@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import RetroPlayCore
 import UIKit
 
-/// Root shell: tile library, system chips, Settings. Appearance preference (dark default).
+/// Root shell: tile library, search, Settings via glass toolbar. Appearance preference (dark default).
 @available(iOS 18.0, *)
 public struct RetroPlayRootView: View {
     @StateObject private var store = LibraryStore()
@@ -11,7 +11,10 @@ public struct RetroPlayRootView: View {
     @State private var selectedTab: RootTab = .library
     @State private var systemTab: SystemTab = .all
     @State private var showImporter = false
+    @State private var showSettings = false
     @State private var playGame: LibraryGame?
+    @State private var searchPlayGame: LibraryGame?
+    @State private var searchQuery = ""
     @State private var importErrorMessage: String?
     @State private var showImportError = false
     @Environment(\.colorScheme) private var colorScheme
@@ -27,15 +30,25 @@ public struct RetroPlayRootView: View {
         store.games(matching: systemTab.systemID)
     }
 
+    private var searchResults: [LibraryGame] {
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
+        return store.games.filter {
+            $0.displayName.localizedCaseInsensitiveContains(q)
+                || $0.systemID.displayName.localizedCaseInsensitiveContains(q)
+                || $0.systemID.defaultCoreName.localizedCaseInsensitiveContains(q)
+        }
+    }
+
     public var body: some View {
         TabView(selection: $selectedTab) {
             libraryNavigation
                 .tabItem { Label("Library", systemImage: "square.grid.2x2.fill") }
                 .tag(RootTab.library)
 
-            SettingsView(appearanceRaw: $appearanceRaw)
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-                .tag(RootTab.settings)
+            searchNavigation
+                .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                .tag(RootTab.search)
         }
         .tint(RetroPlayTheme.accent)
         .preferredColorScheme(appearance.colorScheme)
@@ -45,6 +58,9 @@ public struct RetroPlayRootView: View {
             allowsMultipleSelection: true
         ) { result in
             handleImport(result)
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(appearanceRaw: $appearanceRaw)
         }
         .alert("Import failed", isPresented: $showImportError) {
             Button("OK", role: .cancel) {}
@@ -92,18 +108,72 @@ public struct RetroPlayRootView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
                     Button {
-                        showImporter = true
+                        showSettings = true
                     } label: {
-                        Label("Import", systemImage: "plus")
+                        Label("Settings", systemImage: "gearshape")
+                            .labelStyle(.iconOnly)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .retroPlayGlassChrome()
                     }
+                    .accessibilityLabel("Settings")
+
+                    Button {
+                        showImporter = true
+                    } label: {
+                        Label("Import", systemImage: "plus")
+                            .labelStyle(.iconOnly)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .retroPlayGlassChrome()
+                    }
+                    .accessibilityLabel("Import")
                 }
             }
             .navigationDestination(item: $playGame) { game in
+                PlayView(game: game, romURL: store.absoluteURL(for: game))
+            }
+        }
+    }
+
+    private var searchNavigation: some View {
+        NavigationStack {
+            Group {
+                if store.games.isEmpty {
+                    ContentUnavailableView(
+                        "No Games Yet",
+                        systemImage: "magnifyingglass",
+                        description: Text("Import games from the Library tab, then search them here.")
+                    )
+                } else if searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ContentUnavailableView(
+                        "Search Library",
+                        systemImage: "magnifyingglass",
+                        description: Text("Find games you already imported into RetroPlay.")
+                    )
+                } else if searchResults.isEmpty {
+                    ContentUnavailableView.search(text: searchQuery)
+                } else {
+                    LibraryGridView(
+                        games: searchResults,
+                        onSelect: { searchPlayGame = $0 },
+                        artworkProvider: { game in
+                            loadCover(for: game)
+                        }
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(RetroPlayTheme.canvas(for: colorScheme))
+            .navigationTitle("Search")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(colorScheme, for: .navigationBar)
+            .searchable(text: $searchQuery, prompt: "Search imported games")
+            .navigationDestination(item: $searchPlayGame) { game in
                 PlayView(game: game, romURL: store.absoluteURL(for: game))
             }
         }
@@ -179,13 +249,14 @@ public struct RetroPlayRootView: View {
 @available(iOS 18.0, *)
 private enum RootTab: Hashable {
     case library
-    case settings
+    case search
 }
 
 @available(iOS 18.0, *)
 struct SettingsView: View {
     @Binding var appearanceRaw: String
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
 
     private var appearanceBinding: Binding<AppearancePreference> {
         Binding(
@@ -259,10 +330,15 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
     }
 }
