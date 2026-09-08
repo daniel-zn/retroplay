@@ -407,6 +407,30 @@ public struct PlayView: View {
                             try? await Task.sleep(nanoseconds: 400_000_000)
                         }
                         NSLog("RP_SMOKE n64 pulsed Start+A sawFirstFrame=%d", sawFirstFrame ? 1 : 0)
+                    case .gba:
+                        for bit in [GBAInput.a, GBAInput.up] {
+                            var held: GBAInput = bit
+                            gbaHeld = held
+                            core?.setGBAInput(held)
+                            try? await Task.sleep(nanoseconds: 400_000_000)
+                            held = []
+                            gbaHeld = held
+                            core?.setGBAInput(held)
+                            try? await Task.sleep(nanoseconds: 300_000_000)
+                        }
+                        NSLog("RP_SMOKE gba pulsed A+Up sawFirstFrame=%d", sawFirstFrame ? 1 : 0)
+                    case .psp:
+                        for bit in [PSPInput.cross, PSPInput.circle] {
+                            var held: PSPInput = bit
+                            pspHeld = held
+                            core?.setPSPInput(held)
+                            try? await Task.sleep(nanoseconds: 400_000_000)
+                            held = []
+                            pspHeld = held
+                            core?.setPSPInput(held)
+                            try? await Task.sleep(nanoseconds: 300_000_000)
+                        }
+                        NSLog("RP_SMOKE psp pulsed Cross+Circle sawFirstFrame=%d", sawFirstFrame ? 1 : 0)
                     default:
                         break
                     }
