@@ -121,6 +121,11 @@ public final class LibraryStore: ObservableObject {
         try fileManager.createDirectory(at: romsDirectoryURL, withIntermediateDirectories: true)
     }
 
+    public func games(matching system: SystemID?) -> [LibraryGame] {
+        guard let system else { return games }
+        return games.filter { $0.systemID == system }
+    }
+
     private func uniqueFileName(for originalName: String) -> String {
         let base = (originalName as NSString).deletingPathExtension
         let ext = (originalName as NSString).pathExtension

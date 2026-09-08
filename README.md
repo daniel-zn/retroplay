@@ -17,6 +17,8 @@ See `SPEC.md` for product and engineering detail. Swift M0 scaffold: `App/` (no 
 
 On-screen GBA control layouts: [`docs/CONTROLS-GBA.md`](docs/CONTROLS-GBA.md).
 
+PSP / PPSSPP (IR) scaffold: [`App/Vendor/PPSSPP.md`](App/Vendor/PPSSPP.md).
+
 ### GBA / mGBA (M1)
 
 When you are on a Mac, follow the checklist in [`App/Vendor/mGBA.md`](App/Vendor/mGBA.md) (one-shot script + Xcode drop-in). Do not commit bulky mGBA trees unless you choose to.

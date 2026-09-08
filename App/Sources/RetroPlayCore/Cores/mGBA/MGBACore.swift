@@ -111,7 +111,9 @@ public enum CoreFactory {
         switch system {
         case .gba:
             return MGBACore()
-        case .n64, .nds, .psp:
+        case .psp:
+            return PPSSPPCore()
+        case .n64, .nds:
             return StubEmulatorCore(systemID: system)
         }
     }

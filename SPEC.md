@@ -274,7 +274,7 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 
 ## 11. Next build step
 
-**GBA play path works on Simulator (frames OK).** Next: polish GBA pad (colors/skins later), then N64/NDS pads. Docs: `docs/CONTROLS-GBA.md`, `App/Vendor/mGBA.md`, `XCODE.md`.
+**Library UI:** dark canvas, system filter chips, game tiles; GBA play + pad input green. **PSP:** `PPSSPPCore` scaffold + `App/Vendor/PPSSPP.md` (IR-only). Next: PPSSPP XCFramework on Mac, then smoke *ATV Offroad Fury Pro* (user ROM, not in git). Docs: `docs/CONTROLS-GBA.md`, `App/Vendor/mGBA.md`, `App/Vendor/PPSSPP.md`.
 
 ---
 
