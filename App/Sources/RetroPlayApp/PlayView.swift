@@ -13,6 +13,8 @@ public struct PlayView: View {
     @State private var showError = false
     @State private var statusLine = "Starting…"
     @State private var held: GBAInput = []
+    @State private var frameImage: CGImage?
+    @State private var frameSink = FrameSinkStore()
 
     public init(game: LibraryGame, romURL: URL) {
         self.game = game
@@ -27,16 +29,24 @@ public struct PlayView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.black.opacity(0.85))
-                .aspectRatio(3 / 2, contentMode: .fit)
-                .overlay {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.black.opacity(0.85))
+                if let frameImage {
+                    Image(decorative: frameImage, scale: 1, orientation: .up)
+                        .resizable()
+                        .interpolation(.none)
+                        .aspectRatio(contentMode: .fit)
+                        .padding(8)
+                } else {
                     Text(statusLine)
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .padding()
                 }
+            }
+            .aspectRatio(3 / 2, contentMode: .fit)
 
             if game.systemID == .gba {
                 gbaPad
@@ -44,7 +54,7 @@ public struct PlayView: View {
 
             HStack {
                 Button("Pause") { core?.pause(); statusLine = "Paused" }
-                Button("Resume") { core?.resume(); statusLine = "Running (native pending)" }
+                Button("Resume") { core?.resume(); statusLine = "Running" }
                 Button("Stop") {
                     core?.stop()
                     dismiss()
@@ -56,7 +66,11 @@ public struct PlayView: View {
         .navigationTitle("Play")
         .navigationBarTitleDisplayMode(.inline)
         .task { await boot() }
-        .alert("Cannot play yet", isPresented: $showError) {
+        .onDisappear {
+            core?.stop()
+            core = nil
+        }
+        .alert("Could not play", isPresented: $showError) {
             Button("OK", role: .cancel) { dismiss() }
         } message: {
             Text(errorMessage ?? "Unknown error")
@@ -65,16 +79,12 @@ public struct PlayView: View {
 
     private var gbaPad: some View {
         VStack(spacing: 8) {
-            HStack {
-                padButton("↑", .up)
-            }
+            HStack { padButton("↑", .up) }
             HStack(spacing: 24) {
                 padButton("←", .left)
                 padButton("→", .right)
             }
-            HStack {
-                padButton("↓", .down)
-            }
+            HStack { padButton("↓", .down) }
             HStack(spacing: 16) {
                 padButton("A", .a)
                 padButton("B", .b)
@@ -104,14 +114,21 @@ public struct PlayView: View {
 
     private func boot() async {
         let instance = CoreFactory.makeCore(for: game.systemID)
+        if let mgba = instance as? MGBACore {
+            frameSink.onFrame = { image in
+                frameImage = image
+                statusLine = "Running"
+            }
+            mgba.attachFrameSink(frameSink)
+        }
         core = instance
         do {
             try await instance.loadROM(at: romURL)
             instance.start()
-            statusLine = "Core loaded"
+            statusLine = "Running"
         } catch {
             errorMessage = error.localizedDescription
-            statusLine = "Waiting for mGBA XCFramework"
+            statusLine = "Failed"
             showError = true
         }
     }

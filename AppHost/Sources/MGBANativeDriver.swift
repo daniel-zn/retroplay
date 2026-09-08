@@ -11,6 +11,7 @@ public final class MGBANativeDriver: MGBANativeDriving {
     private var width: Int = 0
     private var height: Int = 0
     private var stride: Int = 0
+    private var configInitialized = false
 
     public init() {}
 
@@ -24,10 +25,15 @@ public final class MGBANativeDriver: MGBANativeDriving {
             found.pointee.deinit(found)
             throw EmulatorCoreError.romLoadFailed("mCore init failed")
         }
-        // GBA reset reads the config hash table; must init before reset/load.
+
+        // Match mGBA SDL: init → InitConfig → LoadConfig → LoadFile → video → reset.
         mCoreInitConfig(found, "retroplay")
+        configInitialized = true
+        core = found
+        mCoreLoadConfig(found)
+
         guard mCoreLoadFile(found, path) else {
-            found.pointee.deinit(found)
+            tearDown()
             throw EmulatorCoreError.romLoadFailed("mCoreLoadFile failed")
         }
 
@@ -38,19 +44,18 @@ public final class MGBANativeDriver: MGBANativeDriving {
         height = Int(h)
         stride = width
         guard width > 0, height > 0 else {
-            found.pointee.deinit(found)
-            throw EmulatorCoreError.romLoadFailed("Invalid video size")
+            tearDown()
+            throw EmulatorCoreError.romLoadFailed("Invalid video size \(w)x\(h)")
         }
 
         let count = width * height
         let buffer = UnsafeMutablePointer<mColor>.allocate(capacity: count)
         buffer.initialize(repeating: 0, count: count)
         found.pointee.setVideoBuffer(found, buffer, stride)
+        videoBuffer = buffer
+
         found.pointee.reset(found)
         _ = mCoreAutoloadSave(found)
-
-        videoBuffer = buffer
-        core = found
     }
 
     public func setKeys(_ bitmask: UInt32) {
@@ -70,21 +75,20 @@ public final class MGBANativeDriver: MGBANativeDriving {
 
     public func copyRGBAFrame() -> EmulatorVideoFrame? {
         guard let videoBuffer, width > 0, height > 0 else { return nil }
-        // Default mColor is uint32 RGBA-like (see mgba-util/image.h without COLOR_16_BIT).
-        let byteCount = width * height * MemoryLayout<mColor>.size
+        let bpp = MemoryLayout<mColor>.size
+        let byteCount = width * height * bpp
         let data = Data(bytes: videoBuffer, count: byteCount)
         return EmulatorVideoFrame(
             width: width,
             height: height,
             bytes: data,
-            bytesPerRow: width * MemoryLayout<mColor>.size
+            bytesPerRow: width * bpp
         )
     }
 
     public func saveState(to url: URL) throws {
-        // Slot 1 via mGBA helper; path-based named states can be added once VFile helpers are verified on Mac.
         guard let core else { throw EmulatorCoreError.notImplemented("no core") }
-        _ = url // reserved for named-state path
+        _ = url
         if !mCoreSaveState(core, 1, 0) {
             throw EmulatorCoreError.romLoadFailed("mCoreSaveState(slot 1) failed")
         }
@@ -100,6 +104,10 @@ public final class MGBANativeDriver: MGBANativeDriving {
 
     public func tearDown() {
         if let core {
+            if configInitialized {
+                mCoreConfigDeinit(&core.pointee.config)
+                configInitialized = false
+            }
             core.pointee.deinit(core)
         }
         core = nil
@@ -117,12 +125,11 @@ public final class MGBANativeDriver: MGBANativeDriving {
 
 #else
 
-/// Placeholder so the package/app sources compile without the XCFramework.
 public final class MGBANativeDriver: MGBANativeDriving {
     public init() {}
     public func loadROM(at url: URL) throws {
         throw EmulatorCoreError.notImplemented(
-            "Compile the app with RETROPLAY_HAS_MGBA and link mGBA.xcframework (see App/Vendor/XCODE.md)."
+            "Compile with RETROPLAY_HAS_MGBA and link mGBA.xcframework."
         )
     }
     public func setKeys(_ bitmask: UInt32) {}
