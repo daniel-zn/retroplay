@@ -87,14 +87,12 @@ public struct RetroPlayRootView: View {
 
     private var libraryNavigation: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                systemPicker
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(RetroPlayTheme.section(for: colorScheme))
-
-                Group {
-                    if filteredGames.isEmpty {
+            Group {
+                if filteredGames.isEmpty {
+                    VStack(spacing: 0) {
+                        systemPicker
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
                         ContentUnavailableView(
                             store.games.isEmpty ? "No Games Yet" : "No \(systemTab.title) Games",
                             systemImage: "gamecontroller",
@@ -105,21 +103,26 @@ public struct RetroPlayRootView: View {
                             )
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(RetroPlayTheme.canvas(for: colorScheme))
-                    } else {
-                        LibraryGridView(
-                            games: filteredGames,
-                            onSelect: { playGame = $0 },
-                            artworkProvider: { game in
-                                loadCover(for: game)
-                            }
-                        )
+                    }
+                } else {
+                    // System chips scroll with the grid so the large title collapses.
+                    LibraryGridView(
+                        games: filteredGames,
+                        onSelect: { playGame = $0 },
+                        artworkProvider: { game in
+                            loadCover(for: game)
+                        }
+                    ) {
+                        systemPicker
+                            .padding(.horizontal, 12)
+                            .padding(.top, 4)
+                            .padding(.bottom, 8)
                     }
                 }
             }
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("RetroPlay")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
@@ -184,7 +187,7 @@ public struct RetroPlayRootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("Search")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
@@ -351,7 +354,7 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
