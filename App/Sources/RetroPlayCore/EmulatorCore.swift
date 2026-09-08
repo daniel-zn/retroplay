@@ -15,6 +15,10 @@ public protocol EmulatorCore: AnyObject, Sendable {
 
     func saveState(to url: URL) async throws
     func loadState(from url: URL) async throws
+
+    /// Optional; default no-op. Declared on the protocol so `any EmulatorCore` uses dynamic dispatch.
+    func setGBAInput(_ input: GBAInput)
+    func attachFrameSink(_ sink: EmulatorFrameSink?)
 }
 
 public enum EmulatorCoreError: Error, Sendable, LocalizedError {

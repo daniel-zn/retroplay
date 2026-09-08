@@ -139,6 +139,7 @@ public struct PlayView: View {
     @MainActor
     private func setHeld(_ bit: GBAInput, _ down: Bool) {
         if down { held.insert(bit) } else { held.remove(bit) }
+        // Must hit MGBACore via protocol requirement (not extension-only) for dynamic dispatch.
         core?.setGBAInput(held)
     }
 

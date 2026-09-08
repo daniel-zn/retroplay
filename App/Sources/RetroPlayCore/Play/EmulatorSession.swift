@@ -39,7 +39,8 @@ public struct GBAInput: OptionSet, Sendable, Hashable {
 }
 
 public extension EmulatorCore {
-    /// Optional hook; default no-op so stubs stay simple.
+    /// Defaults for cores that do not take GBA input / video sinks yet.
+    /// Requirements live on `EmulatorCore` so existential calls dispatch to overrides (e.g. MGBACore).
     func setGBAInput(_ input: GBAInput) {}
     func attachFrameSink(_ sink: EmulatorFrameSink?) {}
 }
