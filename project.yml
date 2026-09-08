@@ -1,0 +1,57 @@
+name: RetroPlay
+options:
+  bundleIdPrefix: com.danielzn
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  RetroPlayPackage:
+    path: App
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+
+targets:
+  RetroPlay:
+    type: application
+    platform: iOS
+    sources:
+      - path: AppHost/Sources
+      - path: AppHost/Supporting
+        buildPhase: resources
+        excludes:
+          - RetroPlay-Bridging-Header.h
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.danielzn.retroplay
+        PRODUCT_NAME: RetroPlay
+        INFOPLIST_FILE: AppHost/Supporting/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        SWIFT_OBJC_BRIDGING_HEADER: AppHost/Supporting/RetroPlay-Bridging-Header.h
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) RETROPLAY_HAS_MGBA"
+        ENABLE_PREVIEWS: false
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: "1.0"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+        FRAMEWORK_SEARCH_PATHS: "$(inherited) $(SRCROOT)/App/Vendor/Output"
+        OTHER_LDFLAGS: "$(inherited) -framework mGBA"
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG RETROPLAY_HAS_MGBA"
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "RETROPLAY_HAS_MGBA"
+    dependencies:
+      - package: RetroPlayPackage
+        product: RetroPlayCore
+      - package: RetroPlayPackage
+        product: RetroPlayApp
+      - framework: App/Vendor/Output/mGBA.xcframework
+        embed: false
+    scheme:
+      testTargets: []
+      gatherCoverageData: false

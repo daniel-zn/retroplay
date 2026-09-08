@@ -27,10 +27,8 @@ Your Mac session:
 - [ ] Install Xcode + CMake + Ninja (`brew install cmake ninja`)
 - [ ] Clone mGBA **outside** this repo
 - [x] Run `build-mgba-ios.sh` → XCFramework on Mac mini at `App/Vendor/Output/mGBA.xcframework` (local only, 2026-09-08)
-- [ ] Create/open iOS App target; follow `XCODE.md` (path documented for Mac mini Output/)
-- [ ] Set bridging header + `RETROPLAY_HAS_MGBA` + `MGBANativeBootstrap.registerIfAvailable()`
-- [ ] Verify `MGBANativeDriver` builds against the XCFramework (native glue is in-repo under `#if RETROPLAY_HAS_MGBA`)
-- [ ] Import a GBA you own via Files → playable frames
+- [ ] On Mac: `./AppHost/bootstrap-xcode.sh` (XcodeGen + open project)
+- [ ] Simulator Run; import a GBA you own via Files → playable frames
 
 ---
 

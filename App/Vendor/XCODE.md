@@ -1,81 +1,29 @@
-# Xcode — drop in `mGBA.xcframework`
+# Xcode app host (automated on Mac)
 
-## Framework on this Mac (already built)
+## Already on Mac mini
 
-On Daniel’s Mac mini (2026-09-08), the XCFramework is at:
+- Repo: `~/src/retroplay` (pull before generating)
+- XCFramework: `App/Vendor/Output/mGBA.xcframework`
 
-```text
-/Users/danielsmacmini/src/retroplay/App/Vendor/Output/mGBA.xcframework
+## One-shot (miniMac)
+
+```bash
+cd ~/src/retroplay
+git pull --ff-only
+./AppHost/bootstrap-xcode.sh
 ```
 
-(Not in git. Built with `App/Vendor/build-mgba-ios.sh`, ios-arm64 + simulator. Repo clone was at `bdadd91` when built — pull latest before opening Xcode.)
+That installs XcodeGen if needed, writes `RetroPlay.xcodeproj`, and opens it. Select any iPhone simulator → Run.
 
-If you rebuild elsewhere, run `./App/Vendor/build-mgba-ios.sh` so Output/ is populated.
+`project.yml` already sets:
 
-## 1. App target
+- Bridging header `AppHost/Supporting/RetroPlay-Bridging-Header.h`
+- `RETROPLAY_HAS_MGBA`
+- Links local `App/` package (`RetroPlayCore` + `RetroPlayApp`)
+- Links `mGBA.xcframework` (Do Not Embed)
 
-SwiftPM `App/Package.swift` only ships libraries. Create an **iOS App** in Xcode:
+`@main` calls `MGBANativeBootstrap.registerIfAvailable()`.
 
-1. File → New → Project → App (iOS), product name **RetroPlay**, interface SwiftUI, language Swift.
-2. Add local package: select the `App/` folder (contains `Package.swift`).
-3. Link `RetroPlayCore` and `RetroPlayApp`.
-4. Ensure app target **also compiles** `Sources/RetroPlayApp/Native/*.swift` (included via the `RetroPlayApp` product if you link that library into the app).
+## If the simulator build fails
 
-Minimum deployment: **iOS 18**.
-
-Root UI example:
-
-```swift
-import SwiftUI
-import RetroPlayApp
-import RetroPlayCore
-
-@main
-struct RetroPlayMacApp: App {
-    init() {
-        MGBANativeBootstrap.registerIfAvailable()
-    }
-    var body: some Scene {
-        WindowGroup {
-            RetroPlayRootView()
-        }
-    }
-}
-```
-
-## 2. Add the XCFramework
-
-1. Drag `App/Vendor/Output/mGBA.xcframework` into the **app** target (not only the package).
-2. **Do Not Embed** for a static XCFramework.
-3. Confirm it appears under Frameworks.
-
-## 3. Bridging header (app target)
-
-Build Settings → **Objective-C Bridging Header**:
-
-```text
-Vendor/Bridging/RetroPlay-Bridging-Header.h
-```
-
-(Adjust path relative to the `.xcodeproj`. Copy the header into the app group if needed.)
-
-## 4. Swift flag (app target)
-
-Active Compilation Conditions (Debug & Release):
-
-```text
-RETROPLAY_HAS_MGBA
-```
-
-This compiles the real `MGBANativeDriver` body and makes `registerIfAvailable()` install the driver.
-
-## 5. Smoke test
-
-1. Pull latest `daniel-zn/retroplay` on the Mac.
-2. Confirm XCFramework path above (or rebuild).
-3. Run app → Import a GBA you own → Play.
-4. Expect frames once driver loads; if registration was skipped, error text explains linking/`RETROPLAY_HAS_MGBA`.
-
-## Architecture note
-
-mGBA C types stay out of the Swift package. `MGBACore` talks to `MGBANativeDriving`; the app target supplies `MGBANativeDriver` when the framework + flag are present.
+Paste the compiler error to the RetroPlay product bot (via Engineer). Do not ask Daniel for intermediate steps — fix on `main`, then `git pull` and rebuild.

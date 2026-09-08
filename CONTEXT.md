@@ -57,5 +57,5 @@ See checklist at top of `App/Vendor/mGBA.md`. One-shot: clone mGBA outside repo 
 ## Mac mini artifact (not in git)
 
 - XCFramework: `/Users/danielsmacmini/src/retroplay/App/Vendor/Output/mGBA.xcframework` (built 2026-09-08)
-- Next on Mac: follow `App/Vendor/XCODE.md` — app host, bridging header, `RETROPLAY_HAS_MGBA`, call `MGBANativeBootstrap.registerIfAvailable()`.
+- Next on Mac: `git pull` && `./AppHost/bootstrap-xcode.sh` → Simulator Run. AppHost holds `@main` + native driver; package stays framework-free.
 
