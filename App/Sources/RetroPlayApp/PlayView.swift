@@ -184,26 +184,46 @@ public struct PlayView: View {
     private var transportBar: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
-                Button("Pause") { core?.pause(); statusLine = "Paused" }
-                Button("Resume") {
+                Button {
+                    core?.pause()
+                    statusLine = "Paused"
+                } label: {
+                    Image(systemName: "pause.fill")
+                }
+                .accessibilityLabel("Pause")
+
+                Button {
                     core?.resume()
                     if sawFirstFrame { statusLine = "Running" }
+                } label: {
+                    Image(systemName: "play.fill")
                 }
-                Button("Stop") {
+                .accessibilityLabel("Resume")
+
+                Button {
                     core?.stop()
                     dismiss()
+                } label: {
+                    Image(systemName: "stop.fill")
                 }
+                .accessibilityLabel("Stop")
             }
 
             HStack(spacing: 10) {
-                Button("Quick Save") {
+                Button {
                     Task { await quickSave() }
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
                 }
+                .accessibilityLabel("Quick Save")
                 .disabled(saveBusy || !(core?.supportsSaveState ?? false))
 
-                Button("Quick Load") {
+                Button {
                     Task { await quickLoad() }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Quick Load")
                 .disabled(
                     saveBusy
                         || !(core?.supportsSaveState ?? false)
