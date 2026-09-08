@@ -9,6 +9,8 @@ public struct PlayView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("retroplay.appearance") private var appearanceRaw = AppearancePreference.dark.rawValue
     @State private var core: (any EmulatorCore)?
     @State private var errorMessage: String?
     @State private var showError = false
@@ -35,13 +37,13 @@ public struct PlayView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.ignoresSafeArea())
-        .preferredColorScheme(.dark)
-        .navigationTitle(game.displayName)
+        .background(RetroPlayTheme.canvas(for: colorScheme).ignoresSafeArea())
+        .preferredColorScheme((AppearancePreference(rawValue: appearanceRaw) ?? .dark).colorScheme)
+                .navigationTitle(game.displayName)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color.black, for: .navigationBar)
+        .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(colorScheme, for: .navigationBar)
         .task { await boot() }
         .onDisappear {
             core?.stop()

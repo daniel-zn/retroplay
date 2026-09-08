@@ -3,19 +3,25 @@ import UniformTypeIdentifiers
 import RetroPlayCore
 import UIKit
 
-/// Root shell: dark library tiles, system tabs, Settings tab. Liquid Glass chrome where useful.
+/// Root shell: tile library, system chips, Settings. Appearance preference (dark default).
 @available(iOS 18.0, *)
 public struct RetroPlayRootView: View {
     @StateObject private var store = LibraryStore()
+    @AppStorage("retroplay.appearance") private var appearanceRaw = AppearancePreference.dark.rawValue
     @State private var selectedTab: RootTab = .library
     @State private var systemTab: SystemTab = .all
     @State private var showImporter = false
     @State private var playGame: LibraryGame?
     @State private var importErrorMessage: String?
     @State private var showImportError = false
+    @Environment(\.colorScheme) private var colorScheme
     private let covers = CoverArtStore()
 
     public init() {}
+
+    private var appearance: AppearancePreference {
+        AppearancePreference(rawValue: appearanceRaw) ?? .dark
+    }
 
     private var filteredGames: [LibraryGame] {
         store.games(matching: systemTab.systemID)
@@ -27,12 +33,12 @@ public struct RetroPlayRootView: View {
                 .tabItem { Label("Library", systemImage: "square.grid.2x2.fill") }
                 .tag(RootTab.library)
 
-            SettingsView()
+            SettingsView(appearanceRaw: $appearanceRaw)
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                 .tag(RootTab.settings)
         }
         .tint(RetroPlayTheme.accent)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(appearance.colorScheme)
         .fileImporter(
             isPresented: $showImporter,
             allowedContentTypes: ImportContentTypes.allowedContentTypes,
@@ -53,7 +59,7 @@ public struct RetroPlayRootView: View {
                 systemPicker
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(RetroPlayTheme.section)
+                    .background(RetroPlayTheme.section(for: colorScheme))
 
                 Group {
                     if filteredGames.isEmpty {
@@ -66,9 +72,8 @@ public struct RetroPlayRootView: View {
                                     : "Import a \(systemTab.title) game, or switch tabs."
                             )
                         )
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(RetroPlayTheme.canvas)
+                        .background(RetroPlayTheme.canvas(for: colorScheme))
                     } else {
                         LibraryGridView(
                             games: filteredGames,
@@ -80,12 +85,12 @@ public struct RetroPlayRootView: View {
                     }
                 }
             }
-            .background(RetroPlayTheme.canvas)
+            .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("RetroPlay")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(RetroPlayTheme.section, for: .navigationBar)
+            .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(colorScheme, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -118,16 +123,16 @@ public struct RetroPlayRootView: View {
                             .padding(.vertical, 8)
                             .background {
                                 Capsule()
-                                    .fill(selected ? RetroPlayTheme.accent.opacity(0.35) : RetroPlayTheme.card)
+                                    .fill(selected ? RetroPlayTheme.accent.opacity(0.35) : RetroPlayTheme.card(for: colorScheme))
                             }
                             .overlay {
                                 Capsule()
                                     .strokeBorder(
-                                        selected ? RetroPlayTheme.accent : RetroPlayTheme.cardStroke,
+                                        selected ? RetroPlayTheme.accent : RetroPlayTheme.cardStroke(for: colorScheme),
                                         lineWidth: 1
                                     )
                             }
-                            .foregroundStyle(.white)
+                            .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                     }
                     .buttonStyle(.plain)
                 }
@@ -159,7 +164,6 @@ public struct RetroPlayRootView: View {
                     importErrorMessage = "No supported P0 ROMs in the selection (GBA, N64, NDS, PSP extensions)."
                     showImportError = true
                 } else if let first = added.first {
-                    // Jump to the system tab for the first imported game.
                     if let tab = SystemTab.allCases.first(where: { $0.systemID == first.systemID }) {
                         systemTab = tab
                     }
@@ -180,9 +184,34 @@ private enum RootTab: Hashable {
 
 @available(iOS 18.0, *)
 struct SettingsView: View {
+    @Binding var appearanceRaw: String
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var appearanceBinding: Binding<AppearancePreference> {
+        Binding(
+            get: { AppearancePreference(rawValue: appearanceRaw) ?? .dark },
+            set: { appearanceRaw = $0.rawValue }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Picker("Appearance", selection: appearanceBinding) {
+                        ForEach(AppearancePreference.allCases) { pref in
+                            Text(pref.title).tag(pref)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    Text("Dark is the default while we build. Light is fully supported.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Appearance")
+                }
+                .listRowBackground(RetroPlayTheme.card(for: colorScheme))
+
                 Section {
                     Text(
                         """
@@ -194,8 +223,7 @@ struct SettingsView: View {
                         """
                     )
                     .font(.body)
-                    .foregroundStyle(.primary)
-                    .listRowBackground(RetroPlayTheme.card)
+                    .listRowBackground(RetroPlayTheme.card(for: colorScheme))
                 } header: {
                     Text("Legal")
                 }
@@ -208,7 +236,7 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        .listRowBackground(RetroPlayTheme.card)
+                        .listRowBackground(RetroPlayTheme.card(for: colorScheme))
                     }
                 } header: {
                     Text("Systems (P0)")
@@ -216,7 +244,7 @@ struct SettingsView: View {
 
                 Section {
                     LabeledContent("GBA", value: "mGBA (playable)")
-                    LabeledContent("PSP", value: "PPSSPP IR (scaffold)")
+                    LabeledContent("PSP", value: "PPSSPP IR (linking)")
                     Text(PPSSPPDefaults.performanceNote)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -226,16 +254,15 @@ struct SettingsView: View {
                 } header: {
                     Text("Cores")
                 }
-                .listRowBackground(RetroPlayTheme.card)
+                .listRowBackground(RetroPlayTheme.card(for: colorScheme))
             }
             .scrollContentBackground(.hidden)
-            .background(RetroPlayTheme.canvas)
+            .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(RetroPlayTheme.section, for: .navigationBar)
+            .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(colorScheme, for: .navigationBar)
         }
-        .preferredColorScheme(.dark)
     }
 }

@@ -8,14 +8,17 @@ struct LibraryGridView: View {
     let onSelect: (LibraryGame) -> Void
     let artworkProvider: (LibraryGame) -> UIImage?
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private let columns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
+        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10)
     ]
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 18) {
+            LazyVGrid(columns: columns, spacing: 14) {
                 ForEach(games) { game in
                     Button {
                         onSelect(game)
@@ -25,9 +28,9 @@ struct LibraryGridView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .padding(.vertical, 12)
         }
-        .background(RetroPlayTheme.canvas)
+        .background(RetroPlayTheme.canvas(for: colorScheme))
     }
 }

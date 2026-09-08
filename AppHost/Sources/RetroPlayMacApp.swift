@@ -6,6 +6,7 @@ import RetroPlayApp
 struct RetroPlayMacApp: App {
     init() {
         MGBANativeBootstrap.registerIfAvailable()
+        PPSSPPNativeBootstrap.registerIfAvailable()
     }
 
     var body: some Scene {

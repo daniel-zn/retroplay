@@ -1,14 +1,38 @@
 import RetroPlayCore
 import SwiftUI
 
-/// Dark-first chrome: true black sections, near-black cards.
+/// Adaptive chrome: true black sections in dark; light system backgrounds in light.
 @available(iOS 18.0, *)
 enum RetroPlayTheme {
-    static let canvas = Color.black
-    static let section = Color(red: 0.07, green: 0.07, blue: 0.08)
-    static let card = Color(red: 0.12, green: 0.12, blue: 0.14)
-    static let cardStroke = Color.white.opacity(0.08)
     static let accent = Color.cyan.opacity(0.85)
+
+    static func canvas(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.black : Color(uiColor: .systemGroupedBackground)
+    }
+
+    static func section(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.07, green: 0.07, blue: 0.08)
+            : Color(uiColor: .secondarySystemGroupedBackground)
+    }
+
+    static func card(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.12, green: 0.12, blue: 0.14)
+            : Color(uiColor: .secondarySystemBackground)
+    }
+
+    static func cardStroke(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)
+    }
+
+    static func primaryText(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? .white : .primary
+    }
+
+    static func secondaryText(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.45) : .secondary
+    }
 
     static func systemTint(_ id: SystemID) -> Color {
         switch id {
