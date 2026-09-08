@@ -18,6 +18,7 @@ public struct PlayView: View {
     @State private var held: GBAInput = []
     @State private var frameImage: CGImage?
     @State private var frameSink = FrameSinkStore()
+    @State private var sawFirstFrame = false
 
     public init(game: LibraryGame, romURL: URL) {
         self.game = game
@@ -153,8 +154,10 @@ public struct PlayView: View {
 
     private func boot() async {
         let instance = CoreFactory.makeCore(for: game.systemID)
+        sawFirstFrame = false
         frameSink.onFrame = { image in
             frameImage = image
+            sawFirstFrame = true
             statusLine = "Running"
         }
         if let mgba = instance as? MGBACore {
@@ -166,7 +169,24 @@ public struct PlayView: View {
         do {
             try await instance.loadROM(at: romURL)
             instance.start()
-            statusLine = "Running"
+            statusLine = "Waiting for first frame…"
+            // Honest timeout: "Running" without pixels is a stuck state, not success.
+            let system = game.systemID
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                guard !sawFirstFrame, frameImage == nil else { return }
+                let message: String
+                if system == .psp {
+                    message = """
+                    PPSSPP produced no video frames after 10 seconds.                     The ISO may have loaded, but the display buffer never became readable                     (common on Simulator if MemMap/graphics init is incomplete).                     Try a physical device, or check the console for MemMap / GetOutputFramebuffer errors.
+                    """
+                } else {
+                    message = "No video frames after 10 seconds. The core may be stuck or not emitting frames."
+                }
+                statusLine = "No frames"
+                errorMessage = message
+                showError = true
+            }
         } catch {
             errorMessage = error.localizedDescription
             statusLine = "Failed"

@@ -55,3 +55,10 @@ Upstream `ffmpeg/ios/universal/lib/*.a` are **iphoneos**. Linking them into an `
 - Header search paths expect sibling checkout: `/Users/danielsmacmini/GitHub/ppsspp`.
 - First boot attempts `NativeInit` + `PSP_Init` with **IR interpreter** + **software GPU** for RGBA capture.
 - If compile/link fails on miniMac, iterate symbol/include fixes; do not commit the XCFramework.
+
+## Troubleshooting: Play shows “Running” but black screen
+
+1. **Fake status:** Play used to set “Running” as soon as `start()` returned. It now shows “Waiting for first frame…” until the frame sink gets pixels, then alerts after ~10s if still empty.
+2. **coreState:** After `PSP_Init`, the host must set `coreState = CORE_RUNNING_CPU`. After each host frame PPSSPP leaves `CORE_NEXTFRAME`; reset to `CORE_RUNNING_CPU` before the next `PSP_RunLoop*` (same as EmuScreen / libretro). Without that, ticks no-op and SoftGPU never gets a display framebuffer.
+3. **RGBA export:** SoftGPU display buffers are often 16-bit. Use `ConvertBufferToScreenshot` (not raw `memcpy` as RGBA8888). `GetOutputFramebuffer` also fails until `sceDisplaySetFrameBuf`.
+4. **Simulator MemMap:** Many `vm_remap failed` / `Failed at view N` lines mean probing; if Init still completes, continue. Persistent MemMap failure blocks real frames — prefer device smoke for ATV.
