@@ -1,16 +1,16 @@
 # PSP on-screen controls
 
-## Portrait
-1. Game frame uses the **full screen width** (16:9) — GeometryReader forces bezel width to the container.
+## Portrait (current focus)
+1. Game frame uses the **full screen width** (16:9). SoftGPU pixels fill the bezel.
 2. All controls sit **below** the frame: L/R, D-pad + △○✕□, Select/Start, then Pause/Resume/Stop.
+3. Library tab bar is hidden while Play is open.
+4. Nav title carries the game name (no extra system caption above the bezel).
 
-## Landscape (like a real PSP)
-1. **Left:** L + D-pad (thumb zone).
-2. **Center:** game screen (as wide as remaining space), Select/Start under it, small transport.
-3. **Right:** R + △○✕□ face diamond (thumb zone).
+## Landscape (deferred)
+Left L/D-pad · center screen · right R/face — polish later after real Simulator rotate works.
 
 ## Face order
-Sony diamond: △ top, ○ right, ✕ bottom, □ left. Center-to-center reach ≈ `0.82 × diameter` so circles do not overlap.
+Sony diamond: △ top, ○ right, ✕ bottom, □ left. Reach ≈ `0.82 × diameter`.
 
 ## Bits
 `PSPInput` matches PPSSPP `CTRL_*`. Bridge calls `__CtrlUpdateButtons` on change.

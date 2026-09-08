@@ -24,25 +24,24 @@ struct PSPFamilyPadView: View {
 
     /// Portrait: shoulders, then D-pad | face with room, Start/Select under.
     private var portraitPad: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             HStack {
-                PSPHoldPadButton(title: "L", bit: .l, isHeld: held.contains(.l), diameter: 46, setHeld: setHeld)
+                PSPHoldPadButton(title: "L", bit: .l, isHeld: held.contains(.l), diameter: 44, setHeld: setHeld)
                 Spacer()
-                PSPHoldPadButton(title: "R", bit: .r, isHeld: held.contains(.r), diameter: 46, setHeld: setHeld)
-            }
-            .padding(.horizontal, 12)
-
-            HStack(alignment: .center, spacing: 20) {
-                PSPDPadView(held: held, arm: 46, setHeld: setHeld)
-                Spacer(minLength: 8)
-                PSPFaceCluster(held: held, diameter: 44, setHeld: setHeld)
+                PSPHoldPadButton(title: "R", bit: .r, isHeld: held.contains(.r), diameter: 44, setHeld: setHeld)
             }
             .padding(.horizontal, 8)
 
+            HStack(alignment: .center, spacing: 24) {
+                PSPDPadView(held: held, arm: 44, setHeld: setHeld)
+                Spacer(minLength: 4)
+                PSPFaceCluster(held: held, diameter: 42, setHeld: setHeld)
+            }
+            .padding(.horizontal, 4)
+
             PSPPadStartSelectRow(held: held, setHeld: setHeld)
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
         .accessibilityLabel("PSP controls")
     }
 

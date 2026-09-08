@@ -51,6 +51,7 @@ public struct PlayView: View {
         .toolbarBackground(RetroPlayTheme.section(for: colorScheme), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(colorScheme, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .task { await boot() }
         .onDisappear {
             core?.stop()
@@ -67,14 +68,7 @@ public struct PlayView: View {
 
     private var portraitBody: some View {
         VStack(spacing: 0) {
-            Text("\(game.systemID.displayName) · \(game.systemID.defaultCoreName)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 4)
-                .padding(.bottom, 6)
-
-            // Edge-to-edge game bezel: force width to the container (no side inset).
+            // Edge-to-edge game bezel; nav title already names the game.
             GeometryReader { geo in
                 gameScreen
                     .frame(width: geo.size.width, height: geo.size.width / screenAspect)
@@ -83,7 +77,7 @@ public struct PlayView: View {
             .frame(maxWidth: .infinity)
             .layoutPriority(1)
 
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 if game.systemID == .gba || game.systemID == .psp {
                     ConsolePadHost(
                         systemID: game.systemID,
@@ -96,9 +90,9 @@ public struct PlayView: View {
                 }
                 transportBar
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
         }
     }
 
@@ -171,17 +165,18 @@ public struct PlayView: View {
                 Image(decorative: frameImage, scale: 1, orientation: .up)
                     .resizable()
                     .interpolation(.none)
-                    .aspectRatio(contentMode: .fit)
+                    // Fill the bezel; SoftGPU frames are already the display aspect.
+                    .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
             } else {
                 Text(statusLine)
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(.white.opacity(0.85))
                     .multilineTextAlignment(.center)
                     .padding()
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: isLandscapeCompactHeight ? 6 : 10, style: .continuous))
     }
 
     private var transportBar: some View {
