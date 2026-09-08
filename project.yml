@@ -25,6 +25,7 @@ targets:
         buildPhase: resources
         excludes:
           - RetroPlay-Bridging-Header.h
+          - Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.danielzn.retroplay
