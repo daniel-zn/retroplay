@@ -44,17 +44,17 @@ enum RetroPlayNavigationBarChrome {
         for scene in UIApplication.shared.connectedScenes {
             guard let windowScene = scene as? UIWindowScene else { continue }
             for window in windowScene.windows {
-                applyToBar(in: window, apply: applyToBar)
+                applyRecursively(in: window, apply: applyToBar)
             }
         }
     }
 
-    private static func applyToBar(in root: UIView, apply: (UINavigationBar) -> Void) {
+    private static func applyRecursively(in root: UIView, apply: (UINavigationBar) -> Void) {
         if let bar = root as? UINavigationBar {
             apply(bar)
         }
         for sub in root.subviews {
-            applyToBar(in: sub, apply: apply)
+            applyRecursively(in: sub, apply: apply)
         }
     }
 }
