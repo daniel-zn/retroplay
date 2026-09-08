@@ -47,7 +47,7 @@ targets:
         USER_HEADER_SEARCH_PATHS: "$(inherited) $(SRCROOT)/../ppsspp"
         # Expose mCoreFind / mCoreLoadFile / save helpers from mgba/core/core.h
         GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) ENABLE_VFS=1 ENABLE_DIRECTORIES=1 RETROPLAY_HAS_PPSSPP=1 RETROPLAY_HAS_MGBA=1"
-        OTHER_LDFLAGS: "$(inherited) -lc++ -ObjC"
+        OTHER_LDFLAGS: "$(inherited) -lc++ -ObjC -lz"
       configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP"
@@ -77,6 +77,10 @@ targets:
       - sdk: VideoToolbox.framework
       - sdk: GameController.framework
       - sdk: Accelerate.framework
+      - sdk: CoreServices.framework
+      - sdk: CoreText.framework
+      - sdk: MobileCoreServices.framework
+      - sdk: UniformTypeIdentifiers.framework
     scheme:
       testTargets: []
       gatherCoverageData: false
