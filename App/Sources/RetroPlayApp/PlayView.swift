@@ -121,20 +121,15 @@ public struct PlayView: View {
             // Screen takes remaining width; chrome under it stays in the center column.
             VStack(spacing: 4) {
                 GeometryReader { geo in
-                    // Prefer the largest 16:9 (or system aspect) that fits the center column.
+                    // Prefer the largest aspect-fit rect that fits the center column.
+                    // Ternaries only — ViewBuilder rejects if/else used to bind lets.
                     let maxW = geo.size.width
                     let maxH = geo.size.height
                     let hFromWidth = maxW / screenAspect
                     let wFromHeight = maxH * screenAspect
-                    let drawnW: CGFloat
-                    let drawnH: CGFloat
-                    if hFromWidth <= maxH {
-                        drawnW = maxW
-                        drawnH = hFromWidth
-                    } else {
-                        drawnW = wFromHeight
-                        drawnH = maxH
-                    }
+                    let fitsByWidth = hFromWidth <= maxH
+                    let drawnW = fitsByWidth ? maxW : wFromHeight
+                    let drawnH = fitsByWidth ? hFromWidth : maxH
                     gameScreen
                         .frame(width: drawnW, height: drawnH)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
