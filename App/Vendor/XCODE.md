@@ -2,13 +2,13 @@
 
 ## Already on Mac mini
 
-- Repo: `~/src/retroplay` (pull before generating)
+- Repo: `/Users/danielsmacmini/GitHub/retroplay` (pull before generating)
 - XCFramework: `App/Vendor/Output/mGBA.xcframework`
 
 ## One-shot (miniMac)
 
 ```bash
-cd ~/src/retroplay
+cd /Users/danielsmacmini/GitHub/retroplay
 git pull --ff-only
 ./AppHost/bootstrap-xcode.sh
 ```

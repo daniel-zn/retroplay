@@ -36,15 +36,15 @@ Your Mac session:
 
 ```bash
 # 1) Check out RetroPlay
-git clone https://github.com/daniel-zn/retroplay.git ~/src/retroplay
-cd ~/src/retroplay
+git clone https://github.com/daniel-zn/retroplay.git /Users/danielsmacmini/GitHub/retroplay
+cd /Users/danielsmacmini/GitHub/retroplay
 
 # 2) Clone mGBA outside the repo (shallow is fine)
-git clone --depth 1 https://github.com/mgba-emu/mgba.git ~/src/mgba
+git clone --depth 1 https://github.com/mgba-emu/mgba.git /Users/danielsmacmini/GitHub/mgba
 
 # 3) Build XCFramework into App/Vendor/Output/ (gitignored)
-export RETROPLAY_ROOT=~/src/retroplay
-export MGBA_SRC=~/src/mgba
+export RETROPLAY_ROOT=/Users/danielsmacmini/GitHub/retroplay
+export MGBA_SRC=/Users/danielsmacmini/GitHub/mgba
 ./App/Vendor/build-mgba-ios.sh
 ```
 

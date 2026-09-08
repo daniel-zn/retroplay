@@ -153,12 +153,14 @@ public struct PlayView: View {
 
     private func boot() async {
         let instance = CoreFactory.makeCore(for: game.systemID)
+        frameSink.onFrame = { image in
+            frameImage = image
+            statusLine = "Running"
+        }
         if let mgba = instance as? MGBACore {
-            frameSink.onFrame = { image in
-                frameImage = image
-                statusLine = "Running"
-            }
             mgba.attachFrameSink(frameSink)
+        } else if let psp = instance as? PPSSPPCore {
+            psp.attachFrameSink(frameSink)
         }
         core = instance
         do {

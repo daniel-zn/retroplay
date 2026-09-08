@@ -25,8 +25,8 @@ Upstream `ffmpeg/ios/universal/lib/*.a` are **iphoneos**. Linking them into an `
 
 1. Clone upstream **outside** retroplay:
    ```bash
-   git clone --recurse-submodules https://github.com/hrydgard/ppsspp.git ~/src/ppsspp
-   cd ~/src/ppsspp && git submodule update --init --recursive
+   git clone --recurse-submodules https://github.com/hrydgard/ppsspp.git /Users/danielsmacmini/GitHub/ppsspp
+   cd /Users/danielsmacmini/GitHub/ppsspp && git submodule update --init --recursive
    ```
 2. Follow upstream iOS build docs: https://www.ppsspp.org/docs/reference/ios-support/ and https://github.com/hrydgard/ppsspp/wiki/Build-instructions (`b.sh` / Xcode).
 3. Prefer producing a **static** library or framework for ios-arm64 + simulator, then:
@@ -34,7 +34,7 @@ Upstream `ffmpeg/ios/universal/lib/*.a` are **iphoneos**. Linking them into an `
    xcodebuild -create-xcframework \
      -library <device/lib….a> -headers <headers> \
      -library <sim/lib….a> -headers <headers> \
-     -output ~/src/retroplay/App/Vendor/Output/PPSSPP.xcframework
+     -output /Users/danielsmacmini/GitHub/retroplay/App/Vendor/Output/PPSSPP.xcframework
    ```
    Helper stub: `App/Vendor/build-ppsspp-ios.sh` (fills in once paths are known on the mini).
 4. XcodeGen / `project.yml`: add `PPSSPP.xcframework` dependency, `RETROPLAY_HAS_PPSSPP` compile condition (alongside mGBA).
@@ -46,3 +46,12 @@ Upstream `ffmpeg/ios/universal/lib/*.a` are **iphoneos**. Linking them into an `
 
 - Product bot lands Swift + docs on GitHub.
 - **miniMac** builds the XCFramework on the Mac mini and wires Xcode.
+
+
+## RETROPLAY_HAS_PPSSPP wiring (2026-09-08)
+
+- `project.yml` links `App/Vendor/Output/PPSSPP.xcframework` and defines `RETROPLAY_HAS_PPSSPP`.
+- C bridge: `AppHost/Sources/RetroPlayPPSSPPBridge.{h,mm}` → Swift `PPSSPPNativeDriver`.
+- Header search paths expect sibling checkout: `/Users/danielsmacmini/GitHub/ppsspp`.
+- First boot attempts `NativeInit` + `PSP_Init` with **IR interpreter** + **software GPU** for RGBA capture.
+- If compile/link fails on miniMac, iterate symbol/include fixes; do not commit the XCFramework.

@@ -2,24 +2,82 @@ import Foundation
 import RetroPlayCore
 
 #if RETROPLAY_HAS_PPSSPP
-/// Real PPSSPP C++/ObjC bridge lands here once the XCFramework is linked.
+
 public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
+    private var bridge: UnsafeMutablePointer<RetroPlayPPSSPPBridge>?
+
     public init() {}
 
     public func loadGame(at url: URL) throws {
-        throw EmulatorCoreError.notImplemented(
-            "PPSSPP XCFramework linked but native loadGame bridge not implemented yet."
-        )
+        tearDown()
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let save = docs.appendingPathComponent("PPSSPP", isDirectory: true)
+        let cache = docs.appendingPathComponent("PPSSPPCache", isDirectory: true)
+        try? FileManager.default.createDirectory(at: save, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+
+        guard let created = rp_ppsspp_create(save.path, cache.path) else {
+            throw EmulatorCoreError.romLoadFailed("rp_ppsspp_create failed")
+        }
+        bridge = created
+
+        var err = [CChar](repeating: 0, count: 1024)
+        let ok = url.path.withCString { pathPtr in
+            rp_ppsspp_load(created, pathPtr, &err, err.count)
+        }
+        if !ok {
+            let message = String(cString: err)
+            tearDown()
+            throw EmulatorCoreError.romLoadFailed(message.isEmpty ? "PPSSPP load failed" : message)
+        }
     }
 
-    public func setKeys(_ bitmask: UInt32) {}
-    public func runFrame() {}
-    public func pauseAudioVideo() {}
-    public func resumeAudioVideo() {}
-    public func copyRGBAFrame() -> EmulatorVideoFrame? { nil }
-    public func tearDown() {}
+    public func setKeys(_ bitmask: UInt32) {
+        guard let bridge else { return }
+        rp_ppsspp_set_buttons(bridge, bitmask)
+    }
+
+    public func runFrame() {
+        guard let bridge else { return }
+        rp_ppsspp_run_frame(bridge)
+    }
+
+    public func pauseAudioVideo() {
+        guard let bridge else { return }
+        rp_ppsspp_pause(bridge)
+    }
+
+    public func resumeAudioVideo() {
+        guard let bridge else { return }
+        rp_ppsspp_resume(bridge)
+    }
+
+    public func copyRGBAFrame() -> EmulatorVideoFrame? {
+        guard let bridge else { return nil }
+        var bytes: UnsafeMutablePointer<UInt8>?
+        var w: Int32 = 0
+        var h: Int32 = 0
+        var stride: Int32 = 0
+        let ok = rp_ppsspp_copy_rgba(bridge, &bytes, &w, &h, &stride)
+        guard ok, let bytes, w > 0, h > 0, stride > 0 else { return nil }
+        defer { free(bytes) }
+        let count = Int(stride) * Int(h)
+        let data = Data(bytes: bytes, count: count)
+        return EmulatorVideoFrame(width: Int(w), height: Int(h), bytes: data, bytesPerRow: Int(stride))
+    }
+
+    public func tearDown() {
+        if let bridge {
+            rp_ppsspp_destroy(bridge)
+        }
+        bridge = nil
+    }
+
+    deinit { tearDown() }
 }
+
 #else
+
 public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
     public init() {}
     public func loadGame(at url: URL) throws {
@@ -34,4 +92,5 @@ public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
     public func copyRGBAFrame() -> EmulatorVideoFrame? { nil }
     public func tearDown() {}
 }
+
 #endif

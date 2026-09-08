@@ -12,3 +12,7 @@
 #import <mgba/core/config.h>
 #import <mgba-util/common.h>
 #import <mgba-util/image.h>
+
+#if __has_include("RetroPlayPPSSPPBridge.h")
+#import "RetroPlayPPSSPPBridge.h"
+#endif
