@@ -9,17 +9,14 @@
 
 #include "Common/File/Path.h"
 #include "Common/System/NativeApp.h"
+#include "Core/CmdLine.h"
 #include "Core/Config.h"
 #include "Core/ConfigValues.h"
 #include "Core/CoreParameter.h"
 #include "Core/System.h"
-
-#if __has_include("GPU/GPU.h")
 #include "GPU/GPU.h"
-#endif
-#if __has_include("GPU/Common/GPUDebugInterface.h")
+#include "GPU/GPUCommon.h"
 #include "GPU/Common/GPUDebugInterface.h"
-#endif
 
 namespace {
 struct BridgeState {
@@ -79,6 +76,7 @@ bool rp_ppsspp_load(void *bridgePtr, const char *gamePath, char *errorOut, size_
     param.cpuCore = CPUCore::IR_INTERPRETER;
     param.gpuCore = GPUCORE_SOFTWARE;
     param.enableSound = false;
+    param.headLess = true;
     param.fileToStart = Path(std::string(gamePath));
     param.startBreak = false;
 
@@ -115,12 +113,12 @@ bool rp_ppsspp_copy_rgba(void *bridgePtr, uint8_t **outBytes, int *outWidth, int
     }
     *outBytes = nullptr;
 
-    extern GPUDebugInterface *gpuDebug;
-    if (!gpuDebug) {
+    // GPUCommon exposes GetOutputFramebuffer; `gpu` is the live instance.
+    if (!gpu) {
         return false;
     }
     GPUDebugBuffer buf;
-    if (!gpuDebug->GetOutputFramebuffer(buf) || buf.GetData() == nullptr) {
+    if (!gpu->GetOutputFramebuffer(buf) || buf.GetData() == nullptr) {
         return false;
     }
     const int w = (int)buf.GetStride();
