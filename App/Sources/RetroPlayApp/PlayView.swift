@@ -211,16 +211,23 @@ public struct PlayView: View {
                 )
 
                 if core?.supportsFastForward == true {
-                    Button(fastForward ? "FF On" : "FF Off") {
+                    Button(fastForward ? "FF ×4" : "FF Off") {
                         fastForward.toggle()
                         core?.setFastForward(fastForward)
-                        statusLine = fastForward ? "Fast-forward on" : "Running"
+                        statusLine = fastForward
+                            ? "FF ×4 — game runs faster (display still ~60)"
+                            : "Running"
                     }
                     .tint(fastForward ? .orange : nil)
                 }
             }
 
-            if core?.supportsSaveState != true {
+            if fastForward {
+                Text("Fast-forward speeds up emulation; the screen refresh can stay near 60.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if core?.supportsSaveState != true {
                 Text("Save states not available for this core yet.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -244,7 +251,7 @@ public struct PlayView: View {
             let url = try SaveStateStore.quickSaveURL(system: game.systemID, gameID: game.id)
             try await core.saveState(to: url)
             core.resume()
-            statusLine = fastForward ? "Fast-forward on" : "Quick save OK"
+            statusLine = fastForward ? "FF ×4 — game runs faster (display still ~60)" : "Quick save OK"
         } catch {
             statusLine = "Quick save failed"
             errorMessage = error.localizedDescription
@@ -269,7 +276,7 @@ public struct PlayView: View {
             }
             try await core.loadState(from: url)
             core.resume()
-            statusLine = fastForward ? "Fast-forward on" : "Quick load OK"
+            statusLine = fastForward ? "FF ×4 — game runs faster (display still ~60)" : "Quick load OK"
         } catch {
             statusLine = "Quick load failed"
             errorMessage = error.localizedDescription
