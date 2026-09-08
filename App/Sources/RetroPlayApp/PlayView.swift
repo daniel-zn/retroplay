@@ -210,20 +210,14 @@ public struct PlayView: View {
             }
 
             HStack(spacing: 10) {
-                Button {
+                Button("Save") {
                     Task { await quickSave() }
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
                 }
-                .accessibilityLabel("Quick Save")
                 .disabled(saveBusy || !(core?.supportsSaveState ?? false))
 
-                Button {
+                Button("Load") {
                     Task { await quickLoad() }
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
                 }
-                .accessibilityLabel("Quick Load")
                 .disabled(
                     saveBusy
                         || !(core?.supportsSaveState ?? false)
