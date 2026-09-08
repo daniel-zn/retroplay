@@ -8,6 +8,7 @@ let package = Package(
     ],
     products: [
         .library(name: "RetroPlayCore", targets: ["RetroPlayCore"]),
+        .library(name: "RetroPlayApp", targets: ["RetroPlayApp"]),
     ],
     targets: [
         .target(
