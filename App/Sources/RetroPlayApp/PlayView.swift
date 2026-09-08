@@ -74,11 +74,14 @@ public struct PlayView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 6)
 
-            // Edge-to-edge game bezel (no side padding).
-            gameScreen
-                .aspectRatio(screenAspect, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .layoutPriority(1)
+            // Edge-to-edge game bezel: force width to the container (no side inset).
+            GeometryReader { geo in
+                gameScreen
+                    .frame(width: geo.size.width, height: geo.size.width / screenAspect)
+            }
+            .aspectRatio(screenAspect, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .layoutPriority(1)
 
             VStack(spacing: 10) {
                 if game.systemID == .gba || game.systemID == .psp {
@@ -117,10 +120,17 @@ public struct PlayView: View {
 
             // Screen takes remaining width; chrome under it stays in the center column.
             VStack(spacing: 4) {
-                gameScreen
-                    .aspectRatio(screenAspect, contentMode: .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .layoutPriority(1)
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    let hFromWidth = w / screenAspect
+                    let h = min(geo.size.height, hFromWidth)
+                    let drawnW = h * screenAspect
+                    gameScreen
+                        .frame(width: drawnW, height: h)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .layoutPriority(1)
 
                 if game.systemID == .gba {
                     GBAPadStartSelectRow(held: gbaHeld, setHeld: setGBAHeld)
