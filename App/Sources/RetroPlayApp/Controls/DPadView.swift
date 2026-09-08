@@ -6,9 +6,9 @@ import RetroPlayCore
 struct DPadView: View {
     let held: GBAInput
     let arm: CGFloat
-    let setHeld: (GBAInput, Bool) -> Void
+    let setHeld: GBAHeldHandler
 
-    init(held: GBAInput, arm: CGFloat = 52, setHeld: @escaping (GBAInput, Bool) -> Void) {
+    init(held: GBAInput, arm: CGFloat = 52, setHeld: @escaping GBAHeldHandler) {
         self.held = held
         self.arm = arm
         self.setHeld = setHeld

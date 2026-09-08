@@ -8,7 +8,7 @@ struct ConsolePadHost: View {
     let systemID: SystemID
     let orientation: GBAFamilyPadView.Orientation
     let held: GBAInput
-    let setHeld: (GBAInput, Bool) -> Void
+    let setHeld: GBAHeldHandler
 
     var body: some View {
         switch systemID {

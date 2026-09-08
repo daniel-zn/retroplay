@@ -81,7 +81,7 @@ public struct PlayView: View {
         VStack(spacing: 6) {
             HStack(alignment: .center, spacing: 8) {
                 if game.systemID == .gba {
-                    GBAFamilyPadParts.leftColumn(held: held, setHeld: setHeld)
+                    GBAPadLeftColumn(held: held, setHeld: setHeld)
                 }
 
                 gameScreen
@@ -89,13 +89,13 @@ public struct PlayView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 if game.systemID == .gba {
-                    GBAFamilyPadParts.rightColumn(held: held, setHeld: setHeld)
+                    GBAPadRightColumn(held: held, setHeld: setHeld)
                 }
             }
             .padding(.horizontal, 8)
 
             if game.systemID == .gba {
-                GBAFamilyPadParts.startSelectRow(held: held, setHeld: setHeld)
+                GBAPadStartSelectRow(held: held, setHeld: setHeld)
             }
 
             transportBar
@@ -136,6 +136,7 @@ public struct PlayView: View {
         .controlSize(.small)
     }
 
+    @MainActor
     private func setHeld(_ bit: GBAInput, _ down: Bool) {
         if down { held.insert(bit) } else { held.remove(bit) }
         core?.setGBAInput(held)

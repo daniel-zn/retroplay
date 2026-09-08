@@ -1,6 +1,8 @@
 import SwiftUI
 import RetroPlayCore
 
+typealias GBAHeldHandler = @MainActor @Sendable (GBAInput, Bool) -> Void
+
 /// Hold-to-press pad control. Uses a drag gesture (min distance 0) so the bit stays
 /// set while the finger is down, matching emulator key semantics.
 @available(iOS 18.0, *)
@@ -9,14 +11,14 @@ struct HoldPadButton: View {
     let bit: GBAInput
     let isHeld: Bool
     let diameter: CGFloat
-    let setHeld: (GBAInput, Bool) -> Void
+    let setHeld: GBAHeldHandler
 
     init(
         title: String,
         bit: GBAInput,
         isHeld: Bool,
         diameter: CGFloat = 56,
-        setHeld: @escaping (GBAInput, Bool) -> Void
+        setHeld: @escaping GBAHeldHandler
     ) {
         self.title = title
         self.bit = bit
@@ -60,7 +62,7 @@ struct HoldPadCapsule: View {
     let title: String
     let bit: GBAInput
     let isHeld: Bool
-    let setHeld: (GBAInput, Bool) -> Void
+    let setHeld: GBAHeldHandler
 
     var body: some View {
         Text(title)
