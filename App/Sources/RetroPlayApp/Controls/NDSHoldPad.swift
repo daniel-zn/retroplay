@@ -9,6 +9,8 @@ struct NDSHoldPadButton: View {
     let bit: NDSInput
     let isHeld: Bool
     let diameter: CGFloat
+    var fill: Color = PadPalette.NDS.dpad
+    var ink: Color = PadPalette.NDS.ink
     let setHeld: NDSHeldHandler
 
     init(
@@ -16,39 +18,28 @@ struct NDSHoldPadButton: View {
         bit: NDSInput,
         isHeld: Bool,
         diameter: CGFloat = 52,
+        fill: Color = PadPalette.NDS.dpad,
+        ink: Color = PadPalette.NDS.ink,
         setHeld: @escaping NDSHeldHandler
     ) {
         self.title = title
         self.bit = bit
         self.isHeld = isHeld
         self.diameter = diameter
+        self.fill = fill
+        self.ink = ink
         self.setHeld = setHeld
     }
 
     var body: some View {
-        Text(title)
-            .font(.system(size: diameter * 0.32, weight: .semibold, design: .rounded))
-            .foregroundStyle(.primary)
-            .frame(width: diameter, height: diameter)
-            .background {
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .opacity(isHeld ? 1.0 : 0.82)
-            }
-            .overlay {
-                Circle()
-                    .strokeBorder(.primary.opacity(isHeld ? 0.45 : 0.22), lineWidth: isHeld ? 2 : 1)
-            }
-            .scaleEffect(isHeld ? 0.94 : 1.0)
-            .animation(.easeOut(duration: 0.08), value: isHeld)
-            .contentShape(Circle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in setHeld(bit, true) }
-                    .onEnded { _ in setHeld(bit, false) }
-            )
-            .accessibilityLabel(title)
-            .accessibilityAddTraits(.isButton)
+        PadFaceButton(
+            title: title,
+            isHeld: isHeld,
+            diameter: diameter,
+            fill: fill,
+            ink: ink,
+            onHeld: { setHeld(bit, $0) }
+        )
     }
 }
 
@@ -60,29 +51,15 @@ struct NDSHoldPadCapsule: View {
     let setHeld: NDSHeldHandler
 
     var body: some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 14)
-            .frame(minWidth: 72, minHeight: 40)
-            .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .opacity(isHeld ? 1.0 : 0.82)
-            }
-            .overlay {
-                Capsule()
-                    .strokeBorder(.primary.opacity(isHeld ? 0.4 : 0.2), lineWidth: 1)
-            }
-            .scaleEffect(isHeld ? 0.96 : 1.0)
-            .animation(.easeOut(duration: 0.08), value: isHeld)
-            .contentShape(Capsule())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in setHeld(bit, true) }
-                    .onEnded { _ in setHeld(bit, false) }
-            )
-            .accessibilityLabel(title)
-            .accessibilityAddTraits(.isButton)
+        PadOvalButton(
+            title: title,
+            isHeld: isHeld,
+            minWidth: 58,
+            minHeight: 40,
+            fill: PadPalette.NDS.shoulder,
+            ink: PadPalette.NDS.ink,
+            onHeld: { setHeld(bit, $0) }
+        )
     }
 }
 
@@ -99,18 +76,22 @@ struct NDSDPadView: View {
     }
 
     var body: some View {
-        let gap: CGFloat = 4
-        VStack(spacing: gap) {
-            NDSHoldPadButton(title: "▲", bit: .up, isHeld: held.contains(.up), diameter: arm, setHeld: setHeld)
-            HStack(spacing: gap) {
-                NDSHoldPadButton(title: "◀", bit: .left, isHeld: held.contains(.left), diameter: arm, setHeld: setHeld)
-                Color.clear.frame(width: arm, height: arm)
-                NDSHoldPadButton(title: "▶", bit: .right, isHeld: held.contains(.right), diameter: arm, setHeld: setHeld)
+        CrossDPad(
+            size: arm * 2.4,
+            armThickness: max(44, arm),
+            isUp: held.contains(.up),
+            isDown: held.contains(.down),
+            isLeft: held.contains(.left),
+            isRight: held.contains(.right),
+            fill: PadPalette.NDS.dpad,
+            heldFill: PadPalette.NDS.shoulder,
+            onChange: { up, down, left, right in
+                setHeld(.up, up)
+                setHeld(.down, down)
+                setHeld(.left, left)
+                setHeld(.right, right)
             }
-            NDSHoldPadButton(title: "▼", bit: .down, isHeld: held.contains(.down), diameter: arm, setHeld: setHeld)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("D-pad")
+        )
     }
 }
 
@@ -126,14 +107,43 @@ struct NDSFaceCluster: View {
 
     var body: some View {
         ZStack {
-            NDSHoldPadButton(title: "X", bit: .x, isHeld: held.contains(.x), diameter: diameter, setHeld: setHeld)
-                .offset(x: 0, y: -reach)
-            NDSHoldPadButton(title: "A", bit: .a, isHeld: held.contains(.a), diameter: diameter, setHeld: setHeld)
-                .offset(x: reach, y: 0)
-            NDSHoldPadButton(title: "B", bit: .b, isHeld: held.contains(.b), diameter: diameter, setHeld: setHeld)
-                .offset(x: 0, y: reach)
-            NDSHoldPadButton(title: "Y", bit: .y, isHeld: held.contains(.y), diameter: diameter, setHeld: setHeld)
-                .offset(x: -reach, y: 0)
+            NDSHoldPadButton(
+                title: "X",
+                bit: .x,
+                isHeld: held.contains(.x),
+                diameter: diameter,
+                fill: PadPalette.NDS.x,
+                setHeld: setHeld
+            )
+            .offset(x: 0, y: -reach)
+            NDSHoldPadButton(
+                title: "A",
+                bit: .a,
+                isHeld: held.contains(.a),
+                diameter: diameter,
+                fill: PadPalette.NDS.a,
+                setHeld: setHeld
+            )
+            .offset(x: reach, y: 0)
+            NDSHoldPadButton(
+                title: "B",
+                bit: .b,
+                isHeld: held.contains(.b),
+                diameter: diameter,
+                fill: PadPalette.NDS.b,
+                ink: PadPalette.NDS.inkDark,
+                setHeld: setHeld
+            )
+            .offset(x: 0, y: reach)
+            NDSHoldPadButton(
+                title: "Y",
+                bit: .y,
+                isHeld: held.contains(.y),
+                diameter: diameter,
+                fill: PadPalette.NDS.y,
+                setHeld: setHeld
+            )
+            .offset(x: -reach, y: 0)
         }
         .frame(width: side, height: side)
         .accessibilityElement(children: .contain)

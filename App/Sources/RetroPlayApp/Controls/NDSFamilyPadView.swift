@@ -1,7 +1,7 @@
 import SwiftUI
 import RetroPlayCore
 
-/// Portrait-first NDS pad. Dual-screen / touch are stubs until Play hosts a touch surface.
+/// Portrait-first NDS pad: DS Lite–like face, rectangular touch panel (not a GBA clone).
 @available(iOS 18.0, *)
 struct NDSFamilyPadView: View {
     enum Orientation {
@@ -25,30 +25,53 @@ struct NDSFamilyPadView: View {
     }
 
     private var portraitPad: some View {
-        VStack(spacing: 10) {
-            HStack {
-                NDSHoldPadButton(title: "L", bit: .l, isHeld: held.contains(.l), diameter: 44, setHeld: setHeld)
-                Spacer()
-                NDSHoldPadButton(title: "R", bit: .r, isHeld: held.contains(.r), diameter: 44, setHeld: setHeld)
-            }
-            .padding(.horizontal, 8)
+        PadChassis(fill: PadPalette.NDS.chassis, stroke: PadPalette.NDS.chassisStroke, cornerRadius: 22) {
+            VStack(spacing: 8) {
+                HStack {
+                    PadShoulderButton(
+                        title: "L",
+                        isHeld: held.contains(.l),
+                        width: 72,
+                        fill: PadPalette.NDS.shoulder,
+                        ink: PadPalette.NDS.ink,
+                        onHeld: { setHeld(.l, $0) }
+                    )
+                    Spacer()
+                    PadShoulderButton(
+                        title: "R",
+                        isHeld: held.contains(.r),
+                        width: 72,
+                        fill: PadPalette.NDS.shoulder,
+                        ink: PadPalette.NDS.ink,
+                        onHeld: { setHeld(.r, $0) }
+                    )
+                }
 
-            HStack(alignment: .center, spacing: 16) {
-                NDSDPadView(held: held, arm: 44, setHeld: setHeld)
-                Spacer(minLength: 4)
-                NDSFaceCluster(held: held, diameter: 40, setHeld: setHeld)
-            }
-            .padding(.horizontal, 4)
+                HStack(alignment: .center, spacing: 8) {
+                    VStack(spacing: 8) {
+                        NDSDPadView(held: held, arm: 42, setHeld: setHeld)
+                        HStack(spacing: 8) {
+                            NDSHoldPadCapsule(
+                                title: "SELECT",
+                                bit: .select,
+                                isHeld: held.contains(.select),
+                                setHeld: setHeld
+                            )
+                            NDSHoldPadCapsule(
+                                title: "START",
+                                bit: .start,
+                                isHeld: held.contains(.start),
+                                setHeld: setHeld
+                            )
+                        }
+                    }
+                    Spacer(minLength: 4)
+                    NDSFaceCluster(held: held, diameter: 40, setHeld: setHeld)
+                }
 
-            HStack(spacing: 16) {
-                NDSHoldPadCapsule(title: "Select", bit: .select, isHeld: held.contains(.select), setHeld: setHeld)
-                NDSHoldPadCapsule(title: "Start", bit: .start, isHeld: held.contains(.start), setHeld: setHeld)
+                NDSTouchPanel(onTouch: onTouch)
             }
-
-            // Touch stub: tap zone stands in for bottom-screen stylus until dual-screen Play lands.
-            touchStub
         }
-        .padding(.vertical, 4)
         .accessibilityLabel("NDS controls")
     }
 
@@ -64,36 +87,58 @@ struct NDSFamilyPadView: View {
         .padding(.vertical, 4)
         .accessibilityLabel("NDS controls")
     }
+}
 
-    private var touchStub: some View {
-        Text("Touch (stub)")
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.7)
+/// Rectangular DS Touch Screen stand-in. Maps the view rect onto 256×192.
+@available(iOS 18.0, *)
+struct NDSTouchPanel: View {
+    var onTouch: (@MainActor @Sendable (NDSTouch) -> Void)?
+    @State private var pressed = false
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(PadPalette.NDS.touchBezel)
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(PadPalette.NDS.touchGlass)
+                    .padding(7)
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .strokeBorder(Color.white.opacity(pressed ? 0.28 : 0.08), lineWidth: 1)
+                    .padding(7)
+                VStack(spacing: 2) {
+                    Text("Touch Screen")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    Text("256 × 192")
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .opacity(0.7)
+                }
+                .foregroundStyle(Color.white.opacity(0.55))
+                .allowsHitTesting(false)
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.15), lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        // Map local stub rect to ~NDS bottom screen (256×192).
-                        let x = UInt16(min(255, max(0, Int(value.location.x))))
-                        let y = UInt16(min(191, max(0, Int(value.location.y))))
-                        onTouch?(NDSTouch(x: x, y: y, pressed: true))
+                        pressed = true
+                        let sample = PadHitTesting.ndsTouch(
+                            x: Double(value.location.x),
+                            y: Double(value.location.y),
+                            width: Double(geo.size.width),
+                            height: Double(geo.size.height)
+                        )
+                        onTouch?(NDSTouch(x: sample.x, y: sample.y, pressed: true))
                     }
                     .onEnded { _ in
+                        pressed = false
                         onTouch?(.idle)
                     }
             )
-            .accessibilityLabel("Touch screen stub")
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 64)
+        .accessibilityLabel("Touch screen")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -103,9 +148,16 @@ struct NDSPadLeftColumn: View {
     let setHeld: NDSHeldHandler
 
     var body: some View {
-        VStack(spacing: 12) {
-            NDSHoldPadButton(title: "L", bit: .l, isHeld: held.contains(.l), diameter: 42, setHeld: setHeld)
-            NDSDPadView(held: held, arm: 42, setHeld: setHeld)
+        VStack(spacing: 10) {
+            PadShoulderButton(
+                title: "L",
+                isHeld: held.contains(.l),
+                width: 64,
+                fill: PadPalette.NDS.shoulder,
+                ink: PadPalette.NDS.ink,
+                onHeld: { setHeld(.l, $0) }
+            )
+            NDSDPadView(held: held, arm: 40, setHeld: setHeld)
             Spacer(minLength: 0)
         }
         .frame(minWidth: 140, maxWidth: 160)
@@ -118,9 +170,16 @@ struct NDSPadRightColumn: View {
     let setHeld: NDSHeldHandler
 
     var body: some View {
-        VStack(spacing: 12) {
-            NDSHoldPadButton(title: "R", bit: .r, isHeld: held.contains(.r), diameter: 42, setHeld: setHeld)
-            NDSFaceCluster(held: held, diameter: 38, setHeld: setHeld)
+        VStack(spacing: 10) {
+            PadShoulderButton(
+                title: "R",
+                isHeld: held.contains(.r),
+                width: 64,
+                fill: PadPalette.NDS.shoulder,
+                ink: PadPalette.NDS.ink,
+                onHeld: { setHeld(.r, $0) }
+            )
+            NDSFaceCluster(held: held, diameter: 36, setHeld: setHeld)
             Spacer(minLength: 0)
         }
         .frame(minWidth: 160, maxWidth: 190)
@@ -133,9 +192,9 @@ struct NDSPadStartSelectRow: View {
     let setHeld: NDSHeldHandler
 
     var body: some View {
-        HStack(spacing: 16) {
-            NDSHoldPadCapsule(title: "Select", bit: .select, isHeld: held.contains(.select), setHeld: setHeld)
-            NDSHoldPadCapsule(title: "Start", bit: .start, isHeld: held.contains(.start), setHeld: setHeld)
+        HStack(spacing: 12) {
+            NDSHoldPadCapsule(title: "SELECT", bit: .select, isHeld: held.contains(.select), setHeld: setHeld)
+            NDSHoldPadCapsule(title: "START", bit: .start, isHeld: held.contains(.start), setHeld: setHeld)
         }
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 import RetroPlayCore
 
-/// Portrait (Game Boy–style) and landscape (GBA slab–style) layouts for the GBA family.
+/// Portrait (GBA slab mapped under-screen) and landscape overlay for the GBA family.
 @available(iOS 18.0, *)
 struct GBAFamilyPadView: View {
     enum Orientation {
@@ -25,50 +25,65 @@ struct GBAFamilyPadView: View {
     // MARK: - Portrait (controls under screen)
 
     private var portraitPad: some View {
-        VStack(spacing: 14) {
-            HStack {
-                HoldPadButton(title: "L", bit: .l, isHeld: held.contains(.l), diameter: 48, setHeld: setHeld)
-                Spacer()
-                HoldPadButton(title: "R", bit: .r, isHeld: held.contains(.r), diameter: 48, setHeld: setHeld)
-            }
-            .padding(.horizontal, 8)
-
-            HStack(alignment: .center, spacing: 12) {
-                DPadView(held: held, arm: 50, setHeld: setHeld)
-                Spacer(minLength: 4)
-                VStack(spacing: 10) {
-                    HoldPadCapsule(title: "Select", bit: .select, isHeld: held.contains(.select), setHeld: setHeld)
-                    HoldPadCapsule(title: "Start", bit: .start, isHeld: held.contains(.start), setHeld: setHeld)
+        PadChassis(fill: PadPalette.GBA.chassis, stroke: PadPalette.GBA.chassisStroke, cornerRadius: 28) {
+            VStack(spacing: 12) {
+                HStack {
+                    PadShoulderButton(
+                        title: "L",
+                        isHeld: held.contains(.l),
+                        fill: PadPalette.GBA.shoulder,
+                        ink: PadPalette.GBA.ink,
+                        onHeld: { setHeld(.l, $0) }
+                    )
+                    Spacer()
+                    PadShoulderButton(
+                        title: "R",
+                        isHeld: held.contains(.r),
+                        fill: PadPalette.GBA.shoulder,
+                        ink: PadPalette.GBA.ink,
+                        onHeld: { setHeld(.r, $0) }
+                    )
                 }
-                Spacer(minLength: 4)
-                faceCluster(diameter: 58)
+
+                HStack(alignment: .center, spacing: 8) {
+                    DPadView(held: held, arm: 48, setHeld: setHeld)
+                    Spacer(minLength: 2)
+                    startSelectPair
+                    Spacer(minLength: 2)
+                    faceCluster(diameter: 54)
+                }
             }
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 8)
         .accessibilityLabel("GBA controls")
     }
 
-    // MARK: - Landscape (self-contained strip)
+    // MARK: - Landscape
 
     private var landscapePad: some View {
-        VStack(spacing: 10) {
-            HStack(alignment: .top) {
-                VStack(spacing: 10) {
-                    HoldPadButton(title: "L", bit: .l, isHeld: held.contains(.l), diameter: 48, setHeld: setHeld)
-                    DPadView(held: held, arm: 48, setHeld: setHeld)
-                }
-                Spacer(minLength: 8)
-                VStack(spacing: 12) {
-                    HoldPadCapsule(title: "Select", bit: .select, isHeld: held.contains(.select), setHeld: setHeld)
-                    HoldPadCapsule(title: "Start", bit: .start, isHeld: held.contains(.start), setHeld: setHeld)
-                }
-                .padding(.top, 24)
-                Spacer(minLength: 8)
-                VStack(spacing: 10) {
-                    HoldPadButton(title: "R", bit: .r, isHeld: held.contains(.r), diameter: 48, setHeld: setHeld)
-                    faceCluster(diameter: 56)
-                }
+        HStack(alignment: .top, spacing: 10) {
+            VStack(spacing: 10) {
+                PadShoulderButton(
+                    title: "L",
+                    isHeld: held.contains(.l),
+                    fill: PadPalette.GBA.shoulder,
+                    ink: PadPalette.GBA.ink,
+                    onHeld: { setHeld(.l, $0) }
+                )
+                DPadView(held: held, arm: 46, setHeld: setHeld)
+            }
+            Spacer(minLength: 6)
+            startSelectPair
+                .padding(.top, 28)
+            Spacer(minLength: 6)
+            VStack(spacing: 10) {
+                PadShoulderButton(
+                    title: "R",
+                    isHeld: held.contains(.r),
+                    fill: PadPalette.GBA.shoulder,
+                    ink: PadPalette.GBA.ink,
+                    onHeld: { setHeld(.r, $0) }
+                )
+                faceCluster(diameter: 52)
             }
         }
         .padding(.horizontal, 8)
@@ -78,30 +93,32 @@ struct GBAFamilyPadView: View {
 
     /// Nintendo-style face: B lower-left, A upper-right.
     private func faceCluster(diameter: CGFloat) -> some View {
-        ZStack {
-            HoldPadButton(
-                title: "B",
-                bit: .b,
-                isHeld: held.contains(.b),
-                diameter: diameter,
-                setHeld: setHeld
-            )
-            .offset(x: -diameter * 0.42, y: diameter * 0.28)
+        GBAFaceCluster(held: held, diameter: diameter, setHeld: setHeld)
+    }
 
-            HoldPadButton(
-                title: "A",
-                bit: .a,
-                isHeld: held.contains(.a),
-                diameter: diameter,
+    /// GBA SELECT / START sit between D-pad and A/B, slightly tilted toward each other.
+    private var startSelectPair: some View {
+        VStack(spacing: 14) {
+            HoldPadCapsule(
+                title: "SELECT",
+                bit: .select,
+                isHeld: held.contains(.select),
+                rotation: .degrees(-16),
                 setHeld: setHeld
             )
-            .offset(x: diameter * 0.42, y: -diameter * 0.28)
+            HoldPadCapsule(
+                title: "START",
+                bit: .start,
+                isHeld: held.contains(.start),
+                rotation: .degrees(16),
+                setHeld: setHeld
+            )
         }
-        .frame(width: diameter * 2.1, height: diameter * 2.0)
+        .frame(width: 78)
     }
 }
 
-// MARK: - Landscape Play shell pieces (Views stay @MainActor; avoids static sendability traps)
+// MARK: - Landscape Play shell pieces
 
 @available(iOS 18.0, *)
 struct GBAPadLeftColumn: View {
@@ -110,8 +127,14 @@ struct GBAPadLeftColumn: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HoldPadButton(title: "L", bit: .l, isHeld: held.contains(.l), diameter: 48, setHeld: setHeld)
-            DPadView(held: held, arm: 48, setHeld: setHeld)
+            PadShoulderButton(
+                title: "L",
+                isHeld: held.contains(.l),
+                fill: PadPalette.GBA.shoulder,
+                ink: PadPalette.GBA.ink,
+                onHeld: { setHeld(.l, $0) }
+            )
+            DPadView(held: held, arm: 46, setHeld: setHeld)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: 160)
@@ -125,8 +148,14 @@ struct GBAPadRightColumn: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HoldPadButton(title: "R", bit: .r, isHeld: held.contains(.r), diameter: 48, setHeld: setHeld)
-            GBAFaceCluster(held: held, diameter: 56, setHeld: setHeld)
+            PadShoulderButton(
+                title: "R",
+                isHeld: held.contains(.r),
+                fill: PadPalette.GBA.shoulder,
+                ink: PadPalette.GBA.ink,
+                onHeld: { setHeld(.r, $0) }
+            )
+            GBAFaceCluster(held: held, diameter: 54, setHeld: setHeld)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: 160)
@@ -139,9 +168,9 @@ struct GBAPadStartSelectRow: View {
     let setHeld: GBAHeldHandler
 
     var body: some View {
-        HStack(spacing: 16) {
-            HoldPadCapsule(title: "Select", bit: .select, isHeld: held.contains(.select), setHeld: setHeld)
-            HoldPadCapsule(title: "Start", bit: .start, isHeld: held.contains(.start), setHeld: setHeld)
+        HStack(spacing: 18) {
+            HoldPadCapsule(title: "SELECT", bit: .select, isHeld: held.contains(.select), setHeld: setHeld)
+            HoldPadCapsule(title: "START", bit: .start, isHeld: held.contains(.start), setHeld: setHeld)
         }
     }
 }
@@ -154,11 +183,28 @@ struct GBAFaceCluster: View {
 
     var body: some View {
         ZStack {
-            HoldPadButton(title: "B", bit: .b, isHeld: held.contains(.b), diameter: diameter, setHeld: setHeld)
-                .offset(x: -diameter * 0.42, y: diameter * 0.28)
-            HoldPadButton(title: "A", bit: .a, isHeld: held.contains(.a), diameter: diameter, setHeld: setHeld)
-                .offset(x: diameter * 0.42, y: -diameter * 0.28)
+            HoldPadButton(
+                title: "B",
+                bit: .b,
+                isHeld: held.contains(.b),
+                diameter: diameter,
+                fill: PadPalette.GBA.face,
+                setHeld: setHeld
+            )
+            .offset(x: -diameter * 0.42, y: diameter * 0.28)
+
+            HoldPadButton(
+                title: "A",
+                bit: .a,
+                isHeld: held.contains(.a),
+                diameter: diameter,
+                fill: PadPalette.GBA.faceA,
+                setHeld: setHeld
+            )
+            .offset(x: diameter * 0.42, y: -diameter * 0.28)
         }
         .frame(width: diameter * 2.1, height: diameter * 2.0)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Face buttons")
     }
 }

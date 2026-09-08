@@ -1,7 +1,7 @@
 import SwiftUI
 import RetroPlayCore
 
-/// Cross D-pad with ≥44 pt arms. Four-way for GBA (diagonals = two bits held).
+/// Plus-shaped D-pad. Diagonals = two bits via `PadHitTesting.dpad`.
 @available(iOS 18.0, *)
 struct DPadView: View {
     let held: GBAInput
@@ -15,17 +15,21 @@ struct DPadView: View {
     }
 
     var body: some View {
-        let gap: CGFloat = 4
-        VStack(spacing: gap) {
-            HoldPadButton(title: "▲", bit: .up, isHeld: held.contains(.up), diameter: arm, setHeld: setHeld)
-            HStack(spacing: gap) {
-                HoldPadButton(title: "◀", bit: .left, isHeld: held.contains(.left), diameter: arm, setHeld: setHeld)
-                Color.clear.frame(width: arm, height: arm)
-                HoldPadButton(title: "▶", bit: .right, isHeld: held.contains(.right), diameter: arm, setHeld: setHeld)
+        CrossDPad(
+            size: arm * 2.55,
+            armThickness: max(44, arm),
+            isUp: held.contains(.up),
+            isDown: held.contains(.down),
+            isLeft: held.contains(.left),
+            isRight: held.contains(.right),
+            fill: PadPalette.GBA.dpad,
+            heldFill: PadPalette.GBA.dpadHeld,
+            onChange: { up, down, left, right in
+                setHeld(.up, up)
+                setHeld(.down, down)
+                setHeld(.left, left)
+                setHeld(.right, right)
             }
-            HoldPadButton(title: "▼", bit: .down, isHeld: held.contains(.down), diameter: arm, setHeld: setHeld)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("D-pad")
+        )
     }
 }

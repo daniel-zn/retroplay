@@ -3,14 +3,15 @@ import RetroPlayCore
 
 typealias GBAHeldHandler = @MainActor @Sendable (GBAInput, Bool) -> Void
 
-/// Hold-to-press pad control. Uses a drag gesture (min distance 0) so the bit stays
-/// set while the finger is down, matching emulator key semantics.
+/// Hold-to-press circular face button (GBA bits). Styled via `PadFaceButton`.
 @available(iOS 18.0, *)
 struct HoldPadButton: View {
     let title: String
     let bit: GBAInput
     let isHeld: Bool
     let diameter: CGFloat
+    var fill: Color = PadPalette.GBA.face
+    var ink: Color = PadPalette.GBA.ink
     let setHeld: GBAHeldHandler
 
     init(
@@ -18,41 +19,28 @@ struct HoldPadButton: View {
         bit: GBAInput,
         isHeld: Bool,
         diameter: CGFloat = 56,
+        fill: Color = PadPalette.GBA.face,
+        ink: Color = PadPalette.GBA.ink,
         setHeld: @escaping GBAHeldHandler
     ) {
         self.title = title
         self.bit = bit
         self.isHeld = isHeld
         self.diameter = diameter
+        self.fill = fill
+        self.ink = ink
         self.setHeld = setHeld
     }
 
     var body: some View {
-        Text(title)
-            .font(.system(size: diameter * 0.32, weight: .semibold, design: .rounded))
-            .foregroundStyle(.primary)
-            .frame(width: diameter, height: diameter)
-            .background {
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .opacity(isHeld ? 1.0 : 0.82)
-            }
-            .overlay {
-                Circle()
-                    .strokeBorder(.primary.opacity(isHeld ? 0.45 : 0.22), lineWidth: isHeld ? 2 : 1)
-            }
-            .scaleEffect(isHeld ? 0.94 : 1.0)
-            .animation(.easeOut(duration: 0.08), value: isHeld)
-            .contentShape(Circle())
-            .gesture(holdGesture)
-            .accessibilityLabel(title)
-            .accessibilityAddTraits(.isButton)
-    }
-
-    private var holdGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { _ in setHeld(bit, true) }
-            .onEnded { _ in setHeld(bit, false) }
+        PadFaceButton(
+            title: title,
+            isHeld: isHeld,
+            diameter: diameter,
+            fill: fill,
+            ink: ink,
+            onHeld: { down in setHeld(bit, down) }
+        )
     }
 }
 
@@ -62,31 +50,21 @@ struct HoldPadCapsule: View {
     let title: String
     let bit: GBAInput
     let isHeld: Bool
+    var rotation: Angle = .zero
+    var fill: Color = PadPalette.GBA.startSelect
+    var ink: Color = PadPalette.GBA.ink
     let setHeld: GBAHeldHandler
 
     var body: some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 14)
-            .frame(minWidth: 72, minHeight: 44)
-            .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .opacity(isHeld ? 1.0 : 0.82)
-            }
-            .overlay {
-                Capsule()
-                    .strokeBorder(.primary.opacity(isHeld ? 0.4 : 0.2), lineWidth: 1)
-            }
-            .scaleEffect(isHeld ? 0.96 : 1.0)
-            .animation(.easeOut(duration: 0.08), value: isHeld)
-            .contentShape(Capsule())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in setHeld(bit, true) }
-                    .onEnded { _ in setHeld(bit, false) }
-            )
-            .accessibilityLabel(title)
-            .accessibilityAddTraits(.isButton)
+        PadOvalButton(
+            title: title,
+            isHeld: isHeld,
+            minWidth: 64,
+            minHeight: 44,
+            rotation: rotation,
+            fill: fill,
+            ink: ink,
+            onHeld: { down in setHeld(bit, down) }
+        )
     }
 }

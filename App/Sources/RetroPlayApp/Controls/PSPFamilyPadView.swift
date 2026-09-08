@@ -1,7 +1,7 @@
 import SwiftUI
 import RetroPlayCore
 
-/// Portrait and landscape PSP layouts: L/R, D-pad, Start/Select, △○✕□ face.
+/// Portrait and landscape PSP layouts: L/R, analog nub stub, D-pad, △○✕□, Home/Select/Start.
 @available(iOS 18.0, *)
 struct PSPFamilyPadView: View {
     enum Orientation {
@@ -22,36 +22,59 @@ struct PSPFamilyPadView: View {
         }
     }
 
-    /// Portrait: shoulders, then D-pad | face with room, Start/Select under.
+    /// Portrait: black/silver slab under the 16:9 frame.
     private var portraitPad: some View {
-        VStack(spacing: 12) {
-            HStack {
-                PSPHoldPadButton(title: "L", bit: .l, isHeld: held.contains(.l), diameter: 44, setHeld: setHeld)
-                Spacer()
-                PSPHoldPadButton(title: "R", bit: .r, isHeld: held.contains(.r), diameter: 44, setHeld: setHeld)
-            }
-            .padding(.horizontal, 8)
+        PadChassis(fill: PadPalette.PSP.chassis, stroke: PadPalette.PSP.chassisStroke, cornerRadius: 18) {
+            VStack(spacing: 10) {
+                HStack {
+                    PadShoulderButton(
+                        title: "L",
+                        isHeld: held.contains(.l),
+                        width: 78,
+                        fill: PadPalette.PSP.nub,
+                        ink: PadPalette.PSP.ink,
+                        onHeld: { setHeld(.l, $0) }
+                    )
+                    Spacer()
+                    PadShoulderButton(
+                        title: "R",
+                        isHeld: held.contains(.r),
+                        width: 78,
+                        fill: PadPalette.PSP.nub,
+                        ink: PadPalette.PSP.ink,
+                        onHeld: { setHeld(.r, $0) }
+                    )
+                }
 
-            HStack(alignment: .center, spacing: 24) {
-                PSPDPadView(held: held, arm: 44, setHeld: setHeld)
-                Spacer(minLength: 4)
-                PSPFaceCluster(held: held, diameter: 42, setHeld: setHeld)
-            }
-            .padding(.horizontal, 4)
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(spacing: 8) {
+                        AnalogStickWell(
+                            wellSize: 56,
+                            x: 0,
+                            y: 0,
+                            wellFill: Color(red: 0.16, green: 0.16, blue: 0.17),
+                            nubFill: PadPalette.PSP.nub,
+                            interactive: false,
+                            accessibilityName: "Analog nub",
+                            onChange: { _, _ in }
+                        )
+                        PSPDPadView(held: held, arm: 44, setHeld: setHeld)
+                    }
+                    Spacer(minLength: 4)
+                    PSPFaceCluster(held: held, diameter: 44, setHeld: setHeld)
+                }
 
-            PSPPadStartSelectRow(held: held, setHeld: setHeld)
+                PSPPadStartSelectRow(held: held, setHeld: setHeld, includeHome: true)
+            }
         }
-        .padding(.vertical, 4)
         .accessibilityLabel("PSP controls")
     }
 
-    /// Landscape strip used when PlayView hosts left/right columns itself.
-    /// Kept for ConsolePadHost(.landscape); Play prefers column pieces.
     private var landscapePad: some View {
         HStack(alignment: .center, spacing: 16) {
             PSPPadLeftColumn(held: held, setHeld: setHeld)
             Spacer(minLength: 12)
-            PSPPadStartSelectRow(held: held, setHeld: setHeld)
+            PSPPadStartSelectRow(held: held, setHeld: setHeld, includeHome: true)
             Spacer(minLength: 12)
             PSPPadRightColumn(held: held, setHeld: setHeld)
         }
@@ -62,34 +85,60 @@ struct PSPFamilyPadView: View {
 }
 
 /// Sony face diamond: △ top, ○ right, ✕ bottom, □ left.
-/// Center-to-center offset ≥ diameter so circles do not overlap (plus a small gap).
 @available(iOS 18.0, *)
 struct PSPFaceCluster: View {
     let held: PSPInput
     let diameter: CGFloat
     let setHeld: PSPHeldHandler
 
-    /// Distance from cluster center to each button center.
-    private var reach: CGFloat {
-        // diameter/2 + diameter/2 + gap ≈ diameter + gap
-        diameter * 0.82
-    }
+    private var reach: CGFloat { diameter * 0.82 }
 
     private var clusterSide: CGFloat {
-        // Two reaches + full button diameter, with a little padding.
         reach * 2 + diameter + 4
     }
 
     var body: some View {
         ZStack {
-            PSPHoldPadButton(title: "△", bit: .triangle, isHeld: held.contains(.triangle), diameter: diameter, setHeld: setHeld)
-                .offset(x: 0, y: -reach)
-            PSPHoldPadButton(title: "○", bit: .circle, isHeld: held.contains(.circle), diameter: diameter, setHeld: setHeld)
-                .offset(x: reach, y: 0)
-            PSPHoldPadButton(title: "✕", bit: .cross, isHeld: held.contains(.cross), diameter: diameter, setHeld: setHeld)
-                .offset(x: 0, y: reach)
-            PSPHoldPadButton(title: "□", bit: .square, isHeld: held.contains(.square), diameter: diameter, setHeld: setHeld)
-                .offset(x: -reach, y: 0)
+            PSPHoldPadButton(
+                title: "△",
+                bit: .triangle,
+                isHeld: held.contains(.triangle),
+                diameter: diameter,
+                fill: PadPalette.PSP.face,
+                ink: PadPalette.PSP.triangle,
+                setHeld: setHeld
+            )
+            .offset(x: 0, y: -reach)
+            PSPHoldPadButton(
+                title: "○",
+                bit: .circle,
+                isHeld: held.contains(.circle),
+                diameter: diameter,
+                fill: PadPalette.PSP.face,
+                ink: PadPalette.PSP.circle,
+                setHeld: setHeld
+            )
+            .offset(x: reach, y: 0)
+            PSPHoldPadButton(
+                title: "✕",
+                bit: .cross,
+                isHeld: held.contains(.cross),
+                diameter: diameter,
+                fill: PadPalette.PSP.face,
+                ink: PadPalette.PSP.cross,
+                setHeld: setHeld
+            )
+            .offset(x: 0, y: reach)
+            PSPHoldPadButton(
+                title: "□",
+                bit: .square,
+                isHeld: held.contains(.square),
+                diameter: diameter,
+                fill: PadPalette.PSP.face,
+                ink: PadPalette.PSP.square,
+                setHeld: setHeld
+            )
+            .offset(x: -reach, y: 0)
         }
         .frame(width: clusterSide, height: clusterSide)
         .accessibilityElement(children: .contain)
@@ -103,9 +152,26 @@ struct PSPPadLeftColumn: View {
     let setHeld: PSPHeldHandler
 
     var body: some View {
-        VStack(spacing: 14) {
-            PSPHoldPadButton(title: "L", bit: .l, isHeld: held.contains(.l), diameter: 44, setHeld: setHeld)
-            PSPDPadView(held: held, arm: 44, setHeld: setHeld)
+        VStack(spacing: 10) {
+            PadShoulderButton(
+                title: "L",
+                isHeld: held.contains(.l),
+                width: 64,
+                fill: PadPalette.PSP.nub,
+                ink: PadPalette.PSP.ink,
+                onHeld: { setHeld(.l, $0) }
+            )
+            AnalogStickWell(
+                wellSize: 48,
+                x: 0,
+                y: 0,
+                wellFill: Color(red: 0.16, green: 0.16, blue: 0.17),
+                nubFill: PadPalette.PSP.nub,
+                interactive: false,
+                accessibilityName: "Analog nub",
+                onChange: { _, _ in }
+            )
+            PSPDPadView(held: held, arm: 42, setHeld: setHeld)
             Spacer(minLength: 0)
         }
         .frame(minWidth: 148, maxWidth: 168)
@@ -120,7 +186,14 @@ struct PSPPadRightColumn: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            PSPHoldPadButton(title: "R", bit: .r, isHeld: held.contains(.r), diameter: 44, setHeld: setHeld)
+            PadShoulderButton(
+                title: "R",
+                isHeld: held.contains(.r),
+                width: 64,
+                fill: PadPalette.PSP.nub,
+                ink: PadPalette.PSP.ink,
+                onHeld: { setHeld(.r, $0) }
+            )
             PSPFaceCluster(held: held, diameter: 42, setHeld: setHeld)
             Spacer(minLength: 0)
         }
@@ -133,11 +206,24 @@ struct PSPPadRightColumn: View {
 struct PSPPadStartSelectRow: View {
     let held: PSPInput
     let setHeld: PSPHeldHandler
+    var includeHome: Bool = false
 
     var body: some View {
-        HStack(spacing: 20) {
-            PSPHoldPadCapsule(title: "Select", bit: .select, isHeld: held.contains(.select), setHeld: setHeld)
-            PSPHoldPadCapsule(title: "Start", bit: .start, isHeld: held.contains(.start), setHeld: setHeld)
+        HStack(spacing: 14) {
+            if includeHome {
+                PadOvalButton(
+                    title: "HOME",
+                    isHeld: false,
+                    minWidth: 56,
+                    minHeight: 40,
+                    fill: PadPalette.PSP.silver,
+                    ink: PadPalette.PSP.chassis,
+                    interactive: false,
+                    onHeld: { _ in }
+                )
+            }
+            PSPHoldPadCapsule(title: "SELECT", bit: .select, isHeld: held.contains(.select), setHeld: setHeld)
+            PSPHoldPadCapsule(title: "START", bit: .start, isHeld: held.contains(.start), setHeld: setHeld)
         }
     }
 }
