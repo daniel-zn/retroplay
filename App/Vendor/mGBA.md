@@ -6,6 +6,9 @@ Agents do **not** build this on Linux and do **not** ask anyone else to build it
 
 This repo does **not** contain a prebuilt XCFramework or the mGBA source tree.
 
+**Mac mini status (2026-09-08):** XCFramework built locally at
+`/Users/danielsmacmini/src/retroplay/App/Vendor/Output/mGBA.xcframework` (ios-arm64 + sim). Product bot does not copy it into git.
+
 ---
 
 ## Checklist — ready for home Mac build
@@ -23,10 +26,10 @@ Your Mac session:
 
 - [ ] Install Xcode + CMake + Ninja (`brew install cmake ninja`)
 - [ ] Clone mGBA **outside** this repo
-- [ ] Run `build-mgba-ios.sh` → `App/Vendor/Output/mGBA.xcframework`
-- [ ] Create/open iOS App target; follow `XCODE.md`
-- [ ] Set bridging header + `RETROPLAY_HAS_MGBA`
-- [ ] Fill remaining `TODO(native)` in `MGBACore` (`mCoreFind` / `runFrame` / keys)
+- [x] Run `build-mgba-ios.sh` → XCFramework on Mac mini at `App/Vendor/Output/mGBA.xcframework` (local only, 2026-09-08)
+- [ ] Create/open iOS App target; follow `XCODE.md` (path documented for Mac mini Output/)
+- [ ] Set bridging header + `RETROPLAY_HAS_MGBA` + `MGBANativeBootstrap.registerIfAvailable()`
+- [ ] Verify `MGBANativeDriver` builds against the XCFramework (native glue is in-repo under `#if RETROPLAY_HAS_MGBA`)
 - [ ] Import a GBA you own via Files → playable frames
 
 ---

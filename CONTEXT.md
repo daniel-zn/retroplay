@@ -53,3 +53,9 @@ M0 landed. M1 scaffolding + exact Mac build docs: `App/Vendor/mGBA.md`, `App/Ven
 ## Ready for home Mac build
 
 See checklist at top of `App/Vendor/mGBA.md`. One-shot: clone mGBA outside repo → `build-mgba-ios.sh` → follow `App/Vendor/XCODE.md` (framework + bridging header + `RETROPLAY_HAS_MGBA`).
+
+## Mac mini artifact (not in git)
+
+- XCFramework: `/Users/danielsmacmini/src/retroplay/App/Vendor/Output/mGBA.xcframework` (built 2026-09-08)
+- Next on Mac: follow `App/Vendor/XCODE.md` — app host, bridging header, `RETROPLAY_HAS_MGBA`, call `MGBANativeBootstrap.registerIfAvailable()`.
+
