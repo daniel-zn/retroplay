@@ -7,6 +7,15 @@
 - **IR caching interpreter only** (`CPUCore = 2`). No dynarec / JIT.
 - Snippet: see `PPSSPPDefaults.appStoreIniSnippet`.
 
+
+## Build order (2026-09-08)
+
+1. **Device (`IOS_PLATFORM=OS`) first.** Upstream Simulator iOS builds are historically unsupported ([ppsspp#18020](https://github.com/hrydgard/ppsspp/issues/18020)). Do not block PSP on sim.
+2. Generate Xcode: `cmake -DCMAKE_TOOLCHAIN_FILE=./cmake/Toolchains/ios.cmake -DIOS_PLATFORM=OS -H. -Bbuild.ios -GXcode` (or `./b.sh --ios-xcode`).
+3. Build iphoneos Release; collect static libs (`Core` + ffmpeg prebuilts + deps).
+4. Optional later: try `IOS_PLATFORM=SIMULATOR`. If it fails, ship **ios-arm64-only** XCFramework and smoke ATV on a **physical device**.
+5. Only then enable `RETROPLAY_HAS_PPSSPP` in `project.yml` and implement the native bridge.
+
 ## Mac mini checklist
 
 1. Clone upstream **outside** retroplay:
