@@ -20,6 +20,7 @@ targets:
     type: application
     platform: iOS
     sources:
+      - path: AppIcon.icon
       - path: AppHost/Sources
       - path: AppHost/Supporting
         buildPhase: resources
