@@ -1,7 +1,7 @@
 import SwiftUI
 import RetroPlayCore
 
-/// Play shell for a library game. GBA and PSP use native cores; other systems stay stubs.
+/// Play shell for a library game. GBA/PSP playable; N64/NDS hosts + pads scaffolded (native pending).
 @available(iOS 18.0, *)
 public struct PlayView: View {
     let game: LibraryGame
@@ -17,6 +17,10 @@ public struct PlayView: View {
     @State private var statusLine = "Starting…"
     @State private var gbaHeld: GBAInput = []
     @State private var pspHeld: PSPInput = []
+    @State private var n64Held: N64Input = []
+    @State private var n64Stick: N64AnalogStick = .zero
+    @State private var ndsHeld: NDSInput = []
+    @State private var ndsTouch: NDSTouch = .idle
     @State private var frameImage: CGImage?
     @State private var frameSink = FrameSinkStore()
     @State private var sawFirstFrame = false
@@ -32,9 +36,14 @@ public struct PlayView: View {
         verticalSizeClass == .compact
     }
 
-    /// GBA ~3:2; PSP native 480×272 ≈ 16:9.
+    /// GBA ~3:2; PSP 480×272; N64 4:3; NDS stacked screens stub 256×384.
     private var screenAspect: CGFloat {
-        game.systemID == .psp ? (480.0 / 272.0) : (3.0 / 2.0)
+        switch game.systemID {
+        case .psp: return 480.0 / 272.0
+        case .n64: return 4.0 / 3.0
+        case .nds: return 256.0 / 384.0
+        case .gba: return 3.0 / 2.0
+        }
     }
 
     public var body: some View {
@@ -80,16 +89,21 @@ public struct PlayView: View {
             .layoutPriority(1)
 
             VStack(spacing: 8) {
-                if game.systemID == .gba || game.systemID == .psp {
-                    ConsolePadHost(
-                        systemID: game.systemID,
-                        orientation: .portrait,
-                        gbaHeld: gbaHeld,
-                        setGBAHeld: setGBAHeld,
-                        pspHeld: pspHeld,
-                        setPSPHeld: setPSPHeld
-                    )
-                }
+                ConsolePadHost(
+                    systemID: game.systemID,
+                    orientation: .portrait,
+                    gbaHeld: gbaHeld,
+                    setGBAHeld: setGBAHeld,
+                    pspHeld: pspHeld,
+                    setPSPHeld: setPSPHeld,
+                    n64Held: n64Held,
+                    setN64Held: setN64Held,
+                    n64Stick: n64Stick,
+                    setN64Stick: setN64Stick,
+                    ndsHeld: ndsHeld,
+                    setNDSHeld: setNDSHeld,
+                    onNDSTouch: setNDSTouch
+                )
                 transportBar
             }
             .padding(.horizontal, 10)
@@ -108,6 +122,10 @@ public struct PlayView: View {
                     GBAPadLeftColumn(held: gbaHeld, setHeld: setGBAHeld)
                 } else if game.systemID == .psp {
                     PSPPadLeftColumn(held: pspHeld, setHeld: setPSPHeld)
+                } else if game.systemID == .n64 {
+                    N64PadLeftColumn(held: n64Held, stick: n64Stick, setHeld: setN64Held, setStick: setN64Stick)
+                } else if game.systemID == .nds {
+                    NDSPadLeftColumn(held: ndsHeld, setHeld: setNDSHeld)
                 } else {
                     Color.clear.frame(width: 8)
                 }
@@ -137,6 +155,10 @@ public struct PlayView: View {
                     GBAPadStartSelectRow(held: gbaHeld, setHeld: setGBAHeld)
                 } else if game.systemID == .psp {
                     PSPPadStartSelectRow(held: pspHeld, setHeld: setPSPHeld)
+                } else if game.systemID == .n64 {
+                    N64HoldPadCapsule(title: "Start", bit: .start, isHeld: n64Held.contains(.start), setHeld: setN64Held)
+                } else if game.systemID == .nds {
+                    NDSPadStartSelectRow(held: ndsHeld, setHeld: setNDSHeld)
                 }
 
                 transportBar
@@ -150,6 +172,10 @@ public struct PlayView: View {
                     GBAPadRightColumn(held: gbaHeld, setHeld: setGBAHeld)
                 } else if game.systemID == .psp {
                     PSPPadRightColumn(held: pspHeld, setHeld: setPSPHeld)
+                } else if game.systemID == .n64 {
+                    N64PadRightColumn(held: n64Held, setHeld: setN64Held)
+                } else if game.systemID == .nds {
+                    NDSPadRightColumn(held: ndsHeld, setHeld: setNDSHeld)
                 } else {
                     Color.clear.frame(width: 8)
                 }
@@ -305,6 +331,30 @@ public struct PlayView: View {
     private func setPSPHeld(_ bit: PSPInput, _ down: Bool) {
         if down { pspHeld.insert(bit) } else { pspHeld.remove(bit) }
         core?.setPSPInput(pspHeld)
+    }
+
+    @MainActor
+    private func setN64Held(_ bit: N64Input, _ down: Bool) {
+        if down { n64Held.insert(bit) } else { n64Held.remove(bit) }
+        core?.setN64Input(n64Held, stick: n64Stick)
+    }
+
+    @MainActor
+    private func setN64Stick(_ stick: N64AnalogStick) {
+        n64Stick = stick
+        core?.setN64Input(n64Held, stick: n64Stick)
+    }
+
+    @MainActor
+    private func setNDSHeld(_ bit: NDSInput, _ down: Bool) {
+        if down { ndsHeld.insert(bit) } else { ndsHeld.remove(bit) }
+        core?.setNDSInput(ndsHeld, touch: ndsTouch)
+    }
+
+    @MainActor
+    private func setNDSTouch(_ touch: NDSTouch) {
+        ndsTouch = touch
+        core?.setNDSInput(ndsHeld, touch: ndsTouch)
     }
 
     private func boot() async {

@@ -39,10 +39,18 @@ public struct GBAInput: OptionSet, Sendable, Hashable {
 }
 
 public extension EmulatorCore {
-    /// Defaults for cores that do not take GBA input / video sinks yet.
+    /// Defaults for cores that do not take console input / video sinks yet.
     /// Requirements live on `EmulatorCore` so existential calls dispatch to overrides (e.g. MGBACore).
     func setGBAInput(_ input: GBAInput) {}
     func setPSPInput(_ input: PSPInput) {}
+    func setN64Input(_ input: N64Input, stick: N64AnalogStick) {
+        _ = input
+        _ = stick
+    }
+    func setNDSInput(_ input: NDSInput, touch: NDSTouch) {
+        _ = input
+        _ = touch
+    }
     func attachFrameSink(_ sink: EmulatorFrameSink?) {}
     var supportsSaveState: Bool { false }
     var supportsFastForward: Bool { false }
@@ -79,3 +87,81 @@ public extension PSPInput {
     static let face: PSPInput = [.triangle, .circle, .cross, .square]
 }
 
+
+/// Button bits matching mupen64plus-core `m64p_plugin.h` BUTTON flags.
+public struct N64Input: OptionSet, Sendable, Hashable {
+    public let rawValue: UInt32
+    public init(rawValue: UInt32) { self.rawValue = rawValue }
+
+    public static let dpadRight = N64Input(rawValue: 0x0001)
+    public static let dpadLeft  = N64Input(rawValue: 0x0002)
+    public static let dpadDown  = N64Input(rawValue: 0x0004)
+    public static let dpadUp    = N64Input(rawValue: 0x0008)
+    public static let start     = N64Input(rawValue: 0x0010)
+    public static let z         = N64Input(rawValue: 0x2000)
+    public static let b         = N64Input(rawValue: 0x4000)
+    public static let a         = N64Input(rawValue: 0x8000)
+    public static let cRight    = N64Input(rawValue: 0x0100)
+    public static let cLeft     = N64Input(rawValue: 0x0200)
+    public static let cDown     = N64Input(rawValue: 0x0400)
+    public static let cUp       = N64Input(rawValue: 0x0800)
+    public static let r         = N64Input(rawValue: 0x1000)
+    public static let l         = N64Input(rawValue: 0x0020)
+}
+
+public extension N64Input {
+    static let dpad: N64Input = [.dpadUp, .dpadDown, .dpadLeft, .dpadRight]
+    static let cButtons: N64Input = [.cUp, .cDown, .cLeft, .cRight]
+}
+
+/// Analog stick for N64 (−128…127). Digital pad scaffolding may leave this at zero.
+public struct N64AnalogStick: Sendable, Hashable {
+    public var x: Int8
+    public var y: Int8
+
+    public init(x: Int8 = 0, y: Int8 = 0) {
+        self.x = x
+        self.y = y
+    }
+
+    public static let zero = N64AnalogStick(x: 0, y: 0)
+}
+
+/// Button bits for NDS (melonDS key order: A B Select Start Right Left Up Down R L X Y).
+public struct NDSInput: OptionSet, Sendable, Hashable {
+    public let rawValue: UInt32
+    public init(rawValue: UInt32) { self.rawValue = rawValue }
+
+    public static let a      = NDSInput(rawValue: 1 << 0)
+    public static let b      = NDSInput(rawValue: 1 << 1)
+    public static let select = NDSInput(rawValue: 1 << 2)
+    public static let start  = NDSInput(rawValue: 1 << 3)
+    public static let right  = NDSInput(rawValue: 1 << 4)
+    public static let left   = NDSInput(rawValue: 1 << 5)
+    public static let up     = NDSInput(rawValue: 1 << 6)
+    public static let down   = NDSInput(rawValue: 1 << 7)
+    public static let r      = NDSInput(rawValue: 1 << 8)
+    public static let l      = NDSInput(rawValue: 1 << 9)
+    public static let x      = NDSInput(rawValue: 1 << 10)
+    public static let y      = NDSInput(rawValue: 1 << 11)
+}
+
+public extension NDSInput {
+    static let dpad: NDSInput = [.up, .down, .left, .right]
+    static let face: NDSInput = [.a, .b, .x, .y]
+}
+
+/// Touchscreen sample for NDS (bottom screen). Idle = not pressed.
+public struct NDSTouch: Sendable, Hashable {
+    public var x: UInt16
+    public var y: UInt16
+    public var pressed: Bool
+
+    public init(x: UInt16 = 0, y: UInt16 = 0, pressed: Bool = false) {
+        self.x = x
+        self.y = y
+        self.pressed = pressed
+    }
+
+    public static let idle = NDSTouch(x: 0, y: 0, pressed: false)
+}

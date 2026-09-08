@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-07 (PT)  
 **Scope:** Layout principles for RetroPlay Play UI (hit targets, spacing, portrait vs landscape). Colors/skins later.  
-**Architecture:** Per-console pad views; this note covers the **GBA family** pad used for Game Boy Advance. N64 / NDS / PSP get separate layouts later.
+**Architecture:** Per-console pad views; this note covers the **GBA family** pad used for Game Boy Advance. See also `CONTROLS-PSP.md` and `CONTROLS-N64-NDS.md`.
 
 ---
 

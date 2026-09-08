@@ -194,7 +194,7 @@ Apple DTS note: no back-deployed equivalent before iOS 26 ([forums thread](https
 
 Layout principles and portrait/landscape rules: [`docs/CONTROLS-GBA.md`](docs/CONTROLS-GBA.md).
 
-Play uses `ConsolePadHost` (per-`SystemID`) with `GBAFamilyPadView` for GBA — portrait Game Boy–style under the screen, landscape GBA slab–style (D-pad left, face right, L/R toward top, Start/Select bottom center). N64/NDS/PSP pads are stubbed until later. Layout/hit targets first; colors/skins later.
+Play uses `ConsolePadHost` (per-`SystemID`) with per-console pads: `GBAFamilyPadView`, `PSPFamilyPadView`, `N64FamilyPadView`, `NDSFamilyPadView` (portrait first; NDS touch stub). Layout/hit targets first; colors/skins later.
 
 
 ---
@@ -249,8 +249,9 @@ Upstream tracks IR-specific instability separately from JIT ([issue #15670](http
 ### M2 — **N64 (mupen64plus-next)** + **NDS (melonDS)**
 
 - Second and third P0 systems.
+- **Scaffolding (landed):** Swift hosts, native registries, portrait pads, Vendor Mac docs/scripts; CoreFactory returns real core classes. Native XCFrameworks + bridges are Mac follow-up (`RETROPLAY_HAS_N64` / `RETROPLAY_HAS_MELONDS`).
 - Box art hook (user art + optional open DB — no piracy catalog).
-- Save states, fast-forward, per-game recent.
+- Save states, fast-forward, per-game recent (gated until native OK).
 - TestFlight checklist + 4.7 compliance notes.
 
 ### M3 — **PSP (PPSSPP IR)** + polish
@@ -274,7 +275,7 @@ No other blockers; proceed on defaults. Display name is **RetroPlay**. Product h
 
 ## 11. Next build step
 
-**Library UI:** dark canvas, system filter chips, game tiles; GBA play + pad input green. **PSP:** `PPSSPPCore` scaffold + `App/Vendor/PPSSPP.md` (IR-only). Next: PPSSPP XCFramework on Mac, then smoke *ATV Offroad Fury Pro* (user ROM, not in git). Docs: `docs/CONTROLS-GBA.md`, `App/Vendor/mGBA.md`, `App/Vendor/PPSSPP.md`.
+**M2 scaffolding landed** (`N64Core` / `MelonDSCore`, pads, Vendor scripts). GBA playable; PSP linking. **Mac next:** build `mupen64plus.xcframework` + `melonDS.xcframework` (`App/Vendor/build-mupen64plus-ios.sh`, `build-melonds-ios.sh`), enable `RETROPLAY_HAS_N64` / `RETROPLAY_HAS_MELONDS` per `XCODE.md`, implement native drivers. Docs: `App/Vendor/mupen64plus.md`, `melonDS.md`, `mGBA.md`, `PPSSPP.md`.
 
 ---
 

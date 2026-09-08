@@ -19,6 +19,8 @@ public protocol EmulatorCore: AnyObject, Sendable {
     /// Optional; default no-op. Declared on the protocol so `any EmulatorCore` uses dynamic dispatch.
     func setGBAInput(_ input: GBAInput)
     func setPSPInput(_ input: PSPInput)
+    func setN64Input(_ input: N64Input, stick: N64AnalogStick)
+    func setNDSInput(_ input: NDSInput, touch: NDSTouch)
     func attachFrameSink(_ sink: EmulatorFrameSink?)
 
     /// When true, Play may show Quick Save / Quick Load.

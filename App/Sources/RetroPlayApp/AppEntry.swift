@@ -364,7 +364,12 @@ struct SettingsView: View {
 
                 Section {
                     LabeledContent("GBA", value: "mGBA (playable)")
+                    LabeledContent("N64", value: "mupen64plus-next (scaffolded)")
+                    LabeledContent("NDS", value: "melonDS interpreter (scaffolded)")
                     LabeledContent("PSP", value: "PPSSPP IR (linking)")
+                    Text("N64: cached_interpreter + GLideN64/GLES — not paraLLEl-RDP. NDS: interpreter only (no JIT). Native XCFrameworks are Mac-built; see App/Vendor/mupen64plus.md and melonDS.md.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Text(PPSSPPDefaults.performanceNote)
                         .font(.caption)
                         .foregroundStyle(.secondary)

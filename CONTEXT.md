@@ -48,14 +48,17 @@ Native iPhone **SwiftUI** emulator with a **library-first** UX (import → tap �
 
 ## Next build step
 
-M0 landed. M1 scaffolding + exact Mac build docs: `App/Vendor/mGBA.md`, `App/Vendor/build-mgba-ios.sh`. Daniel builds mGBA XCFramework himself on a home Mac (miniMac or MacBook). Agents do not loop miniMac for the binary.
+M1 GBA playable + M3 PSP linking in progress. **M2 scaffolding landed:** `N64Core` / `MelonDSCore`, pads, Vendor docs/scripts. Native XCFrameworks are Mac-only — see `App/Vendor/mupen64plus.md` and `App/Vendor/melonDS.md`. Agents do not loop miniMac for binaries.
 
 ## Ready for home Mac build
 
-See checklist at top of `App/Vendor/mGBA.md`. One-shot: clone mGBA outside repo → `build-mgba-ios.sh` → follow `App/Vendor/XCODE.md` (framework + bridging header + `RETROPLAY_HAS_MGBA`).
+- GBA: checklist in `App/Vendor/mGBA.md` → `build-mgba-ios.sh` → `RETROPLAY_HAS_MGBA`.
+- N64: `App/Vendor/mupen64plus.md` → `build-mupen64plus-ios.sh` → `RETROPLAY_HAS_N64` (cached_interpreter + GLideN64/GLES).
+- NDS: `App/Vendor/melonDS.md` → `build-melonds-ios.sh` → `RETROPLAY_HAS_MELONDS` (interpreter, no JIT).
+- Link notes: `App/Vendor/XCODE.md`.
 
 ## Mac mini artifact (not in git)
 
 - XCFramework: `/Users/danielsmacmini/src/retroplay/App/Vendor/Output/mGBA.xcframework` (built 2026-09-08)
-- Next on Mac: `git pull` && `./AppHost/bootstrap-xcode.sh` → Simulator Run. AppHost holds `@main` + native driver; package stays framework-free.
+- Next on Mac: `git pull` && `./AppHost/bootstrap-xcode.sh` → Simulator Run. AppHost holds `@main` + native drivers; package stays framework-free. N64/NDS frameworks when built.
 

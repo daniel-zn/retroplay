@@ -8,3 +8,5 @@ App target only (SPM package does not see this header).
 4. Call `MGBANativeBootstrap.registerIfAvailable()` from `@main` app init.
 
 See `../XCODE.md`.
+
+N64 / NDS bridging headers are added only after Mac XCFrameworks exist — see `../mupen64plus.md`, `../melonDS.md`, and `../XCODE.md` (`RETROPLAY_HAS_N64`, `RETROPLAY_HAS_MELONDS`).
