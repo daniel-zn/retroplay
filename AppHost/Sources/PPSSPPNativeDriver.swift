@@ -4,7 +4,7 @@ import RetroPlayCore
 #if RETROPLAY_HAS_PPSSPP
 
 public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
-    private var bridge: UnsafeMutablePointer<RetroPlayPPSSPPBridge>?
+    private var bridge: OpaquePointer?
 
     public init() {}
 
@@ -19,7 +19,7 @@ public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
         guard let created = rp_ppsspp_create(save.path, cache.path) else {
             throw EmulatorCoreError.romLoadFailed("rp_ppsspp_create failed")
         }
-        bridge = created
+        bridge = OpaquePointer(created)
 
         var err = [CChar](repeating: 0, count: 1024)
         let ok = url.path.withCString { pathPtr in
@@ -34,22 +34,22 @@ public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
 
     public func setKeys(_ bitmask: UInt32) {
         guard let bridge else { return }
-        rp_ppsspp_set_buttons(bridge, bitmask)
+        rp_ppsspp_set_buttons(UnsafeMutableRawPointer(bridge), bitmask)
     }
 
     public func runFrame() {
         guard let bridge else { return }
-        rp_ppsspp_run_frame(bridge)
+        rp_ppsspp_run_frame(UnsafeMutableRawPointer(bridge))
     }
 
     public func pauseAudioVideo() {
         guard let bridge else { return }
-        rp_ppsspp_pause(bridge)
+        rp_ppsspp_pause(UnsafeMutableRawPointer(bridge))
     }
 
     public func resumeAudioVideo() {
         guard let bridge else { return }
-        rp_ppsspp_resume(bridge)
+        rp_ppsspp_resume(UnsafeMutableRawPointer(bridge))
     }
 
     public func copyRGBAFrame() -> EmulatorVideoFrame? {
@@ -58,7 +58,7 @@ public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
         var w: Int32 = 0
         var h: Int32 = 0
         var stride: Int32 = 0
-        let ok = rp_ppsspp_copy_rgba(bridge, &bytes, &w, &h, &stride)
+        let ok = rp_ppsspp_copy_rgba(UnsafeMutableRawPointer(bridge), &bytes, &w, &h, &stride)
         guard ok, let bytes, w > 0, h > 0, stride > 0 else { return nil }
         defer { free(bytes) }
         let count = Int(stride) * Int(h)
@@ -68,7 +68,7 @@ public final class PPSSPPNativeDriver: PPSSPPNativeDriving {
 
     public func tearDown() {
         if let bridge {
-            rp_ppsspp_destroy(bridge)
+            rp_ppsspp_destroy(UnsafeMutableRawPointer(bridge))
         }
         bridge = nil
     }

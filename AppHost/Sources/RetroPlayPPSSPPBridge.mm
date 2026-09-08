@@ -14,7 +14,6 @@
 #include "Core/CoreParameter.h"
 #include "Core/System.h"
 
-// Optional frame path — may not resolve on every PPSSPP revision.
 #if __has_include("GPU/GPU.h")
 #include "GPU/GPU.h"
 #endif
@@ -22,7 +21,8 @@
 #include "GPU/Common/GPUDebugInterface.h"
 #endif
 
-struct RetroPlayPPSSPPBridge {
+namespace {
+struct BridgeState {
     bool inited = false;
     bool paused = false;
     uint32_t buttons = 0;
@@ -30,19 +30,23 @@ struct RetroPlayPPSSPPBridge {
     std::string cacheDir;
 };
 
-static void rp_set_error(char *errorOut, size_t errorOutLen, const std::string &msg) {
+BridgeState *asBridge(void *p) { return static_cast<BridgeState *>(p); }
+
+void setError(char *errorOut, size_t errorOutLen, const std::string &msg) {
     if (!errorOut || errorOutLen == 0) return;
     std::snprintf(errorOut, errorOutLen, "%s", msg.c_str());
 }
+}  // namespace
 
-RetroPlayPPSSPPBridge *rp_ppsspp_create(const char *saveDir, const char *cacheDir) {
-    auto *b = new RetroPlayPPSSPPBridge();
+void *rp_ppsspp_create(const char *saveDir, const char *cacheDir) {
+    auto *b = new BridgeState();
     b->saveDir = saveDir ? saveDir : "";
     b->cacheDir = cacheDir ? cacheDir : "";
     return b;
 }
 
-void rp_ppsspp_destroy(RetroPlayPPSSPPBridge *bridge) {
+void rp_ppsspp_destroy(void *bridgePtr) {
+    auto *bridge = asBridge(bridgePtr);
     if (!bridge) return;
     if (bridge->inited) {
         PSP_Shutdown(true);
@@ -52,9 +56,10 @@ void rp_ppsspp_destroy(RetroPlayPPSSPPBridge *bridge) {
     delete bridge;
 }
 
-bool rp_ppsspp_load(RetroPlayPPSSPPBridge *bridge, const char *gamePath, char *errorOut, size_t errorOutLen) {
+bool rp_ppsspp_load(void *bridgePtr, const char *gamePath, char *errorOut, size_t errorOutLen) {
+    auto *bridge = asBridge(bridgePtr);
     if (!bridge || !gamePath) {
-        rp_set_error(errorOut, errorOutLen, "null bridge or path");
+        setError(errorOut, errorOutLen, "null bridge or path");
         return false;
     }
 
@@ -68,12 +73,10 @@ bool rp_ppsspp_load(RetroPlayPPSSPPBridge *bridge, const char *gamePath, char *e
     CommandLineOptions cmd{};
     NativeInit(2, argv, cmd, bridge->saveDir.c_str(), bridge->saveDir.c_str(), bridge->cacheDir.c_str());
 
-    // App Store: IR interpreter only.
     g_Config.iCpuCore = (int)CPUCore::IR_INTERPRETER;
 
     CoreParameter param{};
     param.cpuCore = CPUCore::IR_INTERPRETER;
-    // Software GPU preferred for headless RGBA capture; Metal comes later.
     param.gpuCore = GPUCORE_SOFTWARE;
     param.enableSound = false;
     param.fileToStart = Path(std::string(gamePath));
@@ -83,7 +86,7 @@ bool rp_ppsspp_load(RetroPlayPPSSPPBridge *bridge, const char *gamePath, char *e
     BootState state = PSP_Init(param, &error);
     if (state != BootState::Complete) {
         NativeShutdown();
-        rp_set_error(errorOut, errorOutLen, error.empty() ? "PSP_Init failed" : error);
+        setError(errorOut, errorOutLen, error.empty() ? "PSP_Init failed" : error);
         return false;
     }
 
@@ -92,25 +95,26 @@ bool rp_ppsspp_load(RetroPlayPPSSPPBridge *bridge, const char *gamePath, char *e
     return true;
 }
 
-void rp_ppsspp_set_buttons(RetroPlayPPSSPPBridge *bridge, uint32_t ctrlBits) {
+void rp_ppsspp_set_buttons(void *bridgePtr, uint32_t ctrlBits) {
+    auto *bridge = asBridge(bridgePtr);
     if (!bridge) return;
     bridge->buttons = ctrlBits;
-    (void)ctrlBits; // Wired to sceCtrl in a follow-up once symbols are confirmed on miniMac.
+    (void)ctrlBits;
 }
 
-void rp_ppsspp_run_frame(RetroPlayPPSSPPBridge *bridge) {
+void rp_ppsspp_run_frame(void *bridgePtr) {
+    auto *bridge = asBridge(bridgePtr);
     if (!bridge || !bridge->inited || bridge->paused) return;
     PSP_RunLoopFor(3333333 / 60);
 }
 
-bool rp_ppsspp_copy_rgba(RetroPlayPPSSPPBridge *bridge, uint8_t **outBytes, int *outWidth, int *outHeight, int *outStrideBytes) {
+bool rp_ppsspp_copy_rgba(void *bridgePtr, uint8_t **outBytes, int *outWidth, int *outHeight, int *outStrideBytes) {
+    auto *bridge = asBridge(bridgePtr);
     if (!bridge || !bridge->inited || !outBytes || !outWidth || !outHeight || !outStrideBytes) {
         return false;
     }
     *outBytes = nullptr;
 
-#if defined(GPU_DEBUG_INTERFACE_AVAILABLE) || 1
-    // Try debug framebuffer when gpuDebug exists (linked from libPPSSPP).
     extern GPUDebugInterface *gpuDebug;
     if (!gpuDebug) {
         return false;
@@ -131,35 +135,30 @@ bool rp_ppsspp_copy_rgba(RetroPlayPPSSPPBridge *bridge, uint8_t **outBytes, int 
     *outHeight = h;
     *outStrideBytes = w * 4;
     return true;
-#else
-    return false;
-#endif
 }
 
-void rp_ppsspp_pause(RetroPlayPPSSPPBridge *bridge) {
-    if (bridge) bridge->paused = true;
+void rp_ppsspp_pause(void *bridgePtr) {
+    if (auto *bridge = asBridge(bridgePtr)) bridge->paused = true;
 }
 
-void rp_ppsspp_resume(RetroPlayPPSSPPBridge *bridge) {
-    if (bridge) bridge->paused = false;
+void rp_ppsspp_resume(void *bridgePtr) {
+    if (auto *bridge = asBridge(bridgePtr)) bridge->paused = false;
 }
 
 #else
 
-struct RetroPlayPPSSPPBridge { int unused; };
-
-RetroPlayPPSSPPBridge *rp_ppsspp_create(const char *, const char *) { return nullptr; }
-void rp_ppsspp_destroy(RetroPlayPPSSPPBridge *) {}
-bool rp_ppsspp_load(RetroPlayPPSSPPBridge *, const char *, char *errorOut, size_t errorOutLen) {
+void *rp_ppsspp_create(const char *, const char *) { return nullptr; }
+void rp_ppsspp_destroy(void *) {}
+bool rp_ppsspp_load(void *, const char *, char *errorOut, size_t errorOutLen) {
     if (errorOut && errorOutLen) {
         std::snprintf(errorOut, errorOutLen, "RETROPLAY_HAS_PPSSPP not set");
     }
     return false;
 }
-void rp_ppsspp_set_buttons(RetroPlayPPSSPPBridge *, uint32_t) {}
-void rp_ppsspp_run_frame(RetroPlayPPSSPPBridge *) {}
-bool rp_ppsspp_copy_rgba(RetroPlayPPSSPPBridge *, uint8_t **, int *, int *, int *) { return false; }
-void rp_ppsspp_pause(RetroPlayPPSSPPBridge *) {}
-void rp_ppsspp_resume(RetroPlayPPSSPPBridge *) {}
+void rp_ppsspp_set_buttons(void *, uint32_t) {}
+void rp_ppsspp_run_frame(void *) {}
+bool rp_ppsspp_copy_rgba(void *, uint8_t **, int *, int *, int *) { return false; }
+void rp_ppsspp_pause(void *) {}
+void rp_ppsspp_resume(void *) {}
 
 #endif
