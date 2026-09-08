@@ -18,3 +18,5 @@
 #import "RetroPlayPPSSPPBridge.h"
 
 #import "MelonDS/MelonDSBridge.h"
+
+#import "N64/N64LibretroHost.h"

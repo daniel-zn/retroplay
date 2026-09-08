@@ -390,14 +390,23 @@ public struct PlayView: View {
                         }
                         NSLog("RP_SMOKE nds pulsed Start+A sawFirstFrame=%d", sawFirstFrame ? 1 : 0)
                     case .n64:
-                        var held: N64Input = [.a]
-                        n64Held = held
-                        core?.setN64Input(held, stick: .zero)
-                        try? await Task.sleep(nanoseconds: 500_000_000)
-                        held = []
-                        n64Held = held
-                        core?.setN64Input(held, stick: .zero)
-                        NSLog("RP_SMOKE n64 pulsed A sawFirstFrame=%d", sawFirstFrame ? 1 : 0)
+                        // Angrylion on Simulator can take several seconds for first VI.
+                        for _ in 0..<40 {
+                            if sawFirstFrame { break }
+                            try? await Task.sleep(nanoseconds: 250_000_000)
+                        }
+                        NSLog("RP_SMOKE n64 pre-pulse sawFirstFrame=%d", sawFirstFrame ? 1 : 0)
+                        for bit in [N64Input.start, N64Input.a] {
+                            var held: N64Input = bit
+                            n64Held = held
+                            core?.setN64Input(held, stick: .zero)
+                            try? await Task.sleep(nanoseconds: 400_000_000)
+                            held = []
+                            n64Held = held
+                            core?.setN64Input(held, stick: .zero)
+                            try? await Task.sleep(nanoseconds: 400_000_000)
+                        }
+                        NSLog("RP_SMOKE n64 pulsed Start+A sawFirstFrame=%d", sawFirstFrame ? 1 : 0)
                     default:
                         break
                     }
