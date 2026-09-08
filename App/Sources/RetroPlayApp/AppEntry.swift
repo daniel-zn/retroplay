@@ -126,6 +126,7 @@ public struct RetroPlayRootView: View {
             .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
+            .retroPlayNavigationTitleChrome(for: colorScheme)
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
@@ -191,6 +192,7 @@ public struct RetroPlayRootView: View {
             .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
+            .retroPlayNavigationTitleChrome(for: colorScheme)
             .searchable(
                 text: $searchQuery,
                 isPresented: $isSearchPresented,
@@ -358,6 +360,7 @@ struct SettingsView: View {
             .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
+            .retroPlayNavigationTitleChrome(for: colorScheme)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
