@@ -3,34 +3,75 @@ import RetroPlayCore
 
 #if RETROPLAY_HAS_MELONDS
 
-/// Real melonDS interpreter bridge lands after XCFramework wiring on Mac (no JIT).
 public final class MelonDSNativeDriver: MelonDSNativeDriving {
+    private var handle: OpaquePointer?
+    private var frameBytes = Data()
+
     public init() {}
 
     public func loadROM(at url: URL) throws {
-        throw EmulatorCoreError.notImplemented(
-            "melonDS native bridge not implemented yet — XCFramework linked but driver stubs remain. See App/Vendor/melonDS.md."
-        )
+        tearDown()
+        guard let h = MelonDS_Create() else {
+            throw EmulatorCoreError.romLoadFailed("MelonDS_Create failed")
+        }
+        handle = h
+        let ok = url.withUnsafeFileSystemRepresentation { path -> Bool in
+            guard let path else { return false }
+            return MelonDS_LoadROM(h, path)
+        }
+        guard ok else {
+            tearDown()
+            throw EmulatorCoreError.romLoadFailed("MelonDS_LoadROM failed for \(url.lastPathComponent)")
+        }
     }
 
     public func setKeys(_ bitmask: UInt32, touchX: UInt16, touchY: UInt16, touchPressed: Bool) {
-        _ = bitmask
-        _ = touchX
-        _ = touchY
-        _ = touchPressed
+        guard let handle else { return }
+        MelonDS_SetKeyMask(handle, bitmask)
+        MelonDS_Touch(handle, touchX, touchY, touchPressed)
     }
 
-    public func runFrame() {}
+    public func runFrame() {
+        guard let handle else { return }
+        MelonDS_RunFrame(handle)
+    }
+
     public func pauseAudioVideo() {}
     public func resumeAudioVideo() {}
-    public func copyRGBAFrame() -> EmulatorVideoFrame? { nil }
+
+    public func copyRGBAFrame() -> EmulatorVideoFrame? {
+        guard let handle else { return nil }
+        var w: Int32 = 0
+        var h: Int32 = 0
+        let capacity = 256 * 384 * 4
+        var buf = [UInt8](repeating: 0, count: capacity)
+        let n = buf.withUnsafeMutableBytes { raw -> Int in
+            MelonDS_CopyRGBA(handle, raw.baseAddress, capacity, &w, &h)
+        }
+        guard n > 0, w > 0, h > 0 else { return nil }
+        return EmulatorVideoFrame(
+            width: Int(w),
+            height: Int(h),
+            bytes: Data(buf.prefix(n)),
+            bytesPerRow: Int(w) * 4
+        )
+    }
+
     public func saveState(to url: URL) throws {
-        throw EmulatorCoreError.notImplemented("melonDS saveState — bridge pending")
+        throw EmulatorCoreError.notImplemented("melonDS saveState not wired yet")
     }
     public func loadState(from url: URL) throws {
-        throw EmulatorCoreError.notImplemented("melonDS loadState — bridge pending")
+        throw EmulatorCoreError.notImplemented("melonDS loadState not wired yet")
     }
-    public func tearDown() {}
+
+    public func tearDown() {
+        if let handle {
+            MelonDS_Destroy(handle)
+        }
+        handle = nil
+    }
+
+    deinit { tearDown() }
 }
 
 #else

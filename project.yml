@@ -35,7 +35,7 @@ targets:
         INFOPLIST_FILE: AppHost/Supporting/Info.plist
         GENERATE_INFOPLIST_FILE: false
         SWIFT_OBJC_BRIDGING_HEADER: AppHost/Supporting/RetroPlay-Bridging-Header.h
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP"
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS"
         CLANG_CXX_LANGUAGE_STANDARD: "c++20"
         CLANG_ENABLE_MODULES: "YES"
         ENABLE_PREVIEWS: false
@@ -45,16 +45,16 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
         FRAMEWORK_SEARCH_PATHS: "$(inherited) $(SRCROOT)/App/Vendor/Output"
-        HEADER_SEARCH_PATHS: "$(inherited) $(SRCROOT)/AppHost/Sources $(SRCROOT)/../ppsspp $(SRCROOT)/../ppsspp/Common $(SRCROOT)/../ppsspp/Core $(SRCROOT)/../ppsspp/GPU $(SRCROOT)/../ppsspp/ext/libzip $(SRCROOT)/../ppsspp/ext"
+        HEADER_SEARCH_PATHS: "$(inherited) $(SRCROOT)/AppHost/Sources $(SRCROOT)/App/Vendor/Output/melonDS-headers $(SRCROOT)/App/Vendor/Output/mupen-headers $(SRCROOT)/../ppsspp $(SRCROOT)/../ppsspp/Common $(SRCROOT)/../ppsspp/Core $(SRCROOT)/../ppsspp/GPU $(SRCROOT)/../ppsspp/ext/libzip $(SRCROOT)/../ppsspp/ext $(SRCROOT)/../melonDS/src"
         USER_HEADER_SEARCH_PATHS: "$(inherited) $(SRCROOT)/../ppsspp"
         # Expose mCoreFind / mCoreLoadFile / save helpers from mgba/core/core.h
-        GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) ENABLE_VFS=1 ENABLE_DIRECTORIES=1 RETROPLAY_HAS_PPSSPP=1 RETROPLAY_HAS_MGBA=1"
+        GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) ENABLE_VFS=1 ENABLE_DIRECTORIES=1 RETROPLAY_HAS_PPSSPP=1 RETROPLAY_HAS_MGBA=1 RETROPLAY_HAS_N64=1 RETROPLAY_HAS_MELONDS=1"
         OTHER_LDFLAGS: "$(inherited) -lc++ -ObjC -lz"
       configs:
         Debug:
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS"
         Release:
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS"
     dependencies:
       - package: RetroPlayPackage
         product: RetroPlayCore
@@ -63,6 +63,10 @@ targets:
       - framework: App/Vendor/Output/mGBA.xcframework
         embed: false
       - framework: App/Vendor/Output/PPSSPP.xcframework
+        embed: false
+      - framework: App/Vendor/Output/mupen64plus.xcframework
+        embed: true
+      - framework: App/Vendor/Output/melonDS.xcframework
         embed: false
       - sdk: UIKit.framework
       - sdk: Foundation.framework

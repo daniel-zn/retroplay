@@ -16,3 +16,5 @@
 #import <mgba-util/vfs.h>
 
 #import "RetroPlayPPSSPPBridge.h"
+
+#import "MelonDS/MelonDSBridge.h"

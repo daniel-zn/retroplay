@@ -63,7 +63,30 @@ public struct RetroPlayRootView: View {
             }
         }
         .preferredColorScheme(appearance.colorScheme)
-        .onAppear { RetroPlayNavigationBarChrome.apply(colorScheme: colorScheme) }
+        .onAppear {
+            RetroPlayNavigationBarChrome.apply(colorScheme: colorScheme)
+            // Mac/sim smoke: -RetroPlaySmokeSystem nds|n64|gba|psp
+            // simctl launch maps "-Key value" into UserDefaults as well as argv.
+            if playGame == nil {
+                let args = ProcessInfo.processInfo.arguments
+                var raw: String?
+                if let idx = args.firstIndex(of: "-RetroPlaySmokeSystem"),
+                   args.index(after: idx) < args.endIndex {
+                    raw = args[args.index(after: idx)]
+                }
+                if raw == nil {
+                    raw = UserDefaults.standard.string(forKey: "RetroPlaySmokeSystem")
+                }
+                if let raw,
+                   let sys = SystemID(rawValue: raw),
+                   let game = store.games.first(where: { $0.systemID == sys }) {
+                    playGame = game
+                    NSLog("RP_SMOKE autoplay system=%@ game=%@", raw, game.displayName)
+                } else if let raw {
+                    NSLog("RP_SMOKE no library game for system=%@ games=%lu", raw, store.games.count)
+                }
+            }
+        }
         .onChange(of: colorScheme) { _, scheme in
             RetroPlayNavigationBarChrome.apply(colorScheme: scheme)
         }
