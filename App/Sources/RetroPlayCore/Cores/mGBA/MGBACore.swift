@@ -32,7 +32,12 @@ public final class MGBACore: EmulatorCore, CoreRunLoopDriving, @unchecked Sendab
     }
 
     public func setFastForward(_ enabled: Bool) {
-        fastForward = enabled
+        runLoop.sync {
+            fastForward = enabled
+            // Keep presenting ~60 callbacks/sec, but advance more emu frames per tick.
+            // Also nudge the host timer slightly so wall-clock catch-up feels snappier.
+            runLoop.framesPerSecond = enabled ? 90 : 60
+        }
     }
 
     public func loadROM(at url: URL) async throws {
@@ -70,13 +75,17 @@ public final class MGBACore: EmulatorCore, CoreRunLoopDriving, @unchecked Sendab
     }
 
     public func pause() {
-        isPaused = true
-        native?.pauseAudioVideo()
+        runLoop.sync {
+            isPaused = true
+            native?.pauseAudioVideo()
+        }
     }
 
     public func resume() {
-        isPaused = false
-        native?.resumeAudioVideo()
+        runLoop.sync {
+            isPaused = false
+            native?.resumeAudioVideo()
+        }
     }
 
     public func stop() {
@@ -90,24 +99,34 @@ public final class MGBACore: EmulatorCore, CoreRunLoopDriving, @unchecked Sendab
     }
 
     public func saveState(to url: URL) async throws {
-        guard let native else {
+        guard native != nil else {
             throw EmulatorCoreError.notImplemented("mGBA saveState — no native driver")
         }
-        try native.saveState(to: url)
+        try runLoop.syncThrows {
+            guard let native else {
+                throw EmulatorCoreError.notImplemented("mGBA saveState — no native driver")
+            }
+            try native.saveState(to: url)
+        }
     }
 
     public func loadState(from url: URL) async throws {
-        guard let native else {
+        guard native != nil else {
             throw EmulatorCoreError.notImplemented("mGBA loadState — no native driver")
         }
-        try native.loadState(from: url)
+        try runLoop.syncThrows {
+            guard let native else {
+                throw EmulatorCoreError.notImplemented("mGBA loadState — no native driver")
+            }
+            try native.loadState(from: url)
+        }
     }
 
     public func runLoopDidTick(_ loop: CoreRunLoop) {
         guard isRunning, !isPaused, let native else { return }
         native.setKeys(UInt32(currentInput.rawValue))
         // Turbo: run several emulated frames per host tick, present the last.
-        let steps = fastForward ? 3 : 1
+        let steps = fastForward ? 4 : 1
         for _ in 0..<steps {
             native.runFrame()
         }

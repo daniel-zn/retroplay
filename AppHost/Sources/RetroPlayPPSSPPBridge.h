@@ -25,7 +25,7 @@ void rp_ppsspp_run_frame(void *bridge);
 /// Caller frees with free(). Returns false if no frame yet.
 bool rp_ppsspp_copy_rgba(void *bridge, uint8_t **outBytes, int *outWidth, int *outHeight, int *outStrideBytes);
 
-/// Synchronous save/load via SaveState::SaveToRam / LoadFromRam into `path`.
+/// Synchronous save/load (Save+Process, with SaveToRam/LoadFromRam fallback) into `path`.
 bool rp_ppsspp_save_state(void *bridge, const char *path, char *errorOut, size_t errorOutLen);
 bool rp_ppsspp_load_state(void *bridge, const char *path, char *errorOut, size_t errorOutLen);
 

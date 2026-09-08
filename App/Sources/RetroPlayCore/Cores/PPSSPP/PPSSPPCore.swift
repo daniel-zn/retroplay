@@ -31,7 +31,10 @@ public final class PPSSPPCore: EmulatorCore, CoreRunLoopDriving, @unchecked Send
     }
 
     public func setFastForward(_ enabled: Bool) {
-        fastForward = enabled
+        runLoop.sync {
+            fastForward = enabled
+            runLoop.framesPerSecond = enabled ? 90 : 60
+        }
     }
 
     public func loadROM(at url: URL) async throws {
@@ -72,13 +75,17 @@ public final class PPSSPPCore: EmulatorCore, CoreRunLoopDriving, @unchecked Send
     }
 
     public func pause() {
-        isPaused = true
-        native?.pauseAudioVideo()
+        runLoop.sync {
+            isPaused = true
+            native?.pauseAudioVideo()
+        }
     }
 
     public func resume() {
-        isPaused = false
-        native?.resumeAudioVideo()
+        runLoop.sync {
+            isPaused = false
+            native?.resumeAudioVideo()
+        }
     }
 
     public func stop() {
@@ -92,22 +99,32 @@ public final class PPSSPPCore: EmulatorCore, CoreRunLoopDriving, @unchecked Send
     }
 
     public func saveState(to url: URL) async throws {
-        guard let native else {
+        guard native != nil else {
             throw EmulatorCoreError.notImplemented("PPSSPP saveState — no native driver")
         }
-        try native.saveState(to: url)
+        try runLoop.syncThrows {
+            guard let native else {
+                throw EmulatorCoreError.notImplemented("PPSSPP saveState — no native driver")
+            }
+            try native.saveState(to: url)
+        }
     }
 
     public func loadState(from url: URL) async throws {
-        guard let native else {
+        guard native != nil else {
             throw EmulatorCoreError.notImplemented("PPSSPP loadState — no native driver")
         }
-        try native.loadState(from: url)
+        try runLoop.syncThrows {
+            guard let native else {
+                throw EmulatorCoreError.notImplemented("PPSSPP loadState — no native driver")
+            }
+            try native.loadState(from: url)
+        }
     }
 
     public func runLoopDidTick(_ loop: CoreRunLoop) {
         guard isRunning, !isPaused, let native else { return }
-        let steps = fastForward ? 3 : 1
+        let steps = fastForward ? 4 : 1
         for _ in 0..<steps {
             native.runFrame()
         }

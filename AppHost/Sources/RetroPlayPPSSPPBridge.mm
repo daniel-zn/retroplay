@@ -19,6 +19,7 @@
 #include "Core/System.h"
 #include "Core/HLE/sceCtrl.h"
 #include "Core/SaveState.h"
+#include "Core/HLE/sceDisplay.h"
 #include <fstream>
 #include <vector>
 #include "GPU/Common/GPUDebugInterface.h"
@@ -228,10 +229,37 @@ bool rp_ppsspp_save_state(void *bridgePtr, const char *path, char *errorOut, siz
         setError(errorOut, errorOutLen, "null bridge/path or not inited");
         return false;
     }
+    if (!gpu) {
+        setError(errorOut, errorOutLen, "PPSSPP GPU not ready for save state");
+        return false;
+    }
+
+    // Prefer the same queued path as EmuScreen (Save + Process) so screenshot/side
+    // effects stay consistent; fall back to SaveToRam if the file op fails.
+    struct Result {
+        bool done = false;
+        bool ok = false;
+        std::string message;
+    } result;
+
+    SaveState::Save(Path(std::string(path)), -1,
+        [&result](SaveState::Status status, std::string_view message, std::string_view) {
+            result.ok = (status != SaveState::Status::FAILURE);
+            result.message = std::string(message);
+            result.done = true;
+        });
+    SaveState::Process();
+    if (result.done && result.ok) {
+        __DisplaySetWasPaused();
+        return true;
+    }
+
+    // Fallback: synchronous RAM snapshot into `path`.
     std::vector<u8> data;
     auto err = SaveState::SaveToRam(data);
     if (err != CChunkFileReader::ERROR_NONE || data.empty()) {
-        setError(errorOut, errorOutLen, "SaveState::SaveToRam failed");
+        setError(errorOut, errorOutLen,
+                 result.message.empty() ? "SaveState::SaveToRam failed" : result.message.c_str());
         return false;
     }
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
@@ -244,6 +272,7 @@ bool rp_ppsspp_save_state(void *bridgePtr, const char *path, char *errorOut, siz
         setError(errorOut, errorOutLen, "write failed");
         return false;
     }
+    __DisplaySetWasPaused();
     return true;
 }
 
@@ -253,9 +282,36 @@ bool rp_ppsspp_load_state(void *bridgePtr, const char *path, char *errorOut, siz
         setError(errorOut, errorOutLen, "null bridge/path or not inited");
         return false;
     }
+    if (!gpu) {
+        setError(errorOut, errorOutLen, "PPSSPP GPU not ready for load state");
+        return false;
+    }
+
+    struct Result {
+        bool done = false;
+        bool ok = false;
+        std::string message;
+    } result;
+
+    SaveState::Load(Path(std::string(path)), -1,
+        [&result](SaveState::Status status, std::string_view message, std::string_view) {
+            result.ok = (status != SaveState::Status::FAILURE);
+            result.message = std::string(message);
+            result.done = true;
+        });
+    SaveState::Process();
+    if (result.done && result.ok) {
+        if (coreState == CORE_NEXTFRAME || coreState == CORE_POWERDOWN) {
+            coreState = CORE_RUNNING_CPU;
+        }
+        __DisplaySetWasPaused();
+        return true;
+    }
+
     std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in) {
-        setError(errorOut, errorOutLen, "save state file missing");
+        setError(errorOut, errorOutLen,
+                 result.message.empty() ? "save state file missing" : result.message.c_str());
         return false;
     }
     const auto sz = in.tellg();
@@ -276,10 +332,10 @@ bool rp_ppsspp_load_state(void *bridgePtr, const char *path, char *errorOut, siz
         setError(errorOut, errorOutLen, errStr.empty() ? "LoadFromRam failed" : errStr);
         return false;
     }
-    // Ensure CPU keeps running after load.
     if (coreState == CORE_NEXTFRAME || coreState == CORE_POWERDOWN) {
         coreState = CORE_RUNNING_CPU;
     }
+    __DisplaySetWasPaused();
     return true;
 }
 

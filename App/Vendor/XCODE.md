@@ -33,4 +33,5 @@ Paste the compiler error to the RetroPlay product bot (via Engineer). Do not ask
 - Quick Save / Quick Load write `Documents/Saves/<system>/<gameUUID>/quick.state` (sandbox only; never git).
 - mGBA: `mCoreSaveStateNamed` / `mCoreLoadStateNamed` via `VFileOpen`.
 - PPSSPP: synchronous `SaveState::SaveToRam` / `LoadFromRam` through `RetroPlayPPSSPPBridge`.
-- Fast-forward runs 3 emulated frames per host tick when toggled (GBA + PSP). N64/NDS stay stubs with honest UI.
+- Fast-forward runs 4 emulated frames per host tick (and ~90 Hz host timer) when toggled (GBA + PSP). UI present rate may stay near 60; judge by in-game motion. N64/NDS stay stubs with honest UI.
+- Save/load run on the core GCD queue (same as runFrame) so PPSSPP CoreTiming is not raced from MainActor.

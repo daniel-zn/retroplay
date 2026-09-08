@@ -214,7 +214,7 @@ public struct PlayView: View {
                     Button(fastForward ? "FF On" : "FF Off") {
                         fastForward.toggle()
                         core?.setFastForward(fastForward)
-                        statusLine = fastForward ? "Fast-forward ×3" : "Running"
+                        statusLine = fastForward ? "Fast-forward on" : "Running"
                     }
                     .tint(fastForward ? .orange : nil)
                 }
@@ -244,7 +244,7 @@ public struct PlayView: View {
             let url = try SaveStateStore.quickSaveURL(system: game.systemID, gameID: game.id)
             try await core.saveState(to: url)
             core.resume()
-            statusLine = fastForward ? "Fast-forward ×3" : "Quick save OK"
+            statusLine = fastForward ? "Fast-forward on" : "Quick save OK"
         } catch {
             statusLine = "Quick save failed"
             errorMessage = error.localizedDescription
@@ -269,7 +269,7 @@ public struct PlayView: View {
             }
             try await core.loadState(from: url)
             core.resume()
-            statusLine = fastForward ? "Fast-forward ×3" : "Quick load OK"
+            statusLine = fastForward ? "Fast-forward on" : "Quick load OK"
         } catch {
             statusLine = "Quick load failed"
             errorMessage = error.localizedDescription
