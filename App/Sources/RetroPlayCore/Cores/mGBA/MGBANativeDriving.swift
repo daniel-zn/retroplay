@@ -19,5 +19,6 @@ public protocol MGBANativeDriving: AnyObject {
 public enum MGBANativeRegistry {
     /// Set from the app target after linking `mGBA.xcframework`, e.g. in `App` init:
     /// `MGBANativeRegistry.makeDriver = { MGBANativeDriver() }`
-    public static var makeDriver: (() -> MGBANativeDriving)?
+    // Swift 6: registry is set once from app init; unsafe avoids global-actor isolation on the factory.
+    nonisolated(unsafe) public static var makeDriver: (() -> MGBANativeDriving)?
 }
