@@ -14,6 +14,11 @@
 2. Generate Xcode: `cmake -DCMAKE_TOOLCHAIN_FILE=./cmake/Toolchains/ios.cmake -DIOS_PLATFORM=OS -H. -Bbuild.ios -GXcode` (or `./b.sh --ios-xcode`).
 3. Build iphoneos Release; collect static libs (`Core` + ffmpeg prebuilts + deps).
 4. Optional later: try `IOS_PLATFORM=SIMULATOR`. If it fails, ship **ios-arm64-only** XCFramework and smoke ATV on a **physical device**.
+
+### Simulator ffmpeg note (2026-09-08)
+
+Upstream `ffmpeg/ios/universal/lib/*.a` are **iphoneos**. Linking them into an `IOS_PLATFORM=SIMULATOR` build fails (`building for iOS-simulator, but linking … built for iOS`). Rebuild ffmpeg for simulator only if you need sim; otherwise ship **ios-arm64** XCFramework and smoke on device.
+
 5. Only then enable `RETROPLAY_HAS_PPSSPP` in `project.yml` and implement the native bridge.
 
 ## Mac mini checklist
