@@ -1,21 +1,10 @@
-# N64 / NDS on-screen controls (M2 scaffold)
+# N64 / NDS on-screen controls
 
-**Date:** 2026-09-08 (PT)  
-**Scope:** Portrait-first pad layouts for N64 and NDS. Colors/skins later.
+**Date:** 2026-09-08 (PT)
 
-## N64 (`N64FamilyPadView`)
+N64 and NDS no longer share one pad design (trident + analog vs clamshell + touch). Full notes:
 
-- Shoulders: L / Z / R
-- Left: D-pad + crude digital stick (±80 → `N64AnalogStick`)
-- Right: Start, A/B face, C-button diamond
-- Bits match mupen64plus `m64p_plugin.h` BUTTON flags
+- [`CONTROLS-N64.md`](CONTROLS-N64.md) — trident, stick well, C cluster, Z, color cues
+- [`CONTROLS-NDS.md`](CONTROLS-NDS.md) — DS face diamond, shoulders, rectangular touch panel
 
-## NDS (`NDSFamilyPadView`)
-
-- L/R, D-pad, Select/Start, X/A/B/Y face diamond
-- Touch stub strip maps drag → `NDSTouch` (bottom-screen coords); dual-screen Play layout TBD
-- Bits match melonDS key order (A B Select Start Right Left Up Down R L X Y)
-
-## Play
-
-`ConsolePadHost` switches on `SystemID`. Save/FF remain disabled (`supports*` false) until native cores register.
+`ConsolePadHost` still switches on `SystemID`. Input bits are unchanged (`N64Input` + `N64AnalogStick`; `NDSInput` + `NDSTouch`).

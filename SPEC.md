@@ -194,7 +194,7 @@ Apple DTS note: no back-deployed equivalent before iOS 26 ([forums thread](https
 
 Layout principles and portrait/landscape rules: [`docs/CONTROLS-GBA.md`](docs/CONTROLS-GBA.md).
 
-Play uses `ConsolePadHost` (per-`SystemID`) with per-console pads: `GBAFamilyPadView`, `PSPFamilyPadView`, `N64FamilyPadView`, `NDSFamilyPadView` (portrait first; NDS touch stub). Layout/hit targets first; colors/skins later.
+Play uses `ConsolePadHost` (per-`SystemID`) with per-console pads: `GBAFamilyPadView`, `PSPFamilyPadView`, `N64FamilyPadView`, `NDSFamilyPadView` (portrait first). Layout notes: [`docs/CONTROLS-GBA.md`](docs/CONTROLS-GBA.md), [`docs/CONTROLS-N64.md`](docs/CONTROLS-N64.md), [`docs/CONTROLS-NDS.md`](docs/CONTROLS-NDS.md), [`docs/CONTROLS-PSP.md`](docs/CONTROLS-PSP.md). Portrait pads mimic hardware shape/placement/labels; analog/HOME stubs are documented where bits are not wired.
 
 
 ---

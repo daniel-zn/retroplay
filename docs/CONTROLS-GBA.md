@@ -1,37 +1,39 @@
-# GBA / Game Boy family on-screen controls
+# GBA on-screen controls
 
-**Date:** 2026-09-07 (PT)  
-**Scope:** Layout principles for RetroPlay Play UI (hit targets, spacing, portrait vs landscape). Colors/skins later.  
-**Architecture:** Per-console pad views; this note covers the **GBA family** pad used for Game Boy Advance. See also `CONTROLS-PSP.md` and `CONTROLS-N64-NDS.md`.
+**Date:** 2026-09-08 (PT)  
+**Scope:** Authentic Game Boy Advance pad for RetroPlay Play UI. Portrait-first (phone under-screen). Landscape kept as a thin overlay, not the design target this pass.  
+**Code:** `GBAFamilyPadView` via `ConsolePadHost` (`.gba`). Bits: `GBAInput` → `setGBAInput`.
 
 ---
 
-## Hardware baselines
+## Hardware baseline (original GBA, AGB-001)
 
-### Classic vertical Game Boy / GBC (portrait reference)
+The original Game Boy Advance is a **landscape slab**: screen in the center, controls on the face, L/R on the top edge.
 
-- Body is **portrait**: screen upper half; controls lower half.
-- **D-pad** sits left of the lower face; **A/B** on the right (A typically upper-right of the pair, B lower-left).
-- **Start / Select** sit between the D-pad and face buttons, below the screen.
-- Useful as the mental model for **phone portrait**: thumbs rest on the lower corners; secondary buttons stay center-bottom.
+| Control | Hardware placement |
+|---------|--------------------|
+| **+ Control Pad** | Left of the screen |
+| **B / A** | Right of the screen. **B left and slightly lower; A right and slightly higher** (Nintendo face pair) |
+| **SELECT / START** | Bottom-center under the screen, between D-pad and A/B. Small oblongs; SELECT left, START right; the pair tilts slightly toward each other |
+| **L / R** | Top shoulders (L left, R right), not on the face |
+| Body | Launch color **Indigo**; later Arctic / Glacier / Fuchsia / Platinum |
 
-Sources: HowStuffWorks overview of Game Boy vs GBA orientation ([howstuffworks.com](https://electronics.howstuffworks.com/gameboy.htm)); Nintendo legacy product history for vertical GB family form factor.
+Official size about **144.5 × 82 × 24.5 mm** (W×H×D). Controls: D-pad + A, B, L, R, Select, Start (no X/Y, no analog).
 
-### Original GBA (landscape slab)
+GBA SP (AGS-001) is a clamshell but the **play surface stays landscape** when open (D-pad left, A/B right, L/R on the hinge). It does not change the face map.
 
-- Official size about **144.5 × 82 × 24.5 mm** (W×H×D).
-- **Horizontal** face: screen centered; **eight-way D-pad** left; **A/B** right; **Select / Start** on the face near the bottom center under the screen; **L / R** on the top shoulders.
-- Controls: D-pad + six action buttons (A, B, L, R, Select, Start).
+### Portrait phone mapping (mental model)
 
-Sources:
+The slab is **rotated in the player’s head**, not redrawn as a vertical Game Boy:
 
-- Nintendo UK technical data (dimensions) — [nintendo.com Support – Technical data](https://www.nintendo.com/en-gb/Support/Legacy-system/Technical-data-619479.html)
-- Wikipedia / repair summaries of control set — [Game Boy Advance](https://en.wikipedia.org/wiki/Game_Boy_Advance), [iFixit GBA](https://www.ifixit.com/Device/Game_Boy_Advance)
-- HowStuffWorks on the shift to horizontal layout and L/R shoulders — [howstuffworks.com](https://electronics.howstuffworks.com/gameboy.htm)
+1. Game frame on top (Play chrome).
+2. Pad cluster **under the screen**, thumbs on the lower corners:
+   - **L / R** sit at the **top of the pad cluster** (shoulder stand-ins).
+   - **D-pad** left; **A/B** right with A above-right of B.
+   - **SELECT / START** center, slightly below the D-pad / face midline (GBA bottom-center).
+3. Indigo / purple face accents are intentional so the pad reads as GBA, not a generic circle grid.
 
-### GBA SP
-
-- Clamshell; play surface remains **landscape** when open (D-pad left, face right, shoulders on hinge side). Reinforces landscape-phone grip more than vertical GB.
+Do **not** use a four-button Nintendo diamond (that is DS / later). Do **not** put L/R as face circles.
 
 ---
 
@@ -44,54 +46,51 @@ Sources:
 | Thumbs at lower / side corners | Portrait: pad under screen. Landscape: D-pad left edge, face right edge |
 | Avoid Home indicator / Dynamic Island | Keep pad inside safe area; no primary buttons under the home bar |
 | Visible press state | Held controls brighten / scale slightly |
-| Prefer not to bury gameplay | Landscape overlays hug left/right; screen stays center |
+| Layout over skins | Plus-shaped D-pad, oblong Start/Select, wide shoulders — not four generic circles |
 
-Sources: Apple HIG game controls (44 / 28 pt) — [Human Interface Guidelines – Game controls](https://developer.apple.com/design/human-interface-guidelines/game-controls); WWDC24 “Design advanced games for Apple platforms” (tap targets, thumb zones) — [developer.apple.com/videos/play/wwdc2024/10085/](https://developer.apple.com/videos/play/wwdc2024/10085/).
+Sources: Apple HIG game controls (44 / 28 pt) — [Human Interface Guidelines – Game controls](https://developer.apple.com/design/human-interface-guidelines/game-controls); WWDC24 “Design advanced games for Apple platforms” — [developer.apple.com/videos/play/wwdc2024/10085/](https://developer.apple.com/videos/play/wwdc2024/10085/).
 
 ---
 
 ## RetroPlay layout rules (GBA family)
 
-### Portrait (Game Boy–style stack)
+### Portrait (this pass)
 
-1. Game frame on top (existing Play chrome).
-2. Control strip below, inside safe area:
-   - **Row 1:** L (left) · R (right) — shoulder stand-ins.
-   - **Row 2:** D-pad (left) · Start/Select stack (center) · A/B cluster (right).
-3. A sits upper-right of B (Nintendo face ordering).
-4. Transport (Pause / Resume / Stop) stays below the pad, smaller chrome.
+1. Indigo chassis plate behind the cluster.
+2. **Row 1:** L (left) · R (right) — wide shoulder bars.
+3. **Row 2:** plus D-pad (left) · SELECT / START pair (center, slightly low) · A/B cluster (right).
+4. A sits upper-right of B (Nintendo face ordering).
+5. Transport (Pause / Resume / Stop) stays **below** the pad; unchanged.
 
-### Landscape (GBA / phone landscape)
+### Landscape (deferred polish)
 
-1. Screen centered (or slightly upper) with letterboxing as needed.
-2. **Left third:** D-pad (+ L near top-left).
-3. **Right third:** A/B (+ R near top-right).
-4. **Under screen / bottom center:** Select · Start.
-5. Keep hit targets in thumb arcs; do not place primary buttons in the unreachable center of the glass.
+Existing left / screen / right split remains: L+D-pad left, SELECT·START under the frame, R+A/B right. Same glyphs as portrait. Not the design target this pass.
 
 ### Spacing
 
 - ≥ 8 pt gap between adjacent primary controls; ≥ 12 pt between D-pad block and face block.
-- D-pad outer span ≈ 120–140 pt; face A/B diameters ≈ 56–64 pt.
+- D-pad outer span ≈ 120–140 pt; face A/B diameters ≈ 52–58 pt.
+- D-pad hit testing uses `PadHitTesting.dpad` (diagonals = two bits).
+
+### Bits
+
+`GBAInput` (A B Select Start Right Left Up Down R L). Unchanged.
 
 ---
 
-## Later systems (stub hooks only for now)
+## Sources (retrieved 2026-09-08)
 
-| System | Why a different pad |
-|--------|---------------------|
-| **N64** | Analog stick + C-buttons + Z; not a GB face layout |
-| **NDS** | Dual screens + touch stylus region; shoulder/face differ |
-| **PSP** | Analog nub, extra face row, different shoulder ergonomics |
-
-`ConsolePadHost` switches on `SystemID` so those pads can land without rewriting Play.
+- Nintendo UK, *Game Boy Advance* instruction booklet (EN/DE/FR PDF): labeled START, SELECT, + Control Pad, A, B, L, R — [nintendo.com/eu/…/GBA_Manual_UK_DE_FR.pdf](https://www.nintendo.com/eu/media/downloads/support_1/game_boy_advance_4/GBA_Manual_UK_DE_FR.pdf); index page [Nintendo UK – GBA manuals](https://www.nintendo.com/en-gb/Support/Legacy-system/Game-Boy-Advance-manual-and-additional-documents-619476.html)
+- Nintendo UK technical data (dimensions) — [Support – Technical data](https://www.nintendo.com/en-gb/Support/Legacy-system/Technical-data-619479.html)
+- HowStuffWorks, “How Game Boy Advance Works” (shift from vertical GB to horizontal slab; L/R shoulders; Indigo launch color) — [electronics.howstuffworks.com/gameboy.htm](https://electronics.howstuffworks.com/gameboy.htm)
+- Control-set summaries — [Wikipedia: Game Boy Advance](https://en.wikipedia.org/wiki/Game_Boy_Advance), [iFixit: Game Boy Advance](https://www.ifixit.com/Device/Game_Boy_Advance)
 
 ---
 
-## Out of scope (this pass)
+## Out of scope
 
-- Brand-accurate plastic colors / skins
+- Pixel-perfect plastic skins / huge assets
 - Haptics / audio click
 - Editable skin JSON
 - Physical Game Controller profiles (future)
-
+- Landscape-first redesign
