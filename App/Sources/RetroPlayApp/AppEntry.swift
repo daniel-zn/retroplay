@@ -16,6 +16,7 @@ public struct RetroPlayRootView: View {
     @State private var searchPlayGame: LibraryGame?
     @State private var searchQuery = ""
     @State private var isSearchPresented = false
+    @State private var libraryTitleCollapsed = false
     @State private var importErrorMessage: String?
     @State private var showImportError = false
     @Environment(\.colorScheme) private var colorScheme
@@ -71,6 +72,9 @@ public struct RetroPlayRootView: View {
                 // First land on Search: show the field; re-tap still forces focus via TabBarReselectHandler.
                 isSearchPresented = true
             }
+            if tab == .library {
+                libraryTitleCollapsed = false
+            }
         }
         .fileImporter(
             isPresented: $showImporter,
@@ -93,10 +97,17 @@ public struct RetroPlayRootView: View {
         NavigationStack {
             Group {
                 if filteredGames.isEmpty {
-                    VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("RetroPlay")
+                            .font(.largeTitle.bold())
+                            .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 2)
+                            .padding(.bottom, 6)
                         systemPicker
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
+                            .padding(.bottom, 8)
                         ContentUnavailableView(
                             store.games.isEmpty ? "No Games Yet" : "No \(systemTab.title) Games",
                             systemImage: "gamecontroller",
@@ -109,13 +120,15 @@ public struct RetroPlayRootView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else {
-                    // System chips scroll with the grid so the large title collapses.
+                    // Custom large title in scroll content (system large titles stay blank on black).
                     LibraryGridView(
                         games: filteredGames,
                         onSelect: { playGame = $0 },
                         artworkProvider: { game in
                             loadCover(for: game)
-                        }
+                        },
+                        largeTitle: "RetroPlay",
+                        titleCollapsed: $libraryTitleCollapsed
                     ) {
                         systemPicker
                             .padding(.horizontal, 12)
@@ -125,11 +138,11 @@ public struct RetroPlayRootView: View {
                 }
             }
             .background(RetroPlayTheme.canvas(for: colorScheme))
-            .navigationTitle("RetroPlay")
-            .navigationBarTitleDisplayMode(.large)
-            // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
+            .navigationTitle(libraryTitleCollapsed ? "RetroPlay" : "")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
-            .retroPlayNavigationTitleChrome(for: colorScheme)
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
