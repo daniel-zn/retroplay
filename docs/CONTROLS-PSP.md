@@ -15,7 +15,7 @@ Official launch size about **170 × 74 × 23 mm**, ~280 g (Sony IPE, 2004-12-06)
 | Control | Hardware placement | Cue |
 |---------|--------------------|-----|
 | **Analog nub** | Lower left, **below** the D-pad | Small grey stick |
-| **Directional buttons** | Left, below the nub | Plus / four-way |
+| **Directional buttons** | Upper left, **above** the analog nub | Plus / four-way |
 | **△ ○ ✕ □** | Right. Sony diamond: **△ top, ○ right, ✕ bottom, □ left** — **not ABXY letters** | PlayStation colors (△ green, ○ red, ✕ blue, □ pink) on black |
 | **L / R** | Top shoulders | Wide |
 | **HOME** | Lower left of the face (system) | Silver |
