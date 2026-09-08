@@ -24,6 +24,8 @@ public final class MGBANativeDriver: MGBANativeDriving {
             found.pointee.deinit(found)
             throw EmulatorCoreError.romLoadFailed("mCore init failed")
         }
+        // GBA reset reads the config hash table; must init before reset/load.
+        mCoreInitConfig(found, "retroplay")
         guard mCoreLoadFile(found, path) else {
             found.pointee.deinit(found)
             throw EmulatorCoreError.romLoadFailed("mCoreLoadFile failed")
