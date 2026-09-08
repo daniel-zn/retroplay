@@ -4,6 +4,7 @@ import RetroPlayCore
 /// Shared hold-to-press gesture used by every console pad.
 @available(iOS 18.0, *)
 enum PadHold {
+    @MainActor
     static func drag(_ onHeld: @escaping @MainActor @Sendable (Bool) -> Void) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { _ in onHeld(true) }
@@ -404,7 +405,7 @@ struct AnalogStickWell: View {
                 .fill(wellFill)
                 .overlay {
                     RegularOctagon()
-                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 1.2)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1.2)
                 }
             Circle()
                 .stroke(Color.white.opacity(0.08), lineWidth: 8)
