@@ -33,7 +33,8 @@ enum RetroPlayNavigationBarChrome {
             bar.compactAppearance = standard
             bar.compactScrollEdgeAppearance = scrollEdge
             bar.tintColor = foreground
-            bar.prefersLargeTitles = true
+            // Do not force prefersLargeTitles here — Library is .inline with a
+            // custom scroll title; forcing true reserves a blank large-title inset.
             bar.isTranslucent = true
         }
 
@@ -117,5 +118,34 @@ extension View {
             .onChange(of: colorScheme) { _, scheme in
                 RetroPlayNavigationBarChrome.apply(colorScheme: scheme)
             }
+    }
+}
+
+
+/// Forces `prefersLargeTitles = false` on the enclosing navigation bar (Library custom title).
+@available(iOS 18.0, *)
+struct LibraryInlineNavChrome: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        let apply: () -> Void = {
+            var current: UIViewController? = uiViewController
+            while let c = current {
+                if let nav = c.navigationController {
+                    nav.navigationBar.prefersLargeTitles = false
+                    return
+                }
+                current = c.parent
+            }
+        }
+        apply()
+        DispatchQueue.main.async(execute: apply)
+    }
+}
+
+@available(iOS 18.0, *)
+extension View {
+    func retroPlayLibraryInlineNav() -> some View {
+        background(LibraryInlineNavChrome())
     }
 }

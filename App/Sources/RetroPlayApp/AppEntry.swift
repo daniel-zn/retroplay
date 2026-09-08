@@ -120,16 +120,23 @@ public struct RetroPlayRootView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else {
-                    // Custom large title in scroll content (system large titles stay blank on black).
+                    // Custom large title in the scroll header (system large titles stay blank on black).
                     LibraryGridView(
                         games: filteredGames,
                         onSelect: { playGame = $0 },
                         artworkProvider: { game in
                             loadCover(for: game)
                         },
-                        largeTitle: "RetroPlay",
                         titleCollapsed: $libraryTitleCollapsed
                     ) {
+                        Text("RetroPlay")
+                            .font(.largeTitle.bold())
+                            .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 2)
+                            .padding(.bottom, 6)
+                            .accessibilityAddTraits(.isHeader)
                         systemPicker
                             .padding(.horizontal, 12)
                             .padding(.top, 4)
@@ -140,6 +147,7 @@ public struct RetroPlayRootView: View {
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .navigationTitle(libraryTitleCollapsed ? "RetroPlay" : "")
             .navigationBarTitleDisplayMode(.inline)
+            .retroPlayLibraryInlineNav()
             .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
