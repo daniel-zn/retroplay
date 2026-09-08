@@ -95,17 +95,28 @@ public struct PlayView: View {
     // MARK: - Landscape
 
     private var landscapeBody: some View {
-        VStack(spacing: 6) {
-            HStack(alignment: .center, spacing: 8) {
+        VStack(spacing: 4) {
+            HStack(alignment: .center, spacing: 6) {
                 if game.systemID == .gba {
                     GBAPadLeftColumn(held: gbaHeld, setHeld: setGBAHeld)
                 } else if game.systemID == .psp {
                     PSPPadLeftColumn(held: pspHeld, setHeld: setPSPHeld)
                 }
 
-                gameScreen
-                    .aspectRatio(screenAspect, contentMode: .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 6) {
+                    gameScreen
+                        .aspectRatio(screenAspect, contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    if game.systemID == .gba {
+                        GBAPadStartSelectRow(held: gbaHeld, setHeld: setGBAHeld)
+                    } else if game.systemID == .psp {
+                        PSPPadStartSelectRow(held: pspHeld, setHeld: setPSPHeld)
+                    }
+
+                    transportBar
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 if game.systemID == .gba {
                     GBAPadRightColumn(held: gbaHeld, setHeld: setGBAHeld)
@@ -113,17 +124,10 @@ public struct PlayView: View {
                     PSPPadRightColumn(held: pspHeld, setHeld: setPSPHeld)
                 }
             }
-            .padding(.horizontal, 8)
-
-            if game.systemID == .gba {
-                GBAPadStartSelectRow(held: gbaHeld, setHeld: setGBAHeld)
-            } else if game.systemID == .psp {
-                PSPPadStartSelectRow(held: pspHeld, setHeld: setPSPHeld)
-            }
-
-            transportBar
+            .padding(.horizontal, 6)
+            .padding(.top, 2)
         }
-        .padding(.bottom, 4)
+        .padding(.bottom, 2)
     }
 
     private var gameScreen: some View {
