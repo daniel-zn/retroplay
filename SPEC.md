@@ -1,0 +1,291 @@
+# SPEC.md — RetroPlay v1
+
+**Status:** v1 product / engineering spec  
+**Date:** 2026-09-04  
+**Fact-check:** primary sources, 2026-09-04 (**P0 locked** to GBA / N64 / NDS / PSP)
+
+Claims below that depend on external tech cite upstream or Apple sources. Marketplace inclusion of a core elsewhere means **availability under App Store rules**, not a measured JIT-less FPS guarantee for RetroPlay.
+
+---
+
+## 1. Goals
+
+1. Ship a **native iPhone SwiftUI** emulator with a **library-first UX**: import games, one tap to play, **automatic ROM → system → core** mapping (**no core picker** in the main path).
+2. Use **Liquid Glass** (iOS 26) as the visual language for chrome (library bars, sheets, play overlays) via SwiftUI `glassEffect` / `GlassEffectContainer` / `glassEffectID`.
+3. Target the **App Store**: bundled, redistributable cores only; **no JIT**.
+4. **Locked P0 only:** Game Boy Advance, Nintendo 64, Nintendo DS, and **Sony PSP** — all as App Store features. PSP uses PPSSPP’s IR caching interpreter (official 2024-05-15: nearly all games full speed on modern iOS without JIT). Do **not** park PSP as sideload-only.
+5. Keep legal posture under **Guideline 4.7**: user-imported games only via Files / document picker; no ROM catalog shipped by us; developer responsibility for offered software.
+
+**Success (v1):** Playable P0 library (GBA → N64 → NDS → PSP) on a real device / TestFlight path documented, Liquid Glass shell shipped, auto system detection working, one default core per P0 system, clear “out of scope” list for JIT-blocked systems and for NES/SNES/GB (not in locked P0).
+
+---
+
+## 2. Non-goals
+
+- Not a multi-core frontend with a user-facing core picker, deep emulator menu tree, or online core updater.
+- Not “every libretro core” or sideload-only parity.
+- Not NES / SNES / GB/GBC as P0 (explicitly out of locked matrix; future expansion only if scope changes).
+- Not GameCube / Wii / Dreamcast / PS2 as App Store features (JIT / dynarec constraints — see matrix).
+- Not distributing ROMs, BIOS packs, or copyrighted game dumps.
+- Not inventing ROM file paths or sample dumps in the repo.
+- Not claiming measured full-speed play for every title on every device without device testing.
+- Not requiring jailbreak, AltStore JIT, or debugger-attached dynarec for the product path.
+- Not inventing that an IPA/binary already exists.
+
+---
+
+## 3. System matrix (locked P0 + out of scope)
+
+P0 = **only** GBA, N64, NDS, PSP.  
+NES/SNES/GB are **not** P0 (future expansion only if scope changes).  
+**Out of scope (store):** systems that require JIT to enable or that maintainers say are unplayable without JIT.
+
+### P0 — ship these (ordered milestones GBA → N64 → NDS → PSP)
+
+| System | Default core (bundled) | JIT note | Evidence |
+|--------|------------------------|----------|----------|
+| **Game Boy Advance** | **mGBA** | Interpreter path; no dynarec required for playable GBA. Prefer for accuracy + active maintenance; MPL 2.0. | [mGBA](https://mgba.io/); [libretro mGBA](https://docs.libretro.com/library/mgba/); [mGBA license](https://github.com/mgba-emu/mgba/blob/master/LICENSE) |
+| **Nintendo 64** | **mupen64plus-next** + GLideN64 (HLE) | Store-viable JIT-less: use `cached_interpreter` + OpenGL ES 3.0; **not** paraLLEl-RDP (Vulkan LLE). | [libretro Mupen64Plus-Next](https://docs.libretro.com/library/mupen64plus/) (`cached_interpreter` when dynarec off) |
+| **Nintendo DS** | **melonDS** | Store-viable interpreter path; BIOS optional for many titles. | [melonDS](https://melonds.kuribo64.net/); [libretro melonDS](https://docs.libretro.com/library/melonds/) |
+| **Sony PSP** | **PPSSPP** (IR caching interpreter; **no dynarec**) | Official: JIT **speeds up**, not required. App Store build uses IR interpreter; nearly all PSP games full speed on modern iOS without JIT. **App Store P0 — not sideload-only.** | [PPSSPP 2024-05-15](https://www.ppsspp.org/news/live-on-app-store/); [PPSSPP iOS](https://www.ppsspp.org/docs/reference/ios-support/); `CPUCore::IR_INTERPRETER = 2` in [ConfigValues.h](https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h) |
+
+#### Core pick rationale (locked)
+
+| System | Pick | Why this one |
+|--------|------|--------------|
+| GBA | mGBA | Accuracy and active maintenance; redistributable (MPL 2.0). |
+| N64 | mupen64plus-next + GLideN64 | Documented `cached_interpreter` when dynarec off; avoid paraLLEl-RDP as iPhone default. |
+| NDS | melonDS | Mature, redistributable DS core with a viable interpreter path. |
+| PSP | PPSSPP | App Store–proven PSP path; IR interpreter documented by upstream (`CPUCore::IR_INTERPRETER`). |
+
+### Explicitly not P0 (do not revive without scope change)
+
+NES (Nestopia), SNES (Snes9x), GB/GBC (Gambatte) — RetroPlay locked P0 does **not** include these. Treat as future expansion candidates only.
+
+### Out of scope for App Store JIT-less RetroPlay
+
+| System | Why blocked | Evidence |
+|--------|-------------|----------|
+| **GameCube / Wii (Dolphin)** | Maintainers: interpreter many times slower; App Store without JIT described as basically unplayable | [OatmealDome 2024-04-19](https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/) |
+| **Dreamcast** | Usable play typically needs dynarec; not an App Store product target for RetroPlay | Apple App Store JIT ban; core dynarec dependency |
+| **PlayStation 2** | Same class: needs dynarec for usable store play | same |
+| **3DS / Switch** | Outside practical App Store JIT-less scope for v1 | Product scope |
+
+**App Store JIT rule:** Apple does not allow JIT on App Store apps. Prefer interpreter / IR paths. Cores must be **bundled** in the signed binary (no downloading new executable cores after install). Sources: [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/); [PPSSPP App Store](https://www.ppsspp.org/news/live-on-app-store/) (retrieved 2026-09-04).
+
+---
+
+## 4. Architecture
+
+### 4.1 Principles
+
+- **SwiftUI app shell** owns library, import, settings, Liquid Glass chrome.
+- **EmulatorCore bridge** (protocol) owns audio/video/input frames and save states.
+- **One bundled core plugin per system**. Hide core choice from users; optional advanced override later.
+- **ROM classifier** maps extension + header/magic → `SystemID` → default core.
+- ROM import via **Files / UIDocumentPicker** only — copy into app sandbox; never invent sample ROM paths in source.
+- No deep emulator menu tree; no online core updater.
+
+### 4.2 Diagram
+
+```mermaid
+flowchart TB
+  subgraph UI["SwiftUI shell (iOS 26)"]
+    Lib["Game Library\n(Liquid Glass)"]
+    Import["ROM Import\n(Files / document picker)"]
+    PlayUI["Play Overlay\n(skins, FF, saves)"]
+    Settings["Settings\n(systems, skins, legal)"]
+  end
+
+  subgraph Domain["App domain"]
+    Registry["SystemRegistry\n(SystemID → Core + extensions)"]
+    Classifier["ROMClassifier\n(auto-pick system)"]
+    LibraryDB["Library store\n(SwiftData / SQLite)"]
+    Artwork["Artwork resolver\n(optional DB / user art)"]
+  end
+
+  subgraph Bridge["Emulator bridge"]
+    CoreHost["CoreHost\n(EmulatorCore protocol)"]
+    AV["Audio / Video surface"]
+    Input["Touch + MFi / GCController"]
+    Saves["Save states + SRAM"]
+  end
+
+  subgraph Bundled["Bundled cores (App Store binary)"]
+    P0Cores["P0: mGBA · mupen64plus-next\nmelonDS · PPSSPP IR"]
+  end
+
+  Import --> Classifier
+  Classifier --> Registry
+  Classifier --> LibraryDB
+  Lib --> LibraryDB
+  Lib --> PlayUI
+  PlayUI --> CoreHost
+  Registry --> CoreHost
+  CoreHost --> P0Cores
+  CoreHost --> AV
+  CoreHost --> Input
+  CoreHost --> Saves
+  Artwork --> Lib
+  Settings --> Registry
+```
+
+### 4.3 Module sketch (v1)
+
+| Module | Responsibility |
+|--------|----------------|
+| `RetroPlayApp` | Entrypoint, scene, appearance |
+| `LibraryFeature` | Grid/list, search, recent, system filters |
+| `ImportFeature` / `ROMImporter` | Document picker, folder import, duplicate detection |
+| `SystemRegistry` | Static map of systems, extensions, default cores |
+| `ROMClassifier` | Heuristics + magic bytes |
+| `EmulatorCore` + `CoreHost` | Protocol + load core, run loop, pause, FF, save/load state |
+| `SkinKit` | On-screen controls; system default skins |
+| `GlassChrome` | Shared `glassEffect` helpers / containers |
+
+Scaffold lives under `App/` (see `App/README.md`). No bulky emulator repos cloned yet.
+
+---
+
+## 5. App Store constraints
+
+| Constraint | Implication | Source |
+|------------|-------------|--------|
+| Guideline **4.7** (5 Apr 2024; PC wording 1 Aug 2024) | Retro console (and PC) emulator apps may offer downloadable games; developer is responsible for compliance and law | [Apple News 2024-04-05](https://developer.apple.com/news/?id=0kjli9o1); [Guidelines](https://developer.apple.com/app-store/review/guidelines/) |
+| 4.7.1–4.7.5 | Privacy, filtering/reporting, payments if selling content, no exposing native APIs to downloaded software without permission, software index + universal links, age gating | same Guidelines page |
+| **No JIT** on App Store | Do not ship dynarec-required systems; use interpreter/IR paths only (PPSSPP IR for PSP) | [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/); [PPSSPP](https://www.ppsspp.org/news/live-on-app-store/) |
+| Cores **bundled** | No post-install core downloads as executable plugins | Guideline **2.5.2**; platform signing model |
+| Guideline **2.5.2** | Do not download/execute code that changes app features | [Guidelines](https://developer.apple.com/app-store/review/guidelines/) |
+| Copyright | User supplies ROMs via Files; we do not distribute game dumps; document ToS clearly | 4.7 responsibility language |
+| Redistribution | Prefer cores with clear OSS licenses (e.g. mGBA MPL 2.0) | Upstream project licenses |
+
+**Policy timeline:** Guideline 4.7 published 5 Apr 2024; PPSSPP App Store announcement 15 May 2024 confirms IR interpreter as a store-viable PSP path.
+
+---
+
+## 6. Liquid Glass UI outline (iOS 26)
+
+**Confirmed APIs (Apple Developer Documentation, availability iOS 26.0+):**
+
+| API | Role |
+|-----|------|
+| `View.glassEffect(_:in:)` | Apply Liquid Glass to a view (default `.regular`, capsule shape) |
+| `GlassEffectContainer` | Shared sampling / morphing for multiple glass views |
+| `View.glassEffectID(_:in:)` | Identity for morph transitions inside a container |
+
+Guide: [Applying Liquid Glass to custom views](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views)  
+Also: [glassEffect(_:in:)](https://developer.apple.com/documentation/swiftui/view/glasseffect(_:in:)), [GlassEffectContainer](https://developer.apple.com/documentation/swiftui/glasseffectcontainer), WWDC25 session [323](https://developer.apple.com/videos/play/wwdc2025/323/) (2025-06-09).  
+Apple DTS note: no back-deployed equivalent before iOS 26 ([forums thread](https://developer.apple.com/forums/thread/840052)).
+
+### UI map
+
+| Surface | Treatment |
+|---------|-----------|
+| Tab / toolbar / floating library actions | `GlassEffectContainer` + `.glassEffect(.regular.interactive())` where touch-primary |
+| Game detail sheet / pause menu | Glass sheet over dimmed playfield |
+| On-screen controls | Prefer non-interactive glass for dense chrome; interactive for primary pause/FF |
+| Game artwork grid | Content stays opaque; glass only on chrome (performance) |
+| Fallback | v1 min = **iOS 26** so Liquid Glass is first-class |
+
+### On-screen controls (GBA family)
+
+Layout principles and portrait/landscape rules: [`docs/CONTROLS-GBA.md`](docs/CONTROLS-GBA.md).
+
+Play uses `ConsolePad` (per-`SystemID`) drawn by display-only `PadControls` with a multi-touch `PadTouchSurface` on top (see `docs/PLAY-RUNTIME.md`) (portrait first). Layout notes: [`docs/CONTROLS-GBA.md`](docs/CONTROLS-GBA.md), [`docs/CONTROLS-N64.md`](docs/CONTROLS-N64.md), [`docs/CONTROLS-NDS.md`](docs/CONTROLS-NDS.md), [`docs/CONTROLS-PSP.md`](docs/CONTROLS-PSP.md). Portrait pads mimic hardware shape/placement/labels; analog/HOME stubs are documented where bits are not wired.
+
+
+---
+
+## 7. PPSSPP IR defaults + heavy-title edge cases
+
+### App Store defaults (product path)
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| `CPUCore` | **`IR_INTERPRETER` (2)** | Enum: `INTERPRETER=0`, `JIT=1`, `IR_INTERPRETER=2`, `JIT_IR=3` — [ConfigValues.h](https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h) |
+| Dynarec / JIT | **Off / unavailable** | App Store cannot use JIT; do not expose a “enable JIT” product path |
+| Claim | Nearly all PSP games full speed on modern iOS without JIT | [PPSSPP 2024-05-15](https://www.ppsspp.org/news/live-on-app-store/) |
+
+### Edge cases (IR path)
+
+Upstream tracks IR-specific instability separately from JIT ([issue #15670](https://github.com/hrydgard/ppsspp/issues/15670)). Historically named titles (many later fixed): Burnout Legends, Metal Gear Solid: Peace Walker, Dissidia 012, Frontier Gate Boost; Outrun 2006 called out as remaining. For RetroPlay:
+
+- Ship IR as the **only** App Store CPU backend for PSP.
+- Keep a buried “compatibility” note for known-heavy titles; prefer upstream fixes over inventing per-game hacks in v1.
+- Do not advertise sideload JIT as the product solution for those titles.
+- Device-tier testing before claiming full-speed on older phones.
+
+---
+
+## 8. ROM import (Files only)
+
+- Use `UIDocumentPicker` / SwiftUI `.fileImporter` / Files app share sheet.
+- Supported extensions registered per `SystemID` (see `App/Sources/RetroPlayCore/SystemID.swift`).
+- Copy security-scoped bookmarks into the app sandbox library store.
+- **Never** commit, generate, or hardcode paths to copyrighted ROMs or BIOS dumps.
+- Empty-state copy: “Import games you own via Files. RetroPlay does not include ROMs.”
+
+---
+
+## 9. Milestones M0–M3 (ordered GBA → N64 → NDS → PSP)
+
+### M0 — Skeleton (**landed** in App/)
+
+- Swift package / Xcode-friendly tree under `App/`.
+- Library shell with Liquid Glass chrome (`#available(iOS 26, *)` + material fallback); empty state; Settings with Guideline 4.7 / “no ROMs included” copy.
+- `SystemID` + `SystemRegistry` + `ROMImporter` / classifier (extension map for four P0 systems).
+- `.fileImporter` → copy into `Documents/ROMs` → `LibraryStore` JSON (`Documents/library.json`); tap row → honest `StubEmulatorCore` alert (no fake play).
+- README pointing at SPEC.
+
+### M1 — First playable: **GBA (mGBA)**
+
+- Bridge + **mGBA** end-to-end.
+- Orientation-aware GBA on-screen pad (see `docs/CONTROLS-GBA.md`); MFi later; save SRAM; pause overlay.
+- Auto-detect `.gba` / related; reject unknown with clear UI.
+
+### M2 — **N64 (mupen64plus-next)** + **NDS (melonDS)**
+
+- Second and third P0 systems.
+- **Scaffolding (landed):** Swift hosts, native registries, portrait pads, Vendor Mac docs/scripts; CoreFactory returns real core classes. Native XCFrameworks + bridges are Mac follow-up (`RETROPLAY_HAS_N64` / `RETROPLAY_HAS_MELONDS`).
+- Box art hook (user art + optional open DB — no piracy catalog).
+- Save states, fast-forward, per-game recent (gated until native OK).
+- TestFlight checklist + 4.7 compliance notes.
+
+### M3 — **PSP (PPSSPP IR)** + polish
+
+- Integrate PPSSPP with **IR interpreter defaults** (no dynarec).
+- Heavy-title edge-case notes; performance pass on device tiers.
+- Explicit “not supported” screen for GC/Wii/Dreamcast/PS2 (and for NES/SNES/GB until scope expands).
+- Only then consider App Store submission prep (screenshots, privacy nutrition, age rating).
+
+---
+
+## 10. Status
+
+All four P0 systems are playable: GBA (mGBA), N64 (mupen64plus-next with GLideN64), NDS
+(melonDS) and PSP (PPSSPP IR interpreter), each built from the revisions in
+`App/Vendor/SOURCES.md`. iPhone only. Remaining before App Store submission: final app icon,
+screenshots and store metadata.
+
+---
+
+## 11. Build
+
+See `README.md` (Building), `App/Vendor/XCODE.md` and the per-core notes in `App/Vendor/`.
+
+---
+
+## 12. References (retrieved 2026-09-04 unless dated)
+
+- Apple 4.7 news (2024-04-05): https://developer.apple.com/news/?id=0kjli9o1
+- Apple 4.7 PC clarification (2024-08-01): https://developer.apple.com/news/?id=ty0avr2s
+- App Review Guidelines: https://developer.apple.com/app-store/review/guidelines/
+- PPSSPP App Store (2024-05-15): https://www.ppsspp.org/news/live-on-app-store/
+- PPSSPP iOS support: https://www.ppsspp.org/docs/reference/ios-support/
+- PPSSPP ConfigValues.h (CPUCore): https://github.com/hrydgard/ppsspp/blob/master/Core/ConfigValues.h
+- PPSSPP IR issues tracker: https://github.com/hrydgard/ppsspp/issues/15670
+- mGBA: https://mgba.io/ · https://docs.libretro.com/library/mgba/
+- mupen64plus-next options (`cached_interpreter`): https://docs.libretro.com/library/mupen64plus/
+- melonDS: https://melonds.kuribo64.net/
+- Dolphin / no App Store JIT (2024-04-19): https://oatmealdome.me/blog/why-dolphin-isnt-coming-to-the-app-store/
+- Liquid Glass guide: https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views

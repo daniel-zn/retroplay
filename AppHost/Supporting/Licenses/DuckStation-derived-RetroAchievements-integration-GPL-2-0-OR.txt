@@ -1,0 +1,19 @@
+Notice copied verbatim from ppsspp/Core/RetroAchievements.cpp:
+
+// SPDX-FileCopyrightText: 2019-2022 Connor McLaughlin <stenzek@gmail.com>
+// SPDX-License-Identifier: (GPL-2.0 OR GPL-3.0 OR CC-BY-NC-ND-4.0)
+
+// Derived from Duckstation's RetroAchievements implementation by stenzek as can be seen
+// above, relicensed to GPL 2.0.
+
+// Actually after the rc_client rewrite, barely anything of that remains.
+
+// The PSP hash function:
+// md5_init
+// md5_hash(PSP_GAME/PARAM.SFO)
+// md5_hash(PSP_GAME/EBOOT.BIN)
+// hash = md5_finalize()
+
+// To test RAIntegration, get the DLL here: https://github.com/RetroAchievements/RAIntegration/releases
+// Then just place it next to PPSSPP and enable RAIntegration in PPSSPP achivement settings, then restart it.
+

@@ -1,0 +1,24 @@
+// App-target bridging header. Defines must appear before mgba headers so
+// mCoreFind / mCoreLoadFile / save helpers (gated on ENABLE_VFS) are visible.
+#ifndef ENABLE_VFS
+#define ENABLE_VFS 1
+#endif
+#ifndef ENABLE_DIRECTORIES
+#define ENABLE_DIRECTORIES 1
+#endif
+
+#import <mgba/core/core.h>
+#import <mgba/core/interface.h>
+#import <mgba/core/config.h>
+#import <mgba/core/serialize.h>
+#import <mgba-util/common.h>
+#import <mgba-util/image.h>
+#import <mgba-util/audio-buffer.h>
+#import <mgba-util/vfs.h>
+#import <mgba-util/audio-buffer.h>
+
+#import "RetroPlayPPSSPPBridge.h"
+
+#import "MelonDS/MelonDSBridge.h"
+
+#import "N64/N64LibretroHost.h"

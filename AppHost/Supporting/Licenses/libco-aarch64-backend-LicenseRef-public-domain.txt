@@ -1,0 +1,3 @@
+Notice copied verbatim from mupen64plus-next/libretro-common/libco/aarch64.c:
+
+/*

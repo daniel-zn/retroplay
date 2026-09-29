@@ -1,0 +1,118 @@
+name: RetroPlay
+options:
+  bundleIdPrefix: com.danielzn
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "27.0"
+  createIntermediateGroups: true
+
+packages:
+  RetroPlayPackage:
+    path: App
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    TARGETED_DEVICE_FAMILY: "1"
+
+targets:
+  RetroPlay:
+    type: application
+    platform: iOS
+    sources:
+      - path: AppIcon.icon
+      - path: AppHost/Sources
+      - path: AppHost/Supporting
+        buildPhase: resources
+        excludes:
+          - RetroPlay-Bridging-Header.h
+          - Info.plist
+          - RetroPlayPPSSPPBridge.h
+          - assets
+          - assets/**
+          - Licenses
+          - Licenses/**
+      - path: AppHost/Supporting/assets
+        buildPhase: resources
+        type: folder
+      - path: AppHost/Supporting/Licenses
+        buildPhase: resources
+        type: folder
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.danielzn.retroplay
+        # iPhone only for now; XcodeGen's app preset would otherwise add iPad ("1,2").
+        TARGETED_DEVICE_FAMILY: "1"
+        PRODUCT_NAME: RetroPlay
+        INFOPLIST_FILE: AppHost/Supporting/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        SWIFT_OBJC_BRIDGING_HEADER: AppHost/Supporting/RetroPlay-Bridging-Header.h
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS"
+        CLANG_CXX_LANGUAGE_STANDARD: "c++20"
+        CLANG_ENABLE_MODULES: "YES"
+        ENABLE_PREVIEWS: false
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: "1.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+        FRAMEWORK_SEARCH_PATHS: "$(inherited) $(SRCROOT)/App/Vendor/Output"
+        HEADER_SEARCH_PATHS: "$(inherited) $(SRCROOT)/AppHost/Sources $(SRCROOT)/App/Vendor/Output/melonDS-headers $(SRCROOT)/App/Vendor/Output/mupen-headers $(SRCROOT)/../ppsspp $(SRCROOT)/../ppsspp/Common $(SRCROOT)/../ppsspp/Core $(SRCROOT)/../ppsspp/GPU $(SRCROOT)/../ppsspp/ext/libzip $(SRCROOT)/../ppsspp/ext $(SRCROOT)/../melonDS/src"
+        USER_HEADER_SEARCH_PATHS: "$(inherited) $(SRCROOT)/../ppsspp"
+        # Expose mCoreFind / mCoreLoadFile / save helpers from mgba/core/core.h
+        GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) ENABLE_VFS=1 ENABLE_DIRECTORIES=1 RETROPLAY_HAS_PPSSPP=1 RETROPLAY_HAS_MGBA=1 RETROPLAY_HAS_N64=1 RETROPLAY_HAS_MELONDS=1"
+        OTHER_LDFLAGS: "$(inherited) -lc++ -ObjC -lz"
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS"
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS"
+    dependencies:
+      - package: RetroPlayPackage
+        product: RetroPlayCore
+      - package: RetroPlayPackage
+        product: RetroPlayApp
+      - framework: App/Vendor/Output/mGBA.xcframework
+        embed: false
+      - framework: App/Vendor/Output/PPSSPP.xcframework
+        embed: false
+      - framework: App/Vendor/Output/mupen64plus.xcframework
+        embed: true
+      - framework: App/Vendor/Output/melonDS.xcframework
+        embed: false
+      - sdk: UIKit.framework
+      - sdk: Foundation.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: QuartzCore.framework
+      - sdk: AudioToolbox.framework
+      - sdk: AVFoundation.framework
+      - sdk: AVKit.framework
+      - sdk: OpenAL.framework
+      - sdk: OpenGLES.framework
+      - sdk: CoreGraphics.framework
+      - sdk: CoreMedia.framework
+      - sdk: CoreVideo.framework
+      - sdk: VideoToolbox.framework
+      - sdk: GameController.framework
+      - sdk: Accelerate.framework
+      - sdk: CoreServices.framework
+      - sdk: CoreText.framework
+      - sdk: MobileCoreServices.framework
+      - sdk: UniformTypeIdentifiers.framework
+    scheme:
+      testTargets:
+        - RetroPlayCoreTests
+      gatherCoverageData: false
+
+  RetroPlayCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: App/Tests/RetroPlayCoreTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - package: RetroPlayPackage
+        product: RetroPlayCore

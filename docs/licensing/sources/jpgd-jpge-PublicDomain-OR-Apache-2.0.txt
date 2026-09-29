@@ -1,0 +1,42 @@
+# jpeg-compressor
+
+This directory contains code from
+https://github.com/richgel999/jpeg-compressor/tree/aeb7d3b463aa8228b87a28013c15ee50a7e6fcf3
+with the following patches:
+
+* https://github.com/richgel999/jpeg-compressor/pull/18
+
+## License
+
+The license of jpgd.cpp/.h and jpge.cpp/.h is either Public Domain or Apache 2.0. Choose whatever you want.
+
+The license for the optional file jpgd_idct.h (and ONLY this file) is Copyright 2009 Intel Corporation:
+
+Permission is granted to use, copy, distribute and prepare derivative works of
+this software for any purpose and without fee, provided, that the above
+copyright notice and this statement appear in all copies. Intel makes no
+representations about the suitability of this software for any purpose. THIS
+SOFTWARE IS PROVIDED "AS IS." INTEL SPECIFICALLY DISCLAIMS ALL WARRANTIES,
+EXPRESS OR IMPLIED, AND ALL LIABILITY, INCLUDING CONSEQUENTIAL AND OTHER
+
+----- header from ext/jpge/jpgd.cpp -----
+// jpgd.cpp - C++ class for JPEG decompression. Written by Richard Geldreich <richgel99@gmail.com> between 1994-2020.
+// Supports progressive and baseline sequential JPEG image files, and the most common chroma subsampling factors: Y, H1V1, H2V1, H1V2, and H2V2.
+// Supports box and linear chroma upsampling.
+//
+// Released under two licenses. You are free to choose which license you want:
+// License 1: 
+// Public Domain
+//
+// License 2:
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.

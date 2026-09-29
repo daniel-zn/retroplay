@@ -1,0 +1,704 @@
+[
+ {
+  "name": "Press Start 2P font",
+  "usedBy": "App",
+  "license": "OFL-1.1",
+  "copyright": "Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name \"Press Start 2P\".",
+  "source": "https://github.com/google/fonts/tree/dbd72d6ef9ebea750d33c02c7189633e972d6a40/ofl/pressstart2p",
+  "version": "google/fonts @ dbd72d6ef9ebea750d33c02c7189633e972d6a40; SHA-256 034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
+  "licenseFile": "Press-Start-2P-font-OFL-1-1.txt"
+ },
+ {
+  "name": "mGBA (libmgba, GBA core only)",
+  "usedBy": "GBA core (mGBA)",
+  "license": "MPL-2.0",
+  "copyright": "Copyright (c) 2013-2026 Jeffrey Pfau",
+  "source": "https://github.com/mgba-emu/mgba/tree/aa6394c93ca24b0ff40dc9231bdb0533f415e0be",
+  "version": "0.11-1-aa6394c (git aa6394c93ca24b0ff40dc9231bdb0533f415e0be)",
+  "licenseFile": "mGBA-libmgba-GBA-core-only-MPL-2-0.txt"
+ },
+ {
+  "name": "CRC32 table (src/util/crc32.c)",
+  "usedBy": "GBA core (mGBA)",
+  "license": "LicenseRef-Gary-Brown-CRC32",
+  "copyright": "COPYRIGHT (C) 1986 Gary S. Brown. You may use this program, or code or tables extracted from it, as desired without restriction.",
+  "source": "https://github.com/mgba-emu/mgba/tree/aa6394c93ca24b0ff40dc9231bdb0533f415e0be",
+  "version": "n/a",
+  "licenseFile": "CRC32-table-src-util-crc32-c-LicenseRef-Gary-Brown-CRC32.txt"
+ },
+ {
+  "name": "inih",
+  "usedBy": "GBA core (mGBA)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright (c) 2009, Ben Hoyt (LICENSE.txt); Copyright (C) 2009-2020, Ben Hoyt (ini.c header)",
+  "source": "https://github.com/mgba-emu/mgba/tree/aa6394c93ca24b0ff40dc9231bdb0533f415e0be",
+  "version": "r50-era (header 'Copyright (C) 2009-2020, Ben Hoyt')",
+  "licenseFile": "inih-BSD-3-Clause.txt"
+ },
+ {
+  "name": "MD5",
+  "usedBy": "GBA core (mGBA)",
+  "license": "MPL-2.0 AND Unlicense",
+  "copyright": "Copyright (c) 2013-2014 Jeffrey Pfau; based on https://github.com/Zunawe/md5-c, originally released under the Unlicense; derived from the RSA Data Security, Inc. MD5 Message-Digest Algorithm",
+  "source": "https://github.com/mgba-emu/mgba/tree/aa6394c93ca24b0ff40dc9231bdb0533f415e0be",
+  "version": "n/a",
+  "licenseFile": "MD5-MPL-2-0-AND-Unlicense.txt"
+ },
+ {
+  "name": "MurmurHash3 (src/util/hash.c)",
+  "usedBy": "GBA core (mGBA)",
+  "license": "LicenseRef-PublicDomain",
+  "copyright": "MurmurHash3 was written by Austin Appleby, and is placed in the public domain.",
+  "source": "https://github.com/mgba-emu/mgba/tree/aa6394c93ca24b0ff40dc9231bdb0533f415e0be",
+  "version": "n/a",
+  "licenseFile": "MurmurHash3-src-util-hash-c-LicenseRef-PublicDomain.txt"
+ },
+ {
+  "name": "SHA-1",
+  "usedBy": "GBA core (mGBA)",
+  "license": "MPL-2.0 AND LicenseRef-PublicDomain",
+  "copyright": "Copyright (c) 2013-2025 Jeffrey Pfau; based on https://github.com/clibs/sha1 (Steve Reid, public domain) - upstream license not in checkout, UNCONFIRMED",
+  "source": "https://github.com/mgba-emu/mgba/tree/aa6394c93ca24b0ff40dc9231bdb0533f415e0be",
+  "version": "n/a",
+  "licenseFile": "SHA-1-MPL-2-0-AND-LicenseRef-PublicDomain.txt"
+ },
+ {
+  "name": "melonDS core",
+  "usedBy": "DS core (melonDS)",
+  "license": "GPL-3.0-or-later",
+  "copyright": "Copyright 2016-2026 melonDS team (per-file headers, e.g. src/NDS.cpp)",
+  "source": "https://github.com/melonDS-emu/melonDS/tree/906e9ebb27da8c6a715cd7abab4abfe8a8d29427",
+  "version": "1.1+ git 906e9eb",
+  "licenseFile": "melonDS-core-GPL-3-0-or-later.txt"
+ },
+ {
+  "name": "blip_buf",
+  "usedBy": "DS core (melonDS)",
+  "license": "LGPL-2.1-or-later",
+  "copyright": "Library Copyright (C) 2003-2009 Shay Green",
+  "source": "https://github.com/melonDS-emu/melonDS/tree/906e9ebb27da8c6a715cd7abab4abfe8a8d29427",
+  "version": "blip_buf (Shay Green), version string '$vers' unexpanded in readme",
+  "licenseFile": "blip-buf-LGPL-2-1-or-later.txt"
+ },
+ {
+  "name": "FatFs",
+  "usedBy": "DS core (melonDS)",
+  "license": "LicenseRef-FatFs",
+  "copyright": "Copyright (C) 20xx, ChaN, all right reserved. (FatFs R0.14b, ff.h)",
+  "source": "https://github.com/melonDS-emu/melonDS/tree/906e9ebb27da8c6a715cd7abab4abfe8a8d29427",
+  "version": "R0.14b",
+  "licenseFile": "FatFs-LicenseRef-FatFs.txt"
+ },
+ {
+  "name": "FreeBIOS",
+  "usedBy": "DS core (melonDS)",
+  "license": "BSD-2-Clause",
+  "copyright": "Copyright (c) 2013, Gilead Kutnick",
+  "source": "https://github.com/melonDS-emu/melonDS/tree/906e9ebb27da8c6a715cd7abab4abfe8a8d29427",
+  "version": "n/a",
+  "licenseFile": "FreeBIOS-BSD-2-Clause.txt"
+ },
+ {
+  "name": "SHA-1 (src/sha1, Steve Reid)",
+  "usedBy": "DS core (melonDS)",
+  "license": "LicenseRef-PublicDomain",
+  "copyright": "SHA-1 in C By Steve Reid <steve@edmweb.com> 100% Public Domain",
+  "source": "https://github.com/melonDS-emu/melonDS/tree/906e9ebb27da8c6a715cd7abab4abfe8a8d29427",
+  "version": "n/a",
+  "licenseFile": "SHA-1-src-sha1-Steve-Reid-LicenseRef-PublicDomain.txt"
+ },
+ {
+  "name": "Teakra (DSi DSP emulator)",
+  "usedBy": "DS core (melonDS)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2018 Weiyi Wang",
+  "source": "https://github.com/melonDS-emu/melonDS/tree/906e9ebb27da8c6a715cd7abab4abfe8a8d29427",
+  "version": "vendored in melonDS 906e9eb",
+  "licenseFile": "Teakra-DSi-DSP-emulator-MIT.txt"
+ },
+ {
+  "name": "tiny-AES-c",
+  "usedBy": "DS core (melonDS)",
+  "license": "Unlicense",
+  "copyright": "Public domain (kokke/tiny-AES-c, unlicense.txt)",
+  "source": "https://github.com/melonDS-emu/melonDS/tree/906e9ebb27da8c6a715cd7abab4abfe8a8d29427",
+  "version": "vendored",
+  "licenseFile": "tiny-AES-c-Unlicense.txt"
+ },
+ {
+  "name": "xxHash",
+  "usedBy": "DS core (melonDS)",
+  "license": "BSD-2-Clause",
+  "copyright": "Copyright (C) 2012-2023 Yann Collet",
+  "source": "https://github.com/melonDS-emu/melonDS/tree/906e9ebb27da8c6a715cd7abab4abfe8a8d29427",
+  "version": "0.8.3",
+  "licenseFile": "xxHash-BSD-2-Clause.txt"
+ },
+ {
+  "name": "mupen64plus-next",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright (C) 2020 M4xw <m4x@m4xw.net> (libretro/libretro.c header); other custom/* files carry mupen64plus-style GPL headers; project LICENSE is plain GPLv2 text",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "git f275caf (libretro/mupen64plus-libretro-nx) + RetroPlay patch",
+  "licenseFile": "mupen64plus-next-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "GLideN64 (core renderer)",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "GPL-2.0-only",
+  "copyright": "Sergey Lipskiy (c) 2014-2015; credits: Orkin (glN64), yongzh (gles2n64), ziggy (z64), Nathaniel Meyer (bloom), Hiroshi Morii (GlideHQ)",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "libretro-bundled 'rev.NX' @ f275caf",
+  "licenseFile": "GLideN64-core-renderer-GPL-2-0-only.txt"
+ },
+ {
+  "name": "GLideNHQ / GlideHQ",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright (C) 2007 Hiroshi Morii (KoolSmoky); Copyright (C) 2003 Rice1964; based on Derek Liauw Kie Fa (2xSaI) and Maxim Stepin (hq4x); deposterize Copyright (c) 2012- PPSSPP Project",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "GlideHQ 1.5 port",
+  "licenseFile": "GLideNHQ-GlideHQ-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "GLSL FXAA shader",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2014 Matt DesLauriers",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "n/a",
+  "licenseFile": "GLSL-FXAA-shader-MIT.txt"
+ },
+ {
+  "name": "libco (aarch64 backend)",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "LicenseRef-public-domain",
+  "copyright": "author: webgeek1234 (aarch64.c); libco by byuu",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "libco.aarch64 2017-06-26",
+  "licenseFile": "libco-aarch64-backend-LicenseRef-public-domain.txt"
+ },
+ {
+  "name": "libpng",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "Libpng",
+  "copyright": "Copyright (c) 1998-2002,2004,2006-2017 Glenn Randers-Pehrson; (c) 1996-1997 Andreas Dilger; (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.; (c) 2000-2017 contributing authors per png.h",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "1.6.34 (locally modified pngpriv.h)",
+  "licenseFile": "libpng-Libpng.txt"
+ },
+ {
+  "name": "libretro-common",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "MIT",
+  "copyright": "Copyright (C) 2010-2019/2010-2020/2010-2021 The RetroArch team",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "bundled @ f275caf",
+  "licenseFile": "libretro-common-MIT.txt"
+ },
+ {
+  "name": "MD5 (L. Peter Deutsch)",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "Zlib",
+  "copyright": "Copyright (C) 1999, 2000, 2002 Aladdin Enterprises. All rights reserved.",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "md5.c v1.6 2002/04/13",
+  "licenseFile": "MD5-L-Peter-Deutsch-Zlib.txt"
+ },
+ {
+  "name": "minizip",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "Zlib",
+  "copyright": "Copyright (C) 1998-2010 Gilles Vollant; (C) 2007-2008 Even Rouault; (C) 2009-2010 Mathias Svensson; crypt.h (C) 1998-2005 Gilles Vollant (from Info-ZIP crypt code)",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "1.1 (unz/zip_copyright strings say 1.01)",
+  "licenseFile": "minizip-Zlib.txt"
+ },
+ {
+  "name": "mupen64plus-core",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Richard Goedeken et al. (see LICENSES); based on Mupen64 0.5 by Hacktarux, Dave2001, Zilmar, Gregor Anich (Blight), Juha Luotio (JttL)",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "2.6.0 (MUPEN_CORE_VERSION 0x020600, libretro fork)",
+  "licenseFile": "mupen64plus-core-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "mupen64plus-rsp-hle",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Richard Goedeken, Bobby Smiles (bsmiles32) et al.; based on Mupen64 0.5 (Hacktarux et al.)",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "libretro fork @ f275caf",
+  "licenseFile": "mupen64plus-rsp-hle-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "N64 CIC-NUS-6105 algorithm",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "BSD-2-Clause-Views",
+  "copyright": "Copyright 2011 X-Scale. All rights reserved.",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "2011",
+  "licenseFile": "N64-CIC-NUS-6105-algorithm-BSD-2-Clause-Views.txt"
+ },
+ {
+  "name": "Preshing lightweight semaphore",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "Zlib",
+  "copyright": "Copyright (c) 2015 Jeff Preshing",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "n/a",
+  "licenseFile": "Preshing-lightweight-semaphore-Zlib.txt"
+ },
+ {
+  "name": "readerwriterqueue (moodycamel)",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "BSD-2-Clause",
+  "copyright": "Copyright (c) 2013-2015, Cameron Desrochers / (c)2013-2016 Cameron Desrochers",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "2013-2016 header (version not stated)",
+  "licenseFile": "readerwriterqueue-moodycamel-BSD-2-Clause.txt"
+ },
+ {
+  "name": "webgl-meincraft FXAA",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright (c) 2011 by Armin Ronacher.",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "n/a",
+  "licenseFile": "webgl-meincraft-FXAA-BSD-3-Clause.txt"
+ },
+ {
+  "name": "xBRZ scaler",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "GPL-3.0-only WITH MAME-linking exception (LicenseRef; not a standard SPDX exception)",
+  "copyright": "Copyright (C) Zenju (zenju AT gmx DOT de) - All Rights Reserved",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "HqMAME xBRZ (version not stated)",
+  "licenseFile": "xBRZ-scaler-GPL-3-0-only-WITH-MAME-linking-exception-License.txt"
+ },
+ {
+  "name": "xxHash",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "BSD-2-Clause",
+  "copyright": "Copyright (C) 2012-present, Yann Collet (xxhash.h); Copyright (C) 2019-present, Yann Collet (xxh3.h)",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "0.7.3",
+  "licenseFile": "xxHash-BSD-2-Clause-2.txt"
+ },
+ {
+  "name": "xxHash",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "BSD-2-Clause",
+  "copyright": "Copyright (C) 2012-2023 Yann Collet",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "0.8.3",
+  "licenseFile": "xxHash-BSD-2-Clause-3.txt"
+ },
+ {
+  "name": "zlib (custom/dependencies/libzlib)",
+  "usedBy": "N64 core (mupen64plus-next)",
+  "license": "Zlib",
+  "copyright": "Copyright (C) 1995-2013 Jean-loup Gailly and Mark Adler",
+  "source": "https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320",
+  "version": "1.2.8 (locally modified zutil.h)",
+  "licenseFile": "zlib-custom-dependencies-libzlib-Zlib.txt"
+ },
+ {
+  "name": "PPSSPP (Core, Common, GPU, UI)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright (c) 2012- PPSSPP Project (Henrik Rydgard et al.)",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "git 98e70c8ca3",
+  "licenseFile": "PPSSPP-Core-Common-GPU-UI-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "PPSSPP data files (PPGe atlas, VFPU tables, compat.ini, langregion.ini, knownfuncs.ini)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright (C) 2012- PPSSPP Project and contributors",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248/assets",
+  "version": "98e70c8ca3",
+  "licenseFile": "PPSSPP-Core-Common-GPU-UI-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "aemu_postoffice client",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "GPL-3.0-only (assumed; repo ships gpl-3.0.txt, no or-later statement found)",
+  "copyright": "kethen (no copyright line in sources)",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "2026-03-29-22-g9e53363",
+  "licenseFile": "melonDS-core-GPL-3-0-or-later.txt"
+ },
+ {
+  "name": "armips",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2009-2020 Kingcom",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "v0.11.0-219-g62adab4",
+  "licenseFile": "armips-MIT.txt"
+ },
+ {
+  "name": "at3_standalone",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "LGPL-2.1-or-later",
+  "copyright": "Copyright (c) 2006-2008 Maxim Poliakovski, Benjamin Larsson; and other FFmpeg authors",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "in-tree",
+  "licenseFile": "at3-standalone-LGPL-2-1-or-later.txt"
+ },
+ {
+  "name": "basis_universal (transcoder)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "Apache-2.0",
+  "copyright": "Copyright (C) 2019-2021 Binomial LLC",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy (2019-2021)",
+  "licenseFile": "basis-universal-transcoder-Apache-2-0.txt"
+ },
+ {
+  "name": "CityHash",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2011 Google, Inc.",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy",
+  "licenseFile": "CityHash-MIT.txt"
+ },
+ {
+  "name": "cpu_features",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "Apache-2.0",
+  "copyright": "Copyright 2017 Google LLC",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "v0.4.1-211-gfd4ffc1",
+  "licenseFile": "cpu-features-Apache-2-0.txt"
+ },
+ {
+  "name": "Dear ImGui",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2014-2024 Omar Cornut",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "1.91.6",
+  "licenseFile": "Dear-ImGui-MIT.txt"
+ },
+ {
+  "name": "disarm (ARM disassembler)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "LicenseRef-disarm",
+  "copyright": "(c) 2000 Gareth McCaughan",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "2000",
+  "licenseFile": "disarm-ARM-disassembler-LicenseRef-disarm.txt"
+ },
+ {
+  "name": "dr_flac (bundled in libchdr)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "Unlicense OR MIT-0",
+  "copyright": "Copyright 2023 David Reid",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "0.12.42",
+  "licenseFile": "dr-flac-bundled-in-libchdr-Unlicense-OR-MIT-0.txt"
+ },
+ {
+  "name": "DuckStation-derived RetroAchievements integration",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "GPL-2.0 OR GPL-3.0 OR CC-BY-NC-ND-4.0",
+  "copyright": "Copyright 2019-2022 Connor McLaughlin",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "in-tree",
+  "licenseFile": "DuckStation-derived-RetroAchievements-integration-GPL-2-0-OR.txt"
+ },
+ {
+  "name": "FFmpeg",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "LGPL-2.1-or-later",
+  "copyright": "Copyright (c) the FFmpeg developers",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "git 537ef3b0e3 (Lavc57.24.102 / Lavf57.25.100, ~3.0 dev; RELEASE file says 3.0.2); ppsspp-ffmpeg submodule b87f7c6d52",
+  "licenseFile": "FFmpeg-LGPL-2-1-or-later.txt"
+ },
+ {
+  "name": "gason",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2013-2015 Ivan Vashchaev",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy",
+  "licenseFile": "gason-MIT.txt"
+ },
+ {
+  "name": "ghc::filesystem",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2018 Steffen Schuemann",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "1.3.3 (GHC_FILESYSTEM_VERSION 10303)",
+  "licenseFile": "ghc-filesystem-MIT.txt"
+ },
+ {
+  "name": "gl3stub",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "Apache-2.0",
+  "copyright": "Copyright 2013 The Android Open Source Project",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "2013",
+  "licenseFile": "gl3stub-Apache-2-0.txt"
+ },
+ {
+  "name": "glslang",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND GPL-3.0-or-later WITH Bison-exception-2.2",
+  "copyright": "Copyright (C) 2002-2005 3Dlabs Inc. Ltd.; 2012-2016 LunarG; 2015-2018 Google; Khronos Group; others",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "2.3-3991-g50e0708e",
+  "licenseFile": "glslang-BSD-3-Clause-AND-BSD-2-Clause-AND-MIT-AND-Apache-2-0.txt"
+ },
+ {
+  "name": "jpgd / jpge (jpeg-compressor)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "LicenseRef-PublicDomain OR Apache-2.0",
+  "copyright": "Richard Geldreich",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "aeb7d3b463 + PR18",
+  "licenseFile": "jpgd-jpge-jpeg-compressor-LicenseRef-PublicDomain-OR-Apache-.txt"
+ },
+ {
+  "name": "libchdr",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright Romain Tisserand",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "v0.3.0~12 (8bba7745d7)",
+  "licenseFile": "libchdr-BSD-3-Clause.txt"
+ },
+ {
+  "name": "libkirk",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "GPL-3.0-or-later AND (GPL-2.0-only OR GPL-3.0-only) AND LicenseRef-PublicDomain",
+  "copyright": "Draan (kirk_engine); Copyright 2007-2022 Segher Boessenkool (bn.c); Rijmen/Bosselaers/Barreto (AES, public domain); David Ireland / A.M. Kuchling (SHA1); tpu (amctrl, no notice)",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy",
+  "licenseFile": "libkirk-GPL-3-0-or-later-AND-GPL-2-0-only-OR-GPL-3-0-only-AN.txt"
+ },
+ {
+  "name": "libpng (1.7 branch)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "Libpng",
+  "copyright": "Copyright (c) 1998-2002,2004,2006-2017 Glenn Randers-Pehrson; (c) 1996-1997 Andreas Dilger; (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "1.7.0beta90",
+  "licenseFile": "libpng-1-7-branch-Libpng.txt"
+ },
+ {
+  "name": "libzip",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright (C) 1999-2020 Dieter Baron and Thomas Klausner",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "1.7.3",
+  "licenseFile": "libzip-BSD-3-Clause.txt"
+ },
+ {
+  "name": "LoongArch64 disassembler",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2021 Loongson Technology Corporation Limited",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy",
+  "licenseFile": "LoongArch64-disassembler-MIT.txt"
+ },
+ {
+  "name": "Lua",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (C) 1994-2024 Lua.org, PUC-Rio",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "5.4.7",
+  "licenseFile": "Lua-MIT.txt"
+ },
+ {
+  "name": "LZMA SDK",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "LicenseRef-LZMA-SDK-PublicDomain",
+  "copyright": "Igor Pavlov (public domain)",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "~23.01 (ext/lzma-sdk, file dates 2023) and 24.05 (libchdr)",
+  "licenseFile": "LZMA-SDK-LicenseRef-LZMA-SDK-PublicDomain.txt"
+ },
+ {
+  "name": "minimp3",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "CC0-1.0",
+  "copyright": "lieff (public domain dedication)",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy",
+  "licenseFile": "minimp3-CC0-1-0.txt"
+ },
+ {
+  "name": "miniupnpc",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright (c) 2005-2024, Thomas BERNARD",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "2.2.7",
+  "licenseFile": "miniupnpc-BSD-3-Clause.txt"
+ },
+ {
+  "name": "nanosvg",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "Zlib",
+  "copyright": "Copyright (c) 2013-14 Mikko Mononen",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "478dbb8f7e (semantics branch)",
+  "licenseFile": "nanosvg-Zlib.txt"
+ },
+ {
+  "name": "PolarSSL/XySSL md5, sha1; Christophe Devine sha256",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright (C) 2006-2009 Paul Bakker; Copyright (C) 2001-2003 Christophe Devine",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "2006-2009",
+  "licenseFile": "PolarSSL-XySSL-md5-sha1-Christophe-Devine-sha256-GPL-2-0-or-.txt"
+ },
+ {
+  "name": "PSPSDK-derived defines/headers",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright (c) 2005 adresd, Marcus R. Brown, James Forshaw, John Kelley, Jesper Svennevid",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "n/a",
+  "licenseFile": "PPSSPP-Core-Common-GPU-UI-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "pugixml",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2006-2025 Arseny Kapoulkine",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "1.15",
+  "licenseFile": "pugixml-MIT.txt"
+ },
+ {
+  "name": "RapidJSON",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "v1.1.0-415-g73063f50",
+  "licenseFile": "RapidJSON-MIT.txt"
+ },
+ {
+  "name": "rcheevos",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2018 RetroAchievements.org",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "v12.3.0-18-g2ac45d3",
+  "licenseFile": "rcheevos-MIT.txt"
+ },
+ {
+  "name": "RISC-V disassembler (riscv-disas)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2016-2017 Michael Clark; Copyright (c) 2017-2018 SiFive, Inc.",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy",
+  "licenseFile": "RISC-V-disassembler-riscv-disas-MIT.txt"
+ },
+ {
+  "name": "SFMT",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright (C) 2006-2013 Mutsuo Saito, Makoto Matsumoto, Hiroshima University, The University of Tokyo",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy",
+  "licenseFile": "SFMT-BSD-3-Clause.txt"
+ },
+ {
+  "name": "snappy",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright 2011, Google Inc.",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "1.1.8",
+  "licenseFile": "snappy-BSD-3-Clause.txt"
+ },
+ {
+  "name": "SPIRV-Cross",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "Apache-2.0",
+  "copyright": "Copyright 2015-2021 Arm Limited; others",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "sdk-1.3.239.0 (4212eef67e)",
+  "licenseFile": "SPIRV-Cross-Apache-2-0.txt"
+ },
+ {
+  "name": "stb_truetype / stb_textedit / stb_rect_pack",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT OR Unlicense",
+  "copyright": "Copyright (c) 2017 Sean Barrett",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "imgui 1.91.6 bundle; ext/stb/stb_rect_pack.h",
+  "licenseFile": "stb-truetype-stb-textedit-stb-rect-pack-MIT-OR-Unlicense.txt"
+ },
+ {
+  "name": "tinyformat (bundled in armips)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSL-1.0",
+  "copyright": "Copyright (C) 2011 Chris Foster",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "armips ext",
+  "licenseFile": "tinyformat-bundled-in-armips-BSL-1-0.txt"
+ },
+ {
+  "name": "udis86",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-2-Clause",
+  "copyright": "Copyright (c) 2002-2012 Vivek Thampi",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy (1.7.x)",
+  "licenseFile": "udis86-BSD-2-Clause.txt"
+ },
+ {
+  "name": "Vulkan Memory Allocator (VMA)",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2017-2025 Advanced Micro Devices, Inc.",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy (2017-2025)",
+  "licenseFile": "Vulkan-Memory-Allocator-VMA-MIT.txt"
+ },
+ {
+  "name": "xBRZ",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "GPL-3.0-only WITH LicenseRef-xBRZ-MAME-exception",
+  "copyright": "Copyright (C) Zenju",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "ext copy (HqMAME)",
+  "licenseFile": "xBRZ-GPL-3-0-only-WITH-LicenseRef-xBRZ-MAME-exception.txt"
+ },
+ {
+  "name": "xxHash",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-2-Clause",
+  "copyright": "Copyright (C) 2012-2020 Yann Collet",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "0.8.1",
+  "licenseFile": "xxHash-BSD-2-Clause.txt"
+ },
+ {
+  "name": "Zstandard",
+  "usedBy": "PSP core (PPSSPP)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright (c) Meta Platforms, Inc. and affiliates",
+  "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
+  "version": "v1.5.7",
+  "licenseFile": "Zstandard-BSD-3-Clause.txt"
+ }
+]

@@ -1,0 +1,12 @@
+
+# Local mGBA XCFramework builds (Mac). Do not commit binaries unless asked.
+App/Vendor/Output/
+RetroPlay.xcodeproj/
+*.xcuserdata/
+DerivedData/
+# Build output (xcodebuild -derivedDataPath build/…, SwiftPM)
+build/
+App/build/
+App/.build/
+__pycache__/
+*.pyc

@@ -1,0 +1,882 @@
+[
+  {
+    "project": "mGBA",
+    "component": "mGBA (libmgba, GBA core only)",
+    "version": "0.11-1-aa6394c (git aa6394c93ca24b0ff40dc9231bdb0533f415e0be)",
+    "spdx": "MPL-2.0",
+    "copyright": "Copyright (c) 2013-2026 Jeffrey Pfau",
+    "licenseFile": "mgba/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "strings libmgba.a: projectVersion '0.11-1-aa6394c', gitCommit aa6394c93ca2...; CMakeCache LIBMGBA_ONLY=ON M_CORE_GBA=ON M_CORE_GB=OFF DISABLE_DEPS=ON ENABLE_SCRIPTING=OFF ENABLE_DEBUGGERS=OFF. MPL-2.0 s3.2: executable distribution must tell recipients how to obtain Source Code Form; ship license text + source link."
+  },
+  {
+    "project": "mGBA",
+    "component": "inih",
+    "version": "r50-era (header 'Copyright (C) 2009-2020, Ben Hoyt')",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (c) 2009, Ben Hoyt (LICENSE.txt); Copyright (C) 2009-2020, Ben Hoyt (ini.c header)",
+    "licenseFile": "mgba/src/third-party/inih/LICENSE.txt",
+    "requiresNoticeText": true,
+    "evidence": "build.ninja compiles src/third-party/inih/ini.c; nm libmgba.a: T _ini_parse, _ini_parse_stream, _ini_parse_string"
+  },
+  {
+    "project": "mGBA",
+    "component": "MurmurHash3 (src/util/hash.c)",
+    "version": "n/a",
+    "spdx": "LicenseRef-PublicDomain",
+    "copyright": "MurmurHash3 was written by Austin Appleby, and is placed in the public domain.",
+    "licenseFile": "mgba/src/util/hash.c",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: hash.c.o; source header"
+  },
+  {
+    "project": "mGBA",
+    "component": "CRC32 table (src/util/crc32.c)",
+    "version": "n/a",
+    "spdx": "LicenseRef-Gary-Brown-CRC32",
+    "copyright": "COPYRIGHT (C) 1986 Gary S. Brown. You may use this program, or code or tables extracted from it, as desired without restriction.",
+    "licenseFile": "mgba/src/util/crc32.c",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: crc32.c.o; nm: T _crc32 (no zlib linked: DISABLE_DEPS=ON, no png_/inflate symbols)"
+  },
+  {
+    "project": "mGBA",
+    "component": "MD5 (src/util/md5.c, based on Zunawe/md5-c)",
+    "version": "n/a",
+    "spdx": "MPL-2.0 AND Unlicense",
+    "copyright": "Copyright (c) 2013-2014 Jeffrey Pfau; based on https://github.com/Zunawe/md5-c, originally released under the Unlicense; derived from the RSA Data Security, Inc. MD5 Message-Digest Algorithm",
+    "licenseFile": "mgba/src/util/md5.c",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: md5.c.o"
+  },
+  {
+    "project": "mGBA",
+    "component": "SHA-1 (src/util/sha1.c, based on clibs/sha1)",
+    "version": "n/a",
+    "spdx": "MPL-2.0 AND LicenseRef-PublicDomain",
+    "copyright": "Copyright (c) 2013-2025 Jeffrey Pfau; based on https://github.com/clibs/sha1 (Steve Reid, public domain) - upstream license not in checkout, UNCONFIRMED",
+    "licenseFile": "mgba/src/util/sha1.c",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: sha1.c.o"
+  },
+  {
+    "project": "mGBA",
+    "component": "NOT LINKED: zlib, libpng, LZMA SDK, SQLite3, discord-rpc, Lua, libzip, FFmpeg, getopt",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "mgba/src/third-party",
+    "requiresNoticeText": false,
+    "evidence": "DISABLE_DEPS=ON; build.ninja compiles only src/third-party/inih from third-party; nm shows no png_/inflate/lzma/sqlite/Discord symbols defined or referenced"
+  },
+  {
+    "project": "melonDS",
+    "component": "melonDS core (interpreter, no JIT, software renderer)",
+    "version": "1.1+ git 906e9eb",
+    "spdx": "GPL-3.0-or-later",
+    "copyright": "Copyright 2016-2026 melonDS team (per-file headers, e.g. src/NDS.cpp)",
+    "licenseFile": "melonDS/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "CMakeCache ENABLE_JIT=OFF ENABLE_OGLRENDERER=OFF ENABLE_GDBSTUB=OFF BUILD_QT_SDL=OFF USE_VCPKG=OFF; ar -t libmelonDS.a lists NDS/DSi/GPU*_Soft/SPU/... objects incl. DSP_HLE (AACUcode, G711Ucode, GraphicsUcode, UcodeBase); melonDS-libs/device/libmelonDS.a is byte-identical. GPL requires license text + Corresponding Source offer."
+  },
+  {
+    "project": "melonDS",
+    "component": "FreeBIOS (DraStic custom NDS ARM7/ARM9 BIOS replacement, src/FreeBIOS.cpp + FreeBIOS_Data.h)",
+    "version": "n/a",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (c) 2013, Gilead Kutnick",
+    "licenseFile": "melonDS/freebios/drastic_bios_readme.txt",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: FreeBIOS.cpp.o (embeds bios_ntr_arm9/arm7 binary arrays); header license in src/FreeBIOS.cpp"
+  },
+  {
+    "project": "melonDS",
+    "component": "blip_buf",
+    "version": "blip_buf (Shay Green), version string '$vers' unexpanded in readme",
+    "spdx": "LGPL-2.1-or-later",
+    "copyright": "Library Copyright (C) 2003-2009 Shay Green",
+    "licenseFile": "melonDS/src/blip-buf/license.txt",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: blip_buf.c.o; nm: _blip_new/_blip_add_delta etc."
+  },
+  {
+    "project": "melonDS",
+    "component": "FatFs",
+    "version": "R0.14b",
+    "spdx": "LicenseRef-FatFs",
+    "copyright": "Copyright (C) 20xx, ChaN, all right reserved. (FatFs R0.14b, ff.h)",
+    "licenseFile": "melonDS/src/fatfs/LICENSE.txt",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: ff.c.o ffsystem.c.o ffunicode.c.o; nm: _f_mount/_f_open... License says binary redistribution need not include FatFs notice (1-clause BSD equivalent); listing it is courtesy"
+  },
+  {
+    "project": "melonDS",
+    "component": "Teakra (DSi DSP emulator)",
+    "version": "vendored in melonDS 906e9eb",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2018 Weiyi Wang",
+    "licenseFile": "melonDS/src/teakra/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "build-ios-device/src/teakra/src/libteakra.a; ar -t libmelonDS.a: teakra.cpp.o processor.cpp.o ahbm/apbp/btdmp/dma/mmio/timer/parser/disassembler/memory_interface .o (externals/catch not linked)"
+  },
+  {
+    "project": "melonDS",
+    "component": "tiny-AES-c",
+    "version": "vendored",
+    "spdx": "Unlicense",
+    "copyright": "Public domain (kokke/tiny-AES-c, unlicense.txt)",
+    "licenseFile": "melonDS/src/tiny-AES-c/unlicense.txt",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: aes.c.o; nm: _AES_init_ctx_iv, _AES_CTR_xcrypt_buffer"
+  },
+  {
+    "project": "melonDS",
+    "component": "SHA-1 (src/sha1, Steve Reid)",
+    "version": "n/a",
+    "spdx": "LicenseRef-PublicDomain",
+    "copyright": "SHA-1 in C By Steve Reid <steve@edmweb.com> 100% Public Domain",
+    "licenseFile": "melonDS/src/sha1/sha1.c",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: sha1.c.o; nm: _SHA1Init/_SHA1Update/_SHA1Final"
+  },
+  {
+    "project": "melonDS",
+    "component": "xxHash",
+    "version": "0.8.3",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (C) 2012-2023 Yann Collet",
+    "licenseFile": "melonDS/src/xxhash/xxhash.h",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: xxhash.c.o. No separate LICENSE file; license is the header comment of xxhash.h (extracted verbatim)"
+  },
+  {
+    "project": "melonDS",
+    "component": "NOT LINKED: Dolphin emitter code (src/dolphin, GPL-2.0-or-later), ARMJIT, OpenGL renderer, net/ (libslirp/libpcap), Qt/SDL frontend, melonDLDI",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "melonDS/src/dolphin/license_dolphin.txt",
+    "requiresNoticeText": false,
+    "evidence": "ENABLE_JIT=OFF, BUILD_QT_SDL=OFF; no dolphin/ARMJIT/GPU*_OpenGL/net objects in ar -t; no non-JIT source includes dolphin/ headers"
+  },
+  {
+    "project": "RetroPlay app resources",
+    "component": "Press Start 2P font (PressStart2P-Regular.ttf)",
+    "version": "google/fonts @ dbd72d6ef9ebea750d33c02c7189633e972d6a40; SHA-256 034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
+    "spdx": "OFL-1.1",
+    "copyright": "Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name \"Press Start 2P\".",
+    "licenseFile": "retroplay/AppHost/Supporting/PressStart2P-OFL.txt",
+    "requiresNoticeText": true,
+    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches SOURCE.md. OFL requires copyright notice + license with the font (bundled OFL.txt satisfies it; also list in in-app licenses)"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "mupen64plus-next (libretro frontend glue: libretro/libretro.c, custom/*)",
+    "version": "git f275caf (libretro/mupen64plus-libretro-nx) + RetroPlay patch",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (C) 2020 M4xw <m4x@m4xw.net> (libretro/libretro.c header); other custom/* files carry mupen64plus-style GPL headers; project LICENSE is plain GPLv2 text",
+    "licenseFile": "mupen64plus-next/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "libretro.o/custom/*.o symbols present in shipped device dylib (text section identical to mupen64plus-next/out-ios/mupen64plus_next_libretro_ios.dylib, built 2026-09-08 10:03); file headers say 'version 2 ... or (at your option) any later version'"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "mupen64plus-core",
+    "version": "2.6.0 (MUPEN_CORE_VERSION 0x020600, libretro fork)",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Richard Goedeken et al. (see LICENSES); based on Mupen64 0.5 by Hacktarux, Dave2001, Zilmar, Gregor Anich (Blight), Juha Luotio (JttL)",
+    "licenseFile": "mupen64plus-next/mupen64plus-core/LICENSES ; mupen64plus-next/mupen64plus-core/doc/gpl-license",
+    "requiresNoticeText": true,
+    "evidence": "cached_interp/pure_interp/r4300/device symbols present (274 cached_interp symbols); no new_dynarec symbols; all compiled file headers GPL-2.0-or-later"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "mupen64plus-rsp-hle",
+    "version": "libretro fork @ f275caf",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Richard Goedeken, Bobby Smiles (bsmiles32) et al.; based on Mupen64 0.5 (Hacktarux et al.)",
+    "licenseFile": "mupen64plus-next/mupen64plus-rsp-hle/LICENSES",
+    "requiresNoticeText": true,
+    "evidence": "_hle_init/_hle_execute + alist/musyx/jpeg/mp3 objects matched in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "GLideN64 (core renderer)",
+    "version": "libretro-bundled 'rev.NX' @ f275caf",
+    "spdx": "GPL-2.0-only",
+    "copyright": "Sergey Lipskiy (c) 2014-2015; credits: Orkin (glN64), yongzh (gles2n64), ziggy (z64), Nathaniel Meyer (bloom), Hiroshi Morii (GlideHQ)",
+    "licenseFile": "mupen64plus-next/GLideN64/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "LICENSE says 'licensed under the GNU General Public License version 2' (no 'or later'); most GLideN64/src/*.cpp have no per-file header; ~130 GLideN64 objects matched in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "GLideNHQ / GlideHQ (texture enhancer, incl. 2xSaI/hq2x/hq4x/lq2x filters)",
+    "version": "GlideHQ 1.5 port",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (C) 2007 Hiroshi Morii (KoolSmoky); Copyright (C) 2003 Rice1964; based on Derek Liauw Kie Fa (2xSaI) and Maxim Stepin (hq4x); deposterize Copyright (c) 2012- PPSSPP Project",
+    "licenseFile": "mupen64plus-next/GLideN64/licenses/GlideHQ/gpl-2.0.txt",
+    "requiresNoticeText": true,
+    "evidence": "TxCache/TxFilter/TxHiRes* + hq/2xsai symbols in binary; headers 'version 2, or (at your option) any later version'"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "xBRZ scaler (GLideN64/src/GLideNHQ/TextureFilters_xbrz.cpp)",
+    "version": "HqMAME xBRZ (version not stated)",
+    "spdx": "GPL-3.0-only WITH MAME-linking exception (LicenseRef; not a standard SPDX exception)",
+    "copyright": "Copyright (C) Zenju (zenju AT gmx DOT de) - All Rights Reserved",
+    "licenseFile": "mupen64plus-next/GLideN64/src/GLideNHQ/TextureFilters_xbrz.cpp (header only; GPL-3.0 text copied from mupen64plus-next/mupen64plus-rsp-paraLLEl/lightning/COPYING)",
+    "requiresNoticeText": true,
+    "evidence": "xbrz::ScalerCfg / scaleImage<Scaler2x..4x> symbols present in shipped binary. RED FLAG: GPL-3.0 code combined with GPL-2.0-only GLideN64"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "GLSL FXAA shader (glsl-fxaa, mattdesl)",
+    "version": "n/a",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2014 Matt DesLauriers",
+    "licenseFile": "mupen64plus-next/GLideN64/licenses/GLSL-FXAA/LICENSE.md",
+    "requiresNoticeText": true,
+    "evidence": "glsl_FXAA.o compiled and matched; shader source embedded as string"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "webgl-meincraft FXAA (base of GLSL FXAA)",
+    "version": "n/a",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (c) 2011 by Armin Ronacher.",
+    "licenseFile": "mupen64plus-next/GLideN64/src/Graphics/OpenGLContext/GLSL/glsl_FXAA.cpp (header lines 1-50)",
+    "requiresNoticeText": true,
+    "evidence": "same object as above; license only in source comment"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "readerwriterqueue (moodycamel)",
+    "version": "2013-2016 header (version not stated)",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (c) 2013-2015, Cameron Desrochers / (c)2013-2016 Cameron Desrochers",
+    "licenseFile": "mupen64plus-next/GLideN64/licenses/readerwriterqueue/LICENSE.md",
+    "requiresNoticeText": true,
+    "evidence": "moodycamel::ReaderWriterQueue / BlockingReaderWriterQueue symbols in binary (ThreadedOpenGl)"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "Preshing lightweight semaphore (in atomicops.h)",
+    "version": "n/a",
+    "spdx": "Zlib",
+    "copyright": "Copyright (c) 2015 Jeff Preshing",
+    "licenseFile": "mupen64plus-next/GLideN64/src/Graphics/OpenGLContext/ThreadedOpenGl/atomicops.h (lines 360-380)",
+    "requiresNoticeText": false,
+    "evidence": "moodycamel::spsc_sema::LightweightSemaphore symbol in binary; zlib license: notice must stay in source, acknowledgement appreciated not required"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "xxHash (mupen64plus-core copy, xxHash/)",
+    "version": "0.7.3",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (C) 2012-present, Yann Collet (xxhash.h); Copyright (C) 2019-present, Yann Collet (xxh3.h)",
+    "licenseFile": "mupen64plus-next/xxHash/xxhash.h (header lines 1-34)",
+    "requiresNoticeText": true,
+    "evidence": "XXH3 inline (XXH_INLINE_ALL) used by mupen64plus-core/src/device/r4300/mips_instructions.def; XXH3_hashLong_64b_defaultSecret defined in cached_interp.o/pure_interp.o and present in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "xxHash (GLideN64 copy, GLideN64/src/xxHash/)",
+    "version": "0.8.3",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (C) 2012-2023 Yann Collet",
+    "licenseFile": "mupen64plus-next/GLideN64/src/xxHash/xxhash.h (header lines 1-34)",
+    "requiresNoticeText": true,
+    "evidence": "included by GLideN64 CRC_OPT.cpp / GLideNHQ/TxUtil.cpp; C++-mangled XXH3 symbols in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "libretro-common (+ libretro.h API header)",
+    "version": "bundled @ f275caf",
+    "spdx": "MIT",
+    "copyright": "Copyright (C) 2010-2019/2010-2020/2010-2021 The RetroArch team",
+    "licenseFile": "mupen64plus-next/libretro-common/streams/file_stream.c (per-file header; no LICENSE file in libretro-common/)",
+    "requiresNoticeText": true,
+    "evidence": "filestream_*, retro_vfs_*, glsm_*, string_list, sinc resampler, config_file, encoding_utf symbols in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "libco (aarch64 backend)",
+    "version": "libco.aarch64 2017-06-26",
+    "spdx": "LicenseRef-public-domain",
+    "copyright": "author: webgeek1234 (aarch64.c); libco by byuu",
+    "licenseFile": "mupen64plus-next/libretro-common/libco/aarch64.c (header 'license: public domain')",
+    "requiresNoticeText": false,
+    "evidence": "_co_create/_co_switch_aarch64 in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "zlib (custom/dependencies/libzlib)",
+    "version": "1.2.8 (locally modified zutil.h)",
+    "spdx": "Zlib",
+    "copyright": "Copyright (C) 1995-2013 Jean-loup Gailly and Mark Adler",
+    "licenseFile": "mupen64plus-next/custom/dependencies/libzlib/zlib.h (header lines 1-29)",
+    "requiresNoticeText": false,
+    "evidence": "strings 'deflate 1.2.8 Copyright 1995-2013 Jean-loup Gailly and Mark Adler' / 'inflate 1.2.8'; zlib license requires altered source to be plainly marked (source-level obligation), binary notice not required"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "libpng (custom/dependencies/libpng)",
+    "version": "1.6.34 (locally modified pngpriv.h)",
+    "spdx": "Libpng",
+    "copyright": "Copyright (c) 1998-2002,2004,2006-2017 Glenn Randers-Pehrson; (c) 1996-1997 Andreas Dilger; (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.; (c) 2000-2017 contributing authors per png.h",
+    "licenseFile": "mupen64plus-next/custom/dependencies/libpng/png.h (lines 1-121; no LICENSE file in dir)",
+    "requiresNoticeText": false,
+    "evidence": "strings 'libpng version 1.6.34 - September 29, 2017', 463 png_* symbols; license: altered versions must be plainly marked; copyright notice may not be removed from source; binary notice not strictly required but recommended"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "minizip (zip/unzip/ioapi + crypt.h)",
+    "version": "1.1 (unz/zip_copyright strings say 1.01)",
+    "spdx": "Zlib",
+    "copyright": "Copyright (C) 1998-2010 Gilles Vollant; (C) 2007-2008 Even Rouault; (C) 2009-2010 Mathias Svensson; crypt.h (C) 1998-2005 Gilles Vollant (from Info-ZIP crypt code)",
+    "licenseFile": "mupen64plus-next/mupen64plus-core/subprojects/minizip/unzip.h (header lines 1-35)",
+    "requiresNoticeText": false,
+    "evidence": "unzOpen*/zip symbols, _crypthead (zip.c includes crypt.h since NOCRYPT undefined), strings ' unzip 1.01 Copyright 1998-2004 Gilles Vollant'"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "MD5 (L. Peter Deutsch)",
+    "version": "md5.c v1.6 2002/04/13",
+    "spdx": "Zlib",
+    "copyright": "Copyright (C) 1999, 2000, 2002 Aladdin Enterprises. All rights reserved.",
+    "licenseFile": "mupen64plus-next/mupen64plus-core/subprojects/md5/md5.c (header lines 1-23)",
+    "requiresNoticeText": false,
+    "evidence": "md5_init/md5_append/md5_finish symbols in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "N64 CIC-NUS-6105 algorithm (X-Scale)",
+    "version": "2011",
+    "spdx": "BSD-2-Clause-Views",
+    "copyright": "Copyright 2011 X-Scale. All rights reserved.",
+    "licenseFile": "mupen64plus-next/mupen64plus-core/src/device/pif/n64_cic_nus_6105.c (header lines 1-89)",
+    "requiresNoticeText": true,
+    "evidence": "_n64_cic_nus_6105 (+ .lut0) symbol in shipped binary; binary redistribution must reproduce notice"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "PPSSPP (Core, Common, GPU, UI)",
+    "version": "git 98e70c8ca3",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (c) 2012- PPSSPP Project (Henrik Rydgard et al.)",
+    "licenseFile": "ppsspp/LICENSE.TXT",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: libCore/libCommon/libGPU/libppsspp_ui members (EmuScreen.o, sceFont.o, PGF.o, ...); 387/388 libCore.a, 154/154 libCommon.a, 78/78 libGPU.a, 57/57 libppsspp_ui.a member names found in libPPSSPP.a | NOTE: LICENSE.TXT also carries the PSPSDK BSD-3-Clause notice (adresd, Marcus R. Brown, James Forshaw, John Kelley, Jesper Svennevid 2005) which requires reproduction in binary docs. Copied as ppsspp-GPL-2.0-or-later.txt."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "PSPSDK-derived defines/headers (inside PPSSPP)",
+    "version": "n/a",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (c) 2005 adresd, Marcus R. Brown, James Forshaw, John Kelley, Jesper Svennevid",
+    "licenseFile": "ppsspp/LICENSE.TXT",
+    "requiresNoticeText": true,
+    "evidence": "Stated in LICENSE.TXT; compiled into PPSSPP objects (not separately identifiable by symbol)"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "PolarSSL/XySSL md5, sha1; Christophe Devine sha256 (Common/Crypto)",
+    "version": "2006-2009",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (C) 2006-2009 Paul Bakker; Copyright (C) 2001-2003 Christophe Devine",
+    "licenseFile": "ppsspp/Common/Crypto/md5.cpp",
+    "requiresNoticeText": false,
+    "evidence": "nm: _ppsspp_md5 (md5.o), _sha1_finish (sha1.o), sha256_finish (sha256.o) | NOTE: Header comment only; GPL-2.0-or-later, covered by PPSSPP GPL text."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "FFmpeg (libavcodec, libavformat, libavutil, libswresample, libswscale, libavdevice)",
+    "version": "git 537ef3b0e3 (Lavc57.24.102 / Lavf57.25.100, ~3.0 dev; RELEASE file says 3.0.2); ppsspp-ffmpeg submodule b87f7c6d52",
+    "spdx": "LGPL-2.1-or-later",
+    "copyright": "Copyright (c) the FFmpeg developers",
+    "licenseFile": "ppsspp/ffmpeg/COPYING.LGPLv2.1",
+    "requiresNoticeText": true,
+    "evidence": "strings: 'libavcodec license: LGPL version 2.1 or later' (and same for avformat/avutil/swresample/swscale/avdevice), 'FFmpeg version 537ef3b0e3', configure string without --enable-gpl/--enable-nonfree; members allcodecs.o, h264dec.o, swresample.o, swscale.o, alldevices.o; 158/160 libavcodec, 39/39 libavformat, 65/66 libavutil, 10/10 swresample, 14/14 swscale, 3/3 avdevice (arm64 slice of ffmpeg/ios/universal/lib) present | NOTE: Statically linked into the app: LGPL-2.1 section 6 obligations (allow relinking: provide object files or source+build scripts) apply. Also ship ffmpeg LICENSE.md (ffmpeg-LICENSE-md.txt)."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "at3_standalone (ATRAC3/ATRAC3+ decoder extracted from FFmpeg)",
+    "version": "in-tree",
+    "spdx": "LGPL-2.1-or-later",
+    "copyright": "Copyright (c) 2006-2008 Maxim Poliakovski, Benjamin Larsson; and other FFmpeg authors",
+    "licenseFile": "ppsspp/ext/at3_standalone/atrac3.cpp",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: 9/9 libat3_standalone.a members (atrac3.o, atrac3plus.o, atrac3plusdec.o ...) ; nm: CreateAtrac3Audio refs | NOTE: No license file; header comment extracted to at3_standalone-LGPL-2.1-or-later.txt. Full LGPL text = ffmpeg-LGPL-2.1-or-later.txt."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "glslang",
+    "version": "2.3-3991-g50e0708e",
+    "spdx": "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND GPL-3.0-or-later WITH Bison-exception-2.2",
+    "copyright": "Copyright (C) 2002-2005 3Dlabs Inc. Ltd.; 2012-2016 LunarG; 2015-2018 Google; Khronos Group; others",
+    "licenseFile": "ppsspp/ext/glslang/LICENSE.txt",
+    "requiresNoticeText": true,
+    "evidence": "nm: glslang::GlslangToSpv; members ShaderLang.o, glslang_tab.o, SpvBuilder.o; libglslang/libMachineIndependent/libSPIRV/libGenericCodeGen/libOSDependent/libOGLCompiler all fully present | NOTE: glslang_tab.cpp is Bison output under GPL-3 with Bison exception (exception permits use under other terms)."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "SPIRV-Cross",
+    "version": "sdk-1.3.239.0 (4212eef67e)",
+    "spdx": "Apache-2.0",
+    "copyright": "Copyright 2015-2021 Arm Limited; others",
+    "licenseFile": "ppsspp/ext/SPIRV-Cross/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "nm: spirv_cross::CompilerGLSL::init; members spirv_glsl.o, spirv_cross.o, spirv_parser.o"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "cpu_features",
+    "version": "v0.4.1-211-gfd4ffc1",
+    "spdx": "Apache-2.0",
+    "copyright": "Copyright 2017 Google LLC",
+    "licenseFile": "ppsspp/ext/cpu_features/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: 17/17 libcpu_features.a members (impl_aarch64_macos_or_iphone.o, hwcaps.o, filesystem.o, stack_line_reader.o, string_view.o)"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "armips",
+    "version": "v0.11.0-219-g62adab4",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2009-2020 Kingcom",
+    "licenseFile": "ppsspp/ext/armips/LICENSE.txt",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: 56/56 libarmips.a members (CArmInstruction.o, MipsParser.o, Assembler.o ...)"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "ghc::filesystem (bundled in armips)",
+    "version": "1.3.3 (GHC_FILESYSTEM_VERSION 10303)",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2018 Steffen Schuemann",
+    "licenseFile": "ppsspp/ext/armips/ext/filesystem/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "nm: 632 ghc::filesystem symbols (e.g. ghc::filesystem::path ctor in MipsElfFile.o)"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "tinyformat (bundled in armips)",
+    "version": "armips ext",
+    "spdx": "BSL-1.0",
+    "copyright": "Copyright (C) 2011 Chris Foster",
+    "licenseFile": "ppsspp/ext/armips/ext/tinyformat/tinyformat.h",
+    "requiresNoticeText": true,
+    "evidence": "nm: tinyformat:: template instantiations (~436 matches for tinyformat/tfm) | NOTE: No license file; header comment extracted. BSL-1.0 does not require notice in binary-only distribution, included anyway."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "CityHash",
+    "version": "ext copy",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2011 Google, Inc.",
+    "licenseFile": "ppsspp/ext/cityhash/COPYING",
+    "requiresNoticeText": true,
+    "evidence": "nm: CityHash32/CityHash64 in city.o"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "gason",
+    "version": "ext copy",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2013-2015 Ivan Vashchaev",
+    "licenseFile": "ppsspp/ext/gason/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "nm: jsonParse in gason.o"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "snappy",
+    "version": "1.1.8",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright 2011, Google Inc.",
+    "licenseFile": "ppsspp/ext/snappy/COPYING",
+    "requiresNoticeText": true,
+    "evidence": "nm: snappy_compress (snappy-c.o); members snappy.o, snappy-sinksource.o"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "rcheevos",
+    "version": "v12.3.0-18-g2ac45d3",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2018 RetroAchievements.org",
+    "licenseFile": "ppsspp/ext/rcheevos/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "nm: rc_client_create (rc_client.o); 23/23 librcheevos.a members"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "udis86",
+    "version": "ext copy (1.7.x)",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (c) 2002-2012 Vivek Thampi",
+    "licenseFile": "ppsspp/ext/udis86/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "nm: ud_init (udis86.o); members decode.o, itab.o, syn-att.o, syn-intel.o"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "libchdr",
+    "version": "v0.3.0~12 (8bba7745d7)",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright Romain Tisserand",
+    "licenseFile": "ppsspp/ext/libchdr/LICENSE.txt",
+    "requiresNoticeText": true,
+    "evidence": "nm: chd_open (libchdr_chd.o); 16/16 libchdr.a members"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "dr_flac (bundled in libchdr)",
+    "version": "0.12.42",
+    "spdx": "Unlicense OR MIT-0",
+    "copyright": "Copyright 2023 David Reid",
+    "licenseFile": "ppsspp/ext/libchdr/include/dr_libs/dr_flac.h",
+    "requiresNoticeText": false,
+    "evidence": "nm: 69 drflac symbols (header-only, compiled into libchdr_flac.o) | NOTE: Either option needs no notice; text extracted anyway."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "LZMA SDK (ext/lzma-sdk 7z reader + libchdr/deps/lzma-24.05)",
+    "version": "~23.01 (ext/lzma-sdk, file dates 2023) and 24.05 (libchdr)",
+    "spdx": "LicenseRef-LZMA-SDK-PublicDomain",
+    "copyright": "Igor Pavlov (public domain)",
+    "licenseFile": "ppsspp/ext/libchdr/deps/lzma-24.05/LICENSE",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: 7zArcIn.o, 7zDec.o, LzmaDec.o (x2), Lzma2Dec.o, LzmaEnc.o, LzFind.o; nm: SzArEx_Open | NOTE: Public domain; no notice required."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "Zstandard",
+    "version": "v1.5.7",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (c) Meta Platforms, Inc. and affiliates",
+    "licenseFile": "ppsspp/ext/zstd/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "nm: ZSTD_versionNumber (zstd_common.o); 30/30 liblibzstd_static.a members | NOTE: Dual BSD-3-Clause OR GPL-2.0; BSD chosen."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "miniupnpc",
+    "version": "2.2.7",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (c) 2005-2024, Thomas BERNARD",
+    "licenseFile": "ppsspp/ext/miniupnp/miniupnpc/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "nm: upnpDiscover (miniupnpc.o); 14/14 libminiupnpc.a members"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "libzip",
+    "version": "1.7.3",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (C) 1999-2020 Dieter Baron and Thomas Klausner",
+    "licenseFile": "ppsspp/ext/libzip/zip.h",
+    "requiresNoticeText": true,
+    "evidence": "nm: zip_open (zip_open.o); 112/112 liblibzip.a members | NOTE: No license file in ext/libzip; header comment extracted verbatim."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "libpng (1.7 branch)",
+    "version": "1.7.0beta90",
+    "spdx": "Libpng",
+    "copyright": "Copyright (c) 1998-2002,2004,2006-2017 Glenn Randers-Pehrson; (c) 1996-1997 Andreas Dilger; (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.",
+    "licenseFile": "ppsspp/ext/libpng17/png.h",
+    "requiresNoticeText": true,
+    "evidence": "nm: png_get_libpng_ver (png.o); 17/17 libpng17.a members | NOTE: CMakeCache USE_SYSTEM_LIBPNG=ON but in-tree libpng17 was still built and merged. License extracted from png.h (lines 20-118). Libpng license: notice must not be removed from source; binary notice not strictly required but recommended."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "Lua",
+    "version": "5.4.7",
+    "spdx": "MIT",
+    "copyright": "Copyright (C) 1994-2024 Lua.org, PUC-Rio",
+    "licenseFile": "ppsspp/ext/lua/lua.h",
+    "requiresNoticeText": true,
+    "evidence": "nm: lua_newstate (lstate.o); 32/32 liblua.a members | NOTE: License extracted from end of lua.h."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "pugixml",
+    "version": "1.15",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2006-2025 Arseny Kapoulkine",
+    "licenseFile": "ppsspp/ext/pugixml/pugixml.hpp",
+    "requiresNoticeText": true,
+    "evidence": "nm: pugi::xml_document::load_string (pugixml.o) | NOTE: License extracted from end of pugixml.hpp."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "xxHash",
+    "version": "0.8.1",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (C) 2012-2020 Yann Collet",
+    "licenseFile": "ppsspp/ext/xxhash.h",
+    "requiresNoticeText": true,
+    "evidence": "nm: XXH3_64bits, XXH64 (xxhash.o, two copies: ext/xxhash.c and zstd's) | NOTE: Header comment extracted."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "SFMT (SIMD-oriented Fast Mersenne Twister)",
+    "version": "ext copy",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (C) 2006-2013 Mutsuo Saito, Makoto Matsumoto, Hiroshima University, The University of Tokyo",
+    "licenseFile": "ppsspp/ext/sfmt19937/SFMT.c",
+    "requiresNoticeText": true,
+    "evidence": "nm: sfmt_init_by_array (SFMT.o) | NOTE: Header refers to LICENSE.txt which is NOT present in ext/sfmt19937; only the header comment could be extracted (full BSD-3 text missing - unconfirmed exact wording)."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "basis_universal (transcoder)",
+    "version": "ext copy (2019-2021)",
+    "spdx": "Apache-2.0",
+    "copyright": "Copyright (C) 2019-2021 Binomial LLC",
+    "licenseFile": "ppsspp/ext/basis_universal/basisu_transcoder.cpp",
+    "requiresNoticeText": true,
+    "evidence": "nm: basist::basisu_transcoder_init (basisu_transcoder.o) | NOTE: No LICENSE/NOTICE file in ext; header extracted. Apache-2.0 full text available in spirv-cross-Apache-2.0.txt / cpu_features-Apache-2.0.txt."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "Vulkan Memory Allocator (VMA)",
+    "version": "ext copy (2017-2025)",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2017-2025 Advanced Micro Devices, Inc.",
+    "licenseFile": "ppsspp/ext/vma/vk_mem_alloc.h",
+    "requiresNoticeText": true,
+    "evidence": "nm: vmaCreateAllocator (vk_mem_alloc.o)"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "Dear ImGui",
+    "version": "1.91.6",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2014-2024 Omar Cornut",
+    "licenseFile": "ppsspp/ext/imgui/imgui.cpp",
+    "requiresNoticeText": true,
+    "evidence": "nm: ~2349 ImGui symbols; members imgui.o, imgui_draw.o, imgui_widgets.o, imgui_tables.o, imgui_demo.o | NOTE: ext/imgui has NO LICENSE.txt; only the header statement 'standard MIT License' exists. Full MIT text must be supplied from upstream (not in checkout)."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "stb_truetype / stb_textedit / stb_rect_pack (imstb_* in imgui, ext/stb)",
+    "version": "imgui 1.91.6 bundle; ext/stb/stb_rect_pack.h",
+    "spdx": "MIT OR Unlicense",
+    "copyright": "Copyright (c) 2017 Sean Barrett",
+    "licenseFile": "ppsspp/ext/imgui/imstb_truetype.h",
+    "requiresNoticeText": false,
+    "evidence": "nm: stbrp_pack_rects, stbrp_init_target; 17 stbtt symbols | NOTE: Public-domain alternative means no notice strictly required; MIT text extracted anyway (imgui-imstb-MIT-OR-Unlicense.txt, stb_rect_pack-MIT-OR-Unlicense.txt)."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "nanosvg",
+    "version": "478dbb8f7e (semantics branch)",
+    "spdx": "Zlib",
+    "copyright": "Copyright (c) 2013-14 Mikko Mononen",
+    "licenseFile": "ppsspp/ext/nanosvg/LICENSE.txt",
+    "requiresNoticeText": true,
+    "evidence": "nm: nsvgParse, nsvgRasterize defined in UIAtlas.o (header-only) | NOTE: Zlib license does not strictly require binary notice; included."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "RapidJSON",
+    "version": "v1.1.0-415-g73063f50",
+    "spdx": "MIT",
+    "copyright": "Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip",
+    "licenseFile": "ppsspp/ext/rapidjson/license.txt",
+    "requiresNoticeText": true,
+    "evidence": "nm: 42 rapidjson template symbols (e.g. AdhocServerScreen.o) - header-only | NOTE: license.txt also mentions JSON License for bin/jsonchecker (not compiled)."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "minimp3",
+    "version": "ext copy",
+    "spdx": "CC0-1.0",
+    "copyright": "lieff (public domain dedication)",
+    "licenseFile": "ppsspp/ext/minimp3/minimp3.h",
+    "requiresNoticeText": false,
+    "evidence": "nm: mp3dec_init (minimp3.o)"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "jpgd / jpge (jpeg-compressor)",
+    "version": "aeb7d3b463 + PR18",
+    "spdx": "LicenseRef-PublicDomain OR Apache-2.0",
+    "copyright": "Richard Geldreich",
+    "licenseFile": "ppsspp/ext/jpge/README.md",
+    "requiresNoticeText": false,
+    "evidence": "nm: jpgd::decompress_jpeg_image_from_memory (jpgd.o), jpge::compress_image_to_jpeg_file_in_memory | NOTE: Public Domain option chosen -> no notice needed. Intel-licensed jpgd_idct.h only used when JPGD_USE_SSE2 (x86) - not on arm64 (inferred from #if, not symbol-verified)."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "xBRZ",
+    "version": "ext copy (HqMAME)",
+    "spdx": "GPL-3.0-only WITH LicenseRef-xBRZ-MAME-exception",
+    "copyright": "Copyright (C) Zenju",
+    "licenseFile": "ppsspp/ext/xbrz/xbrz.cpp",
+    "requiresNoticeText": true,
+    "evidence": "nm: xbrz::scale (xbrz.o, 59 syms) | NOTE: Header says 'GNU General Public License: http://www.gnu.org/licenses/gpl.html' without version; upstream xBRZ is GPL-3.0. Makes combined work GPL-3.0. No GPL-3.0 text in ext/xbrz; use aemu_postoffice-GPL-3.0.txt."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "libkirk (kirk_engine, amctrl, bn, ec, AES, SHA1)",
+    "version": "ext copy",
+    "spdx": "GPL-3.0-or-later AND (GPL-2.0-only OR GPL-3.0-only) AND LicenseRef-PublicDomain",
+    "copyright": "Draan (kirk_engine); Copyright 2007-2022 Segher Boessenkool (bn.c); Rijmen/Bosselaers/Barreto (AES, public domain); David Ireland / A.M. Kuchling (SHA1); tpu (amctrl, no notice)",
+    "licenseFile": "ppsspp/ext/libkirk/kirk_engine.c",
+    "requiresNoticeText": true,
+    "evidence": "nm: kirk_init (kirk_engine.o); members AES.o, SHA1.o, amctrl.o, bn.o, ec.o | NOTE: GPL-3.0-or-later forces the combined binary to GPL-3.0. Contains Sony PSP crypto key vault. amctrl.c and ec.c have no license header."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "aemu_postoffice client",
+    "version": "2026-03-29-22-g9e53363",
+    "spdx": "GPL-3.0-only (assumed; repo ships gpl-3.0.txt, no or-later statement found)",
+    "copyright": "kethen (no copyright line in sources)",
+    "licenseFile": "ppsspp/ext/aemu_postoffice/gpl-3.0.txt",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: postoffice.o, postoffice_mem_stdc.o, sock_impl_linux.o, mutex_impl_cpp.o, delay_impl_cpp.o, log_impl_ppsspp.o (6/6) | NOTE: No per-file headers; license inferred from repo's gpl-3.0.txt."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "RISC-V disassembler (riscv-disas)",
+    "version": "ext copy",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2016-2017 Michael Clark; Copyright (c) 2017-2018 SiFive, Inc.",
+    "licenseFile": "ppsspp/ext/riscv-disas.cpp",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: riscv-disas.o"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "LoongArch64 disassembler",
+    "version": "ext copy",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2021 Loongson Technology Corporation Limited",
+    "licenseFile": "ppsspp/ext/loongarch-disasm.cpp",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: loongarch-disasm.o"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "disarm (ARM disassembler)",
+    "version": "2000",
+    "spdx": "LicenseRef-disarm",
+    "copyright": "(c) 2000 Gareth McCaughan",
+    "licenseFile": "ppsspp/ext/disarm.cpp",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: disarm.o | NOTE: Notice says object code distribution is unrestricted; notice included anyway."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "gl3stub (Android Open Source Project)",
+    "version": "2013",
+    "spdx": "Apache-2.0",
+    "copyright": "Copyright 2013 The Android Open Source Project",
+    "licenseFile": "ppsspp/Common/GPU/OpenGL/gl3stub.c",
+    "requiresNoticeText": true,
+    "evidence": "ar -t: gl3stub.o; nm: _gl3stubInit | NOTE: On iOS the Android body is #if'd out; file still compiled. Low relevance."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "DuckStation-derived RetroAchievements integration (Core/RetroAchievements.cpp)",
+    "version": "in-tree",
+    "spdx": "GPL-2.0 OR GPL-3.0 OR CC-BY-NC-ND-4.0",
+    "copyright": "Copyright 2019-2022 Connor McLaughlin",
+    "licenseFile": "ppsspp/Core/RetroAchievements.cpp",
+    "requiresNoticeText": false,
+    "evidence": "ar -t: RetroAchievements.o | NOTE: GPL option chosen; covered by GPL texts."
+  },
+  {
+    "project": "PPSSPP",
+    "component": "zlib (ext/zlib, libchdr/deps/zlib-1.3.1)",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "ppsspp/ext/zlib/LICENSE",
+    "requiresNoticeText": false,
+    "evidence": "not linked: inflate/deflate/crc32 are undefined (U) in libPPSSPP.a -> resolved against iOS SDK libz at app link"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "discord-rpc",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "ppsspp/ext/discord-rpc/LICENSE",
+    "requiresNoticeText": false,
+    "evidence": "not linked: USE_DISCORD=ON in CMakeCache but no Discord_Initialize or discord-rpc members"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "naett",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "ppsspp/ext/naett-lib/LICENSE",
+    "requiresNoticeText": false,
+    "evidence": "not linked: no naett functions (only static g_naettInitialized in Resolve.o)"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "FreeType",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "ppsspp/ext/freetype/LICENSE.TXT",
+    "requiresNoticeText": false,
+    "evidence": "not linked: no FT_ symbols"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "OpenXR-SDK",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "ppsspp/ext/OpenXR-SDK/LICENSE",
+    "requiresNoticeText": false,
+    "evidence": "not linked: only PPSSPP OpenXRLoader.o/VR*.o (PPSSPP code)"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "libadrenotools",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "ppsspp/ext/libadrenotools/LICENSE",
+    "requiresNoticeText": false,
+    "evidence": "not linked"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "ext/sha1 (Dominik Reichl CSHA1)",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "ppsspp/ext/sha1/sha1.cpp",
+    "requiresNoticeText": false,
+    "evidence": "not linked: no CSHA1 symbols (sha1.o is Common/Crypto)"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "libchdr/deps/zstd-1.5.6",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "ppsspp/ext/libchdr/deps/zstd-1.5.6/LICENSE",
+    "requiresNoticeText": false,
+    "evidence": "not used; ext/zstd v1.5.7 linked instead"
+  },
+  {
+    "project": "PPSSPP",
+    "component": "MoltenVK / Vulkan loader",
+    "version": "n/a",
+    "spdx": "n/a",
+    "copyright": "n/a",
+    "licenseFile": "ppsspp/ios/MoltenVK",
+    "requiresNoticeText": false,
+    "evidence": "not in libPPSSPP.a; RetroPlay project.yml does not link MoltenVK"
+  }
+]

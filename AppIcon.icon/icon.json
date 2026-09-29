@@ -1,0 +1,33 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "solid": "srgb:0.03529,0.07451,0.05882,1.00000"
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "srgb:0.00000,0.00000,0.00000,1.00000"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "layers": [
+        {
+          "glass": false,
+          "hidden": false,
+          "image-name": "psp-glass.png",
+          "name": "PSP Device",
+          "opacity": 1
+        }
+      ],
+      "lighting": "combined",
+      "specular": false
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

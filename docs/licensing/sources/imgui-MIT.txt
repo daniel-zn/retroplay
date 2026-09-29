@@ -1,0 +1,5 @@
+// dear imgui, v1.91.6
+// (main code and documentation)
+// Copyright (c) 2014-2024 Omar Cornut
+// Developed by Omar Cornut and every direct or indirect contributors to the GitHub.
+// See LICENSE.txt for copyright and licensing details (standard MIT License).

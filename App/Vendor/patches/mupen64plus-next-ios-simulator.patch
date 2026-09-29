@@ -1,0 +1,19 @@
+diff --git a/Makefile b/Makefile
+index 2443f80..bdefba5 100644
+--- a/Makefile
++++ b/Makefile
+@@ -451,10 +451,10 @@ else ifneq (,$(findstring ios,$(platform)))
+ 		COREFLAGS  += -Ofast -ffast-math -funsafe-math-optimizations -DNO_ASM
+ 		CPUFLAGS   += -Ofast -ffast-math -funsafe-math-optimizations -DNO_ASM
+ 		HAVE_NEON=1
+-		CC         += -miphoneos-version-min=8.0
+-		CC_AS      += -miphoneos-version-min=8.0
+-		CXX        += -miphoneos-version-min=8.0
+-		PLATCFLAGS += -miphoneos-version-min=8.0 -Wno-error=implicit-function-declaration
++		CC         += -mios-simulator-version-min=18.0
++		CC_AS      += -mios-simulator-version-min=18.0
++		CXX        += -mios-simulator-version-min=18.0
++		PLATCFLAGS += -mios-simulator-version-min=18.0 -Wno-error=implicit-function-declaration
+ 		CC = clang -arch arm64 -isysroot $(IOSSDK)
+ 		CXX = clang++ -arch arm64 -isysroot $(IOSSDK)
+ 	else

@@ -1,0 +1,7 @@
+Notice copied verbatim from melonDS/src/sha1/sha1.c:
+
+
+/* from valgrind tests */
+
+/* ================ sha1.c ================ */
+/*

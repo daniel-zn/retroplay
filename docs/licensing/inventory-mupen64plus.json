@@ -1,0 +1,192 @@
+[
+  {
+    "project": "mupen64plus-next",
+    "component": "mupen64plus-next (libretro frontend glue: libretro/libretro.c, custom/*)",
+    "version": "git f275caf (libretro/mupen64plus-libretro-nx) + RetroPlay patch",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (C) 2020 M4xw <m4x@m4xw.net> (libretro/libretro.c header); other custom/* files carry mupen64plus-style GPL headers; project LICENSE is plain GPLv2 text",
+    "licenseFile": "mupen64plus-next/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "libretro.o/custom/*.o symbols present in shipped device dylib (text section identical to mupen64plus-next/out-ios/mupen64plus_next_libretro_ios.dylib, built 2026-09-08 10:03); file headers say 'version 2 ... or (at your option) any later version'"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "mupen64plus-core",
+    "version": "2.6.0 (MUPEN_CORE_VERSION 0x020600, libretro fork)",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Richard Goedeken et al. (see LICENSES); based on Mupen64 0.5 by Hacktarux, Dave2001, Zilmar, Gregor Anich (Blight), Juha Luotio (JttL)",
+    "licenseFile": "mupen64plus-next/mupen64plus-core/LICENSES ; mupen64plus-next/mupen64plus-core/doc/gpl-license",
+    "requiresNoticeText": true,
+    "evidence": "cached_interp/pure_interp/r4300/device symbols present (274 cached_interp symbols); no new_dynarec symbols; all compiled file headers GPL-2.0-or-later"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "mupen64plus-rsp-hle",
+    "version": "libretro fork @ f275caf",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Richard Goedeken, Bobby Smiles (bsmiles32) et al.; based on Mupen64 0.5 (Hacktarux et al.)",
+    "licenseFile": "mupen64plus-next/mupen64plus-rsp-hle/LICENSES",
+    "requiresNoticeText": true,
+    "evidence": "_hle_init/_hle_execute + alist/musyx/jpeg/mp3 objects matched in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "GLideN64 (core renderer)",
+    "version": "libretro-bundled 'rev.NX' @ f275caf",
+    "spdx": "GPL-2.0-only",
+    "copyright": "Sergey Lipskiy (c) 2014-2015; credits: Orkin (glN64), yongzh (gles2n64), ziggy (z64), Nathaniel Meyer (bloom), Hiroshi Morii (GlideHQ)",
+    "licenseFile": "mupen64plus-next/GLideN64/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "LICENSE says 'licensed under the GNU General Public License version 2' (no 'or later'); most GLideN64/src/*.cpp have no per-file header; ~130 GLideN64 objects matched in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "GLideNHQ / GlideHQ (texture enhancer, incl. 2xSaI/hq2x/hq4x/lq2x filters)",
+    "version": "GlideHQ 1.5 port",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (C) 2007 Hiroshi Morii (KoolSmoky); Copyright (C) 2003 Rice1964; based on Derek Liauw Kie Fa (2xSaI) and Maxim Stepin (hq4x); deposterize Copyright (c) 2012- PPSSPP Project",
+    "licenseFile": "mupen64plus-next/GLideN64/licenses/GlideHQ/gpl-2.0.txt",
+    "requiresNoticeText": true,
+    "evidence": "TxCache/TxFilter/TxHiRes* + hq/2xsai symbols in binary; headers 'version 2, or (at your option) any later version'"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "xBRZ scaler (GLideN64/src/GLideNHQ/TextureFilters_xbrz.cpp)",
+    "version": "HqMAME xBRZ (version not stated)",
+    "spdx": "GPL-3.0-only WITH MAME-linking exception (LicenseRef; not a standard SPDX exception)",
+    "copyright": "Copyright (C) Zenju (zenju AT gmx DOT de) - All Rights Reserved",
+    "licenseFile": "mupen64plus-next/GLideN64/src/GLideNHQ/TextureFilters_xbrz.cpp (header only; GPL-3.0 text copied from mupen64plus-next/mupen64plus-rsp-paraLLEl/lightning/COPYING)",
+    "requiresNoticeText": true,
+    "evidence": "xbrz::ScalerCfg / scaleImage<Scaler2x..4x> symbols present in shipped binary. RED FLAG: GPL-3.0 code combined with GPL-2.0-only GLideN64"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "GLSL FXAA shader (glsl-fxaa, mattdesl)",
+    "version": "n/a",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2014 Matt DesLauriers",
+    "licenseFile": "mupen64plus-next/GLideN64/licenses/GLSL-FXAA/LICENSE.md",
+    "requiresNoticeText": true,
+    "evidence": "glsl_FXAA.o compiled and matched; shader source embedded as string"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "webgl-meincraft FXAA (base of GLSL FXAA)",
+    "version": "n/a",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (c) 2011 by Armin Ronacher.",
+    "licenseFile": "mupen64plus-next/GLideN64/src/Graphics/OpenGLContext/GLSL/glsl_FXAA.cpp (header lines 1-50)",
+    "requiresNoticeText": true,
+    "evidence": "same object as above; license only in source comment"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "readerwriterqueue (moodycamel)",
+    "version": "2013-2016 header (version not stated)",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (c) 2013-2015, Cameron Desrochers / (c)2013-2016 Cameron Desrochers",
+    "licenseFile": "mupen64plus-next/GLideN64/licenses/readerwriterqueue/LICENSE.md",
+    "requiresNoticeText": true,
+    "evidence": "moodycamel::ReaderWriterQueue / BlockingReaderWriterQueue symbols in binary (ThreadedOpenGl)"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "Preshing lightweight semaphore (in atomicops.h)",
+    "version": "n/a",
+    "spdx": "Zlib",
+    "copyright": "Copyright (c) 2015 Jeff Preshing",
+    "licenseFile": "mupen64plus-next/GLideN64/src/Graphics/OpenGLContext/ThreadedOpenGl/atomicops.h (lines 360-380)",
+    "requiresNoticeText": false,
+    "evidence": "moodycamel::spsc_sema::LightweightSemaphore symbol in binary; zlib license: notice must stay in source, acknowledgement appreciated not required"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "xxHash (mupen64plus-core copy, xxHash/)",
+    "version": "0.7.3",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (C) 2012-present, Yann Collet (xxhash.h); Copyright (C) 2019-present, Yann Collet (xxh3.h)",
+    "licenseFile": "mupen64plus-next/xxHash/xxhash.h (header lines 1-34)",
+    "requiresNoticeText": true,
+    "evidence": "XXH3 inline (XXH_INLINE_ALL) used by mupen64plus-core/src/device/r4300/mips_instructions.def; XXH3_hashLong_64b_defaultSecret defined in cached_interp.o/pure_interp.o and present in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "xxHash (GLideN64 copy, GLideN64/src/xxHash/)",
+    "version": "0.8.3",
+    "spdx": "BSD-2-Clause",
+    "copyright": "Copyright (C) 2012-2023 Yann Collet",
+    "licenseFile": "mupen64plus-next/GLideN64/src/xxHash/xxhash.h (header lines 1-34)",
+    "requiresNoticeText": true,
+    "evidence": "included by GLideN64 CRC_OPT.cpp / GLideNHQ/TxUtil.cpp; C++-mangled XXH3 symbols in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "libretro-common (+ libretro.h API header)",
+    "version": "bundled @ f275caf",
+    "spdx": "MIT",
+    "copyright": "Copyright (C) 2010-2019/2010-2020/2010-2021 The RetroArch team",
+    "licenseFile": "mupen64plus-next/libretro-common/streams/file_stream.c (per-file header; no LICENSE file in libretro-common/)",
+    "requiresNoticeText": true,
+    "evidence": "filestream_*, retro_vfs_*, glsm_*, string_list, sinc resampler, config_file, encoding_utf symbols in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "libco (aarch64 backend)",
+    "version": "libco.aarch64 2017-06-26",
+    "spdx": "LicenseRef-public-domain",
+    "copyright": "author: webgeek1234 (aarch64.c); libco by byuu",
+    "licenseFile": "mupen64plus-next/libretro-common/libco/aarch64.c (header 'license: public domain')",
+    "requiresNoticeText": false,
+    "evidence": "_co_create/_co_switch_aarch64 in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "zlib (custom/dependencies/libzlib)",
+    "version": "1.2.8 (locally modified zutil.h)",
+    "spdx": "Zlib",
+    "copyright": "Copyright (C) 1995-2013 Jean-loup Gailly and Mark Adler",
+    "licenseFile": "mupen64plus-next/custom/dependencies/libzlib/zlib.h (header lines 1-29)",
+    "requiresNoticeText": false,
+    "evidence": "strings 'deflate 1.2.8 Copyright 1995-2013 Jean-loup Gailly and Mark Adler' / 'inflate 1.2.8'; zlib license requires altered source to be plainly marked (source-level obligation), binary notice not required"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "libpng (custom/dependencies/libpng)",
+    "version": "1.6.34 (locally modified pngpriv.h)",
+    "spdx": "Libpng",
+    "copyright": "Copyright (c) 1998-2002,2004,2006-2017 Glenn Randers-Pehrson; (c) 1996-1997 Andreas Dilger; (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.; (c) 2000-2017 contributing authors per png.h",
+    "licenseFile": "mupen64plus-next/custom/dependencies/libpng/png.h (lines 1-121; no LICENSE file in dir)",
+    "requiresNoticeText": false,
+    "evidence": "strings 'libpng version 1.6.34 - September 29, 2017', 463 png_* symbols; license: altered versions must be plainly marked; copyright notice may not be removed from source; binary notice not strictly required but recommended"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "minizip (zip/unzip/ioapi + crypt.h)",
+    "version": "1.1 (unz/zip_copyright strings say 1.01)",
+    "spdx": "Zlib",
+    "copyright": "Copyright (C) 1998-2010 Gilles Vollant; (C) 2007-2008 Even Rouault; (C) 2009-2010 Mathias Svensson; crypt.h (C) 1998-2005 Gilles Vollant (from Info-ZIP crypt code)",
+    "licenseFile": "mupen64plus-next/mupen64plus-core/subprojects/minizip/unzip.h (header lines 1-35)",
+    "requiresNoticeText": false,
+    "evidence": "unzOpen*/zip symbols, _crypthead (zip.c includes crypt.h since NOCRYPT undefined), strings ' unzip 1.01 Copyright 1998-2004 Gilles Vollant'"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "MD5 (L. Peter Deutsch)",
+    "version": "md5.c v1.6 2002/04/13",
+    "spdx": "Zlib",
+    "copyright": "Copyright (C) 1999, 2000, 2002 Aladdin Enterprises. All rights reserved.",
+    "licenseFile": "mupen64plus-next/mupen64plus-core/subprojects/md5/md5.c (header lines 1-23)",
+    "requiresNoticeText": false,
+    "evidence": "md5_init/md5_append/md5_finish symbols in binary"
+  },
+  {
+    "project": "mupen64plus-next",
+    "component": "N64 CIC-NUS-6105 algorithm (X-Scale)",
+    "version": "2011",
+    "spdx": "BSD-2-Clause-Views",
+    "copyright": "Copyright 2011 X-Scale. All rights reserved.",
+    "licenseFile": "mupen64plus-next/mupen64plus-core/src/device/pif/n64_cic_nus_6105.c (header lines 1-89)",
+    "requiresNoticeText": true,
+    "evidence": "_n64_cic_nus_6105 (+ .lut0) symbol in shipped binary; binary redistribution must reproduce notice"
+  }
+]

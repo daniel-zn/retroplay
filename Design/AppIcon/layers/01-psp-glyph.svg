@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Wide PSP glyph for Icon Composer (no background). fill-rule evenodd for cutouts. -->
+  <path fill="#FFFFFF" fill-rule="evenodd" d="
+    M168 382c-30 0-50 26-50 66v128c0 40 20 66 50 66h688c30 0 50-26 50-66V448c0-40-20-66-50-66H168z
+    M175 360h70v28c0 8-6 14-14 14h-42c-8 0-14-6-14-14v-28z
+    M779 360h70v28c0 8-6 14-14 14h-42c-8 0-14-6-14-14v-28z
+    M348 430h328v164H348z
+    M212 458h32v20h20v32h-20v20h-32v-20h-20v-32h20z
+    M228 548m-20 0a20 20 0 1 0 40 0a20 20 0 1 0-40 0
+    M762 466m-13 0a13 13 0 1 0 26 0a13 13 0 1 0-26 0
+    M732 496m-13 0a13 13 0 1 0 26 0a13 13 0 1 0-26 0
+    M792 496m-13 0a13 13 0 1 0 26 0a13 13 0 1 0-26 0
+    M762 526m-13 0a13 13 0 1 0 26 0a13 13 0 1 0-26 0
+    M468 590h40v18h-40z
+    M516 590h40v18h-40z
+  "/>
+</svg>
