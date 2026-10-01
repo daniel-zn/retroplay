@@ -56,6 +56,12 @@ public final class CastingCoordinator: ObservableObject {
     }
 
     func beginGame(title: String, aspect: CGFloat) {
+        // A missed disconnect callback would leave the phone showing "Playing on AirPlay"
+        // with no picture anywhere; recount the external-display scenes that really exist.
+        let externalScenes = UIApplication.shared.connectedScenes
+            .filter { $0.session.role == .windowExternalDisplayNonInteractive }
+            .count
+        reconcileExternalDisplayConnectivity(connectedScreenCount: externalScenes + 1)
         gameTitle = title
         screenAspect = aspect
         video = nil
@@ -82,6 +88,7 @@ public final class CastingCoordinator: ObservableObject {
 @available(iOS 18.0, *)
 public struct ExternalGameDisplayView: View {
     @ObservedObject private var casting = CastingCoordinator.shared
+    @AppStorage(PlaySettingsKey.smoothScreen) private var smoothScreen = false
 
     public init() {}
 
@@ -89,7 +96,7 @@ public struct ExternalGameDisplayView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let video = casting.video {
-                GameScreenView(store: video, smoothing: false)
+                GameScreenView(store: video, smoothing: smoothScreen)
                     .aspectRatio(casting.screenAspect, contentMode: .fit)
                     .accessibilityElement()
                     .accessibilityLabel(casting.gameTitle.map { "Game video for \($0)" } ?? "Game video")

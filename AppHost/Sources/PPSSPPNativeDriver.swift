@@ -116,6 +116,11 @@ public final class PPSSPPNativeDriver: NativeEmulatorDriver {
     }
 
     /// The PSP CPU stopped on an unrecoverable error; frames no longer advance.
+    public func setFastForward(_ enabled: Bool) {
+        guard let bridge else { return }
+        rp_ppsspp_set_fast_forward(bridge, enabled)
+    }
+
     public var hadRuntimeError: Bool {
         guard let bridge else { return false }
         return rp_ppsspp_had_runtime_error(bridge)

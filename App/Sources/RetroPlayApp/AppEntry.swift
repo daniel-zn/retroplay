@@ -17,6 +17,9 @@ public struct RetroPlayRootView: View {
     @State private var searchPlayGame: LibraryGame?
     @State private var searchQuery = ""
     @State private var isSearchPresented = false
+    /// Keyboard focus for the search field. isSearchPresented alone can't re-show the
+    /// keyboard once it's already true (after Search or switching tabs).
+    @FocusState private var searchFocused: Bool
     @State private var libraryTitleCollapsed = false
     @State private var importErrorMessage: String?
     @State private var showImportError = false
@@ -88,13 +91,10 @@ public struct RetroPlayRootView: View {
     }
 
     private var searchResults: [LibraryGame] {
-        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return [] }
         let matches = store.games.filter {
-            $0.displayName.localizedCaseInsensitiveContains(q)
-                || $0.systemID.displayName.localizedCaseInsensitiveContains(q)
-                || RetroPlayTheme.shortName($0.systemID).localizedCaseInsensitiveContains(q)
-                || $0.systemID.defaultCoreName.localizedCaseInsensitiveContains(q)
+            LibrarySearch.matches($0, query: searchQuery) { system in
+                [system.displayName, RetroPlayTheme.shortName(system), system.defaultCoreName]
+            }
         }
         return LibrarySort.name.sorted(matches, lastPlayed: lastPlayed)
     }
@@ -123,6 +123,7 @@ public struct RetroPlayRootView: View {
             TabBarReselectHandler { index in
                 if index == RootTab.search.rawValue {
                     isSearchPresented = true
+                    searchFocused = true
                 }
             }
         }
@@ -182,6 +183,7 @@ public struct RetroPlayRootView: View {
         }
         .onChange(of: store.games) { _, _ in
             refreshActivity()
+            coverCache.forgetMissing()
         }
         // Pick up ROMs added or removed in Files → RetroPlay → Games.
         .task { await store.reconcileWithGamesFolder() }
@@ -195,8 +197,9 @@ public struct RetroPlayRootView: View {
         }
         .onChange(of: selectedTab) { _, tab in
             if tab == .search {
-                // First land on Search: show the field; re-tap still forces focus via TabBarReselectHandler.
+                // First land on Search: show the field; re-tap forces focus via TabBarReselectHandler.
                 isSearchPresented = true
+                searchFocused = true
             }
             if tab == .library {
                 libraryTitleCollapsed = false
@@ -468,6 +471,7 @@ public struct RetroPlayRootView: View {
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Games"
             )
+            .searchFocused($searchFocused)
             .navigationDestination(item: $searchPlayGame) { game in
                 PlayView(game: game, romURL: store.absoluteURL(for: game))
             }

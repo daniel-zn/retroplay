@@ -14,7 +14,7 @@ struct OpenSourceComponent: Decodable, Identifiable, Hashable {
     /// File name inside `Licenses/` holding the full license text.
     let licenseFile: String
 
-    var id: String { "\(usedBy)/\(name)" }
+    var id: String { "\(usedBy)/\(name)/\(licenseFile)" }
 }
 
 /// Settings → Open Source Licenses: RetroPlay's own GPL notice, where to get the source,

@@ -39,6 +39,10 @@ public protocol NativeEmulatorDriver: AnyObject {
     func flushSaveData()
     /// True once the core stopped on an unrecoverable error (frames no longer advance).
     var hadRuntimeError: Bool { get }
+
+    /// Fast-forward started or stopped. Cores that pace themselves to real time
+    /// (PPSSPP) must stop throttling, or the extra frames per tick are slept away.
+    func setFastForward(_ enabled: Bool)
     /// Release every native resource. The driver is not used again afterwards.
     func tearDown()
 }
@@ -48,6 +52,7 @@ public extension NativeEmulatorDriver {
     func reset() {}
     func flushSaveData() {}
     var hadRuntimeError: Bool { false }
+    func setFastForward(_ enabled: Bool) {}
 }
 
 /// Factories registered by the app target once the native XCFrameworks are linked.

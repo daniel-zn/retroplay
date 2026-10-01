@@ -79,6 +79,7 @@ struct ContinuePlayingRow: View {
     let onPlay: (LibraryGame) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -130,7 +131,9 @@ struct ContinuePlayingRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(10)
-        .frame(width: 270, height: 116)
+        // Fixed size at normal text sizes; wider and as tall as needed at accessibility sizes.
+        .frame(width: dynamicTypeSize.isAccessibilitySize ? 320 : 270)
+        .frame(minHeight: 116)
         .background(RetroPlayTheme.card(for: colorScheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)

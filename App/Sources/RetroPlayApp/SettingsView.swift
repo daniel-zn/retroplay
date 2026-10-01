@@ -117,6 +117,7 @@ struct SettingsView: View {
                 Slider(value: $padOpacity, in: 0.25...1) {
                     Text("Landscape controls opacity")
                 }
+                .accessibilityValue("\(Int((padOpacity * 100).rounded())) percent")
             }
             .padding(.vertical, 4)
             Toggle(isOn: $touchWithController) {
@@ -125,8 +126,8 @@ struct SettingsView: View {
             DisclosureGroup {
                 VStack(alignment: .leading, spacing: 8) {
                     helpRow("Controllers", "MFi, Xbox, PlayStation and Switch Pro. Buttons map by position; Home opens the menu.")
-                    helpRow("Keyboard", "Arrows move · Z X A S face buttons · Q W shoulders · Return Start · Esc menu.")
-                    helpRow("N64", "Left trigger is Z; the right stick is the C buttons.")
+                    helpRow("Keyboard", "Arrows: D-pad (and stick on N64 / PSP) · Z X A S: face buttons · Q W: shoulders · E R: triggers · Return: Start · Right Shift or Delete: Select · Esc: menu.")
+                    helpRow("N64", "Left trigger (keyboard E) is Z; the right stick (keyboard I J K L) is the C buttons.")
                 }
                 .padding(.vertical, 6)
             } label: {
@@ -306,10 +307,11 @@ struct SettingsIconLabel: View {
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
                 .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .accessibilityHidden(true)
             Text(title)
                 .font(RetroPlayFont.caption)
                 .foregroundStyle(.primary)
-                .lineLimit(1)
+                .lineLimit(2)
                 .minimumScaleFactor(0.75)
         }
     }

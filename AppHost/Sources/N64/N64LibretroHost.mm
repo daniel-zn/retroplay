@@ -57,6 +57,8 @@ struct N64HostHandle {
     bool hwValid = false;
     bool loaded = false;
     bool contextReady = false;
+    /// GLideN64 finished a frame into the FBO; read back lazily in N64Host_Frame.
+    bool hwFramePending = false;
     bool hasFrame = false;
     enum retro_pixel_format pixelFormat = RETRO_PIXEL_FORMAT_0RGB1555;
 
@@ -232,26 +234,32 @@ static void video_refresh(const void *data, unsigned width, unsigned height, siz
         return;
     }
 
-    // HW path (GLideN64): read back the whole FBO (GLideN64 renders at the 640x480 screen size).
+    // HW path (GLideN64): only note the frame. The blocking GPU readback happens once, when
+    // the app takes the frame; fast-forward runs several frames per tick and only shows the last.
     if (!gHost->contextReady) return;
-    [EAGLContext setCurrentContext:gHost->context];
-    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)gHost->fbo);
-    const int w = gHost->fbW;
-    const int h = gHost->fbH;
+    gHost->hwFramePending = true;
+    gHost->hasFrame = true;
+}
+
+/// Read the whole FBO back (GLideN64 renders at the 640x480 screen size), flipped upright.
+static void readBackHWFrame(N64HostHandle *host) {
+    [EAGLContext setCurrentContext:host->context];
+    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)host->fbo);
+    const int w = host->fbW;
+    const int h = host->fbH;
     const size_t stride = (size_t)w * 4;
-    gHost->readback.resize(stride * (size_t)h);
+    host->readback.resize(stride * (size_t)h);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, gHost->readback.data());
-    gHost->rgba.resize(gHost->readback.size());
+    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, host->readback.data());
+    host->rgba.resize(host->readback.size());
     // GL rows are bottom-up.
     for (int y = 0; y < h; y++) {
-        memcpy(gHost->rgba.data() + (size_t)(h - 1 - y) * stride,
-               gHost->readback.data() + (size_t)y * stride,
+        memcpy(host->rgba.data() + (size_t)(h - 1 - y) * stride,
+               host->readback.data() + (size_t)y * stride,
                stride);
     }
-    gHost->frameW = w;
-    gHost->frameH = h;
-    gHost->hasFrame = true;
+    host->frameW = w;
+    host->frameH = h;
 }
 
 static void ensureDirs(N64HostHandle *h) {
@@ -684,7 +692,12 @@ void N64Host_Reset(N64HostHandle* h) {
 }
 
 const uint8_t* N64Host_Frame(N64HostHandle* h, int* outW, int* outH) {
-    if (!h || !h->hasFrame || h->rgba.empty()) return nullptr;
+    if (!h || !h->hasFrame) return nullptr;
+    if (h->hwFramePending && h->contextReady) {
+        readBackHWFrame(h);
+        h->hwFramePending = false;
+    }
+    if (h->rgba.empty()) return nullptr;
     const size_t need = (size_t)h->frameW * (size_t)h->frameH * 4;
     if (h->frameW <= 0 || h->frameH <= 0 || h->rgba.size() < need) return nullptr;
     if (outW) *outW = h->frameW;

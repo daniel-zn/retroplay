@@ -22,6 +22,8 @@ void rp_ppsspp_set_buttons(void *bridge, uint32_t ctrlBits);
 /// True once the emulated CPU hit an unrecoverable runtime error (CORE_RUNTIME_ERROR).
 /// Frames no-op after that; a successful state load clears it.
 bool rp_ppsspp_had_runtime_error(void *bridge);
+/// PPSSPP paces itself to real time unless fast-forward is set on its CoreParameter.
+void rp_ppsspp_set_fast_forward(void *bridge, bool enabled);
 
 /// Left analog stick, -1…1, Y up-positive.
 void rp_ppsspp_set_analog(void *bridge, float x, float y);

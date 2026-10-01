@@ -144,6 +144,23 @@ bool packRGBAFromDebugBuffer(const GPUDebugBuffer &buf, uint8_t **outBytes, int 
     return true;
 }
 
+/// Opaque black 480×272 RGBA, malloc'd like packRGBAFromDebugBuffer's output.
+bool blackFrame(uint8_t **outBytes, int *outWidth, int *outHeight, int *outStrideBytes) {
+    const int w = 480, h = 272;
+    uint8_t *out = (uint8_t *)std::malloc((size_t)w * h * 4);
+    if (!out) return false;
+    for (size_t i = 0; i < (size_t)w * h; ++i) {
+        out[i * 4 + 0] = 0;
+        out[i * 4 + 1] = 0;
+        out[i * 4 + 2] = 0;
+        out[i * 4 + 3] = 0xFF;
+    }
+    *outBytes = out;
+    *outWidth = w;
+    *outHeight = h;
+    *outStrideBytes = w * 4;
+    return true;
+}
 }  // namespace
 
 void *rp_ppsspp_create(const char *saveDir, const char *cacheDir) {
@@ -266,6 +283,12 @@ void rp_ppsspp_run_frame(void *bridgePtr) {
     }
 }
 
+void rp_ppsspp_set_fast_forward(void *bridgePtr, bool enabled) {
+    auto *bridge = asBridge(bridgePtr);
+    if (!bridge || !bridge->inited) return;
+    PSP_CoreParameter().fastForward = enabled;
+}
+
 bool rp_ppsspp_had_runtime_error(void *bridgePtr) {
     auto *bridge = asBridge(bridgePtr);
     return bridge ? bridge->hadRuntimeError : false;
@@ -278,10 +301,19 @@ bool rp_ppsspp_copy_rgba(void *bridgePtr, uint8_t **outBytes, int *outWidth, int
     }
     *outBytes = nullptr;
 
-    // Only the display framebuffer is shown. Until the game sets one (sceDisplaySetFrameBuf)
-    // there is nothing to show, as on a real PSP: report no new frame and the screen keeps
-    // its last image (black on a fresh boot). Reading raw VRAM instead showed garbage
-    // ("static") after Restart from Scratch, when VRAM holds data in another format.
+    // Only the display framebuffer is shown, never raw VRAM: before the game sets up its
+    // display (any boot without a resume save, e.g. a first launch or Restart from
+    // Scratch) VRAM holds the game's own data in other formats, which showed as "static".
+    // A game that turns the display off (sceDisplaySetFrameBuf with address 0, common on
+    // loading screens) still gets a "valid" SoftGPU framebuffer at VRAM's base, which shows
+    // as streaks of raw VRAM. A real PSP shows black: publish a black frame instead.
+    PSPPointer<u8> topaddr;
+    topaddr.ptr = 0;
+    u32 linesize = 0;
+    __DisplayGetFramebuf(&topaddr, &linesize, nullptr, 0);
+    if (topaddr.ptr == 0 || linesize == 0) {
+        return blackFrame(outBytes, outWidth, outHeight, outStrideBytes);
+    }
     if (gpu) {
         GPUDebugBuffer buf;
         if (gpu->GetOutputFramebuffer(buf) && buf.GetData() != nullptr) {
@@ -472,6 +504,7 @@ void rp_ppsspp_set_analog(void *, float, float) {}
 int rp_ppsspp_read_audio(void *, int16_t *, int) { return 0; }
 void rp_ppsspp_run_frame(void *) {}
 bool rp_ppsspp_had_runtime_error(void *) { return false; }
+void rp_ppsspp_set_fast_forward(void *, bool) {}
 bool rp_ppsspp_copy_rgba(void *, uint8_t **, int *, int *, int *) { return false; }
 bool rp_ppsspp_save_state(void *, const char *, char *errorOut, size_t errorOutLen) {
     if (errorOut && errorOutLen) std::snprintf(errorOut, errorOutLen, "RETROPLAY_HAS_PPSSPP not set");

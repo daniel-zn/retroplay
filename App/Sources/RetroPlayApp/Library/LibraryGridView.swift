@@ -19,11 +19,14 @@ struct LibraryGridView<Header: View>: View {
     let header: () -> Header
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    /// Three across on a phone, more on iPad / landscape.
-    private let columns = [
-        GridItem(.adaptive(minimum: 100, maximum: 170), spacing: 12, alignment: .top)
-    ]
+    /// Three across on a phone (more in landscape); two at accessibility text sizes, where the
+    /// pixel face (~1 em per letter) would leave only a few letters per line in a narrow tile.
+    private var columns: [GridItem] {
+        let minimum: CGFloat = dynamicTypeSize.isAccessibilitySize ? 150 : 100
+        return [GridItem(.adaptive(minimum: minimum, maximum: 240), spacing: 12, alignment: .top)]
+    }
 
     init(
         games: [LibraryGame],

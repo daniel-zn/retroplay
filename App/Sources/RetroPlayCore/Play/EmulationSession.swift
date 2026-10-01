@@ -30,7 +30,11 @@ final class EmulationSession: @unchecked Sendable {
     private(set) var isStarted = false
     private var isTornDown = false
     var isPaused = false
-    var fastForward = false
+    var fastForward = false {
+        didSet {
+            if fastForward != oldValue { driver.setFastForward(fastForward) }
+        }
+    }
     var audioEnabled = true
     var respectSilentSwitch = false
 
