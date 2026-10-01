@@ -973,7 +973,22 @@ public struct PlayView: View {
             }
             NSLog("RP_SMOKE %@ pulsed Start+A", system.rawValue)
         }
+        // `-RetroPlaySmokeRestartAfter <seconds>`: run Restart from Scratch's reboot once,
+        // so the fresh-boot path can be checked without driving the menu.
+        if let index = args.firstIndex(of: "-RetroPlaySmokeRestartAfter"),
+           args.index(after: index) < args.endIndex,
+           let seconds = Double(args[args.index(after: index)]),
+           !Self.didSmokeRestart {
+            Self.didSmokeRestart = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(seconds))
+                NSLog("RP_SMOKE restart from scratch")
+                await reboot(autoResume: false)
+            }
+        }
     }
+
+    @MainActor private static var didSmokeRestart = false
     #endif
 }
 

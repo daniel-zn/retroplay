@@ -20,7 +20,6 @@
 #include "Core/Util/PathUtil.h"
 #include "Core/HLE/sceUtility.h"
 #include "Core/HW/MemoryStick.h"
-#include "Core/MemMap.h"
 #include "Core/Screenshot.h"
 #include "Core/System.h"
 #include "Core/HLE/sceCtrl.h"
@@ -32,7 +31,6 @@
 #include <vector>
 #include "GPU/Common/GPUDebugInterface.h"
 #include "GPU/GPUCommon.h"
-#include "GPU/GPUState.h"
 #include "GPU/ge_constants.h"
 
 namespace {
@@ -146,37 +144,6 @@ bool packRGBAFromDebugBuffer(const GPUDebugBuffer &buf, uint8_t **outBytes, int 
     return true;
 }
 
-/// SoftGPU::GetOutputFramebuffer fails until sceDisplaySetFrameBuf (displayFramebuf_ valid).
-/// Fall back to the current render target via gstate + Memory once MemMap is up.
-bool copyFromGStateVRAM(uint8_t **outBytes, int *outWidth, int *outHeight, int *outStrideBytes) {
-    if (!Memory::IsActive()) return false;
-
-    u32 addr = gstate.getFrameBufAddress();
-    if (!Memory::IsValidAddress(addr)) {
-        addr = 0x04000000;
-        if (!Memory::IsValidAddress(addr)) return false;
-    }
-
-    const u8 *src = Memory::GetPointerOrNull(addr);
-    if (!src) return false;
-
-    int stride = gstate.FrameBufStride();
-    if (stride <= 0) stride = 512;
-    GEBufferFormat fmt = gstate.FrameBufFormat();
-
-    const int w = 480;
-    const int h = 272;
-    const int depth = (fmt == GE_FORMAT_8888) ? 4 : 2;
-
-    GPUDebugBuffer tight;
-    tight.Allocate((u32)w, (u32)h, fmt);
-    u8 *td = tight.GetData();
-    if (!td) return false;
-    for (int y = 0; y < h; ++y) {
-        std::memcpy(td + y * w * depth, src + y * stride * depth, (size_t)w * (size_t)depth);
-    }
-    return packRGBAFromDebugBuffer(tight, outBytes, outWidth, outHeight, outStrideBytes);
-}
 }  // namespace
 
 void *rp_ppsspp_create(const char *saveDir, const char *cacheDir) {
@@ -311,17 +278,17 @@ bool rp_ppsspp_copy_rgba(void *bridgePtr, uint8_t **outBytes, int *outWidth, int
     }
     *outBytes = nullptr;
 
+    // Only the display framebuffer is shown. Until the game sets one (sceDisplaySetFrameBuf)
+    // there is nothing to show, as on a real PSP: report no new frame and the screen keeps
+    // its last image (black on a fresh boot). Reading raw VRAM instead showed garbage
+    // ("static") after Restart from Scratch, when VRAM holds data in another format.
     if (gpu) {
         GPUDebugBuffer buf;
         if (gpu->GetOutputFramebuffer(buf) && buf.GetData() != nullptr) {
-            if (packRGBAFromDebugBuffer(buf, outBytes, outWidth, outHeight, outStrideBytes)) {
-                return true;
-            }
+            return packRGBAFromDebugBuffer(buf, outBytes, outWidth, outHeight, outStrideBytes);
         }
     }
-
-    // Display buffer not set yet (or SoftGPU early-out). Try render-target VRAM via gstate.
-    return copyFromGStateVRAM(outBytes, outWidth, outHeight, outStrideBytes);
+    return false;
 }
 
 
