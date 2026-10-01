@@ -17,6 +17,7 @@ public struct RetroPlayRootView: View {
     @State private var searchPlayGame: LibraryGame?
     @State private var searchQuery = ""
     @State private var isSearchPresented = false
+    @AppStorage("retroplay.recentSearches") private var recentSearchesRaw = ""
     /// Keyboard focus for the search field. isSearchPresented alone can't re-show the
     /// keyboard once it's already true (after Search or switching tabs).
     @FocusState private var searchFocused: Bool
@@ -100,7 +101,7 @@ public struct RetroPlayRootView: View {
     }
 
     public var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: tabSelection) {
             libraryNavigation
                 .tabItem {
                     Label("Library", systemImage: "square.grid.2x2.fill")
@@ -119,14 +120,6 @@ public struct RetroPlayRootView: View {
         .tint(RetroPlayTheme.accent)
         .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
-        .background {
-            TabBarReselectHandler { index in
-                if index == RootTab.search.rawValue {
-                    isSearchPresented = true
-                    searchFocused = true
-                }
-            }
-        }
         // Set on the window, not via preferredColorScheme, so an open Settings sheet
         // follows the Appearance picker live (and "System" really clears the override).
         .onAppear { appearance.applyToWindows() }
@@ -197,9 +190,11 @@ public struct RetroPlayRootView: View {
         }
         .onChange(of: selectedTab) { _, tab in
             if tab == .search {
-                // First land on Search: show the field; re-tap forces focus via TabBarReselectHandler.
-                isSearchPresented = true
-                searchFocused = true
+                // Landing on Search shows the page and recent searches without the keyboard;
+                // tapping the Search tab again focuses the field (see tabSelection).
+                searchFocused = false
+                isSearchPresented = false
+                searchQuery = ""
             }
             if tab == .library {
                 libraryTitleCollapsed = false
@@ -430,11 +425,15 @@ public struct RetroPlayRootView: View {
                         description: "Import games from the Library tab, then search them here."
                     )
                 } else if searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    RetroPlayUnavailableView(
-                        title: "Search Library",
-                        systemImage: "magnifyingglass",
-                        description: "Find games you already imported into RetroPlay."
-                    )
+                    if recentSearches.isEmpty {
+                        RetroPlayUnavailableView(
+                            title: "Search Library",
+                            systemImage: "magnifyingglass",
+                            description: "Find games you already imported into RetroPlay."
+                        )
+                    } else {
+                        recentSearchesList
+                    }
                 } else if searchResults.isEmpty {
                     RetroPlayUnavailableView(
                         title: "No Results",
@@ -475,9 +474,73 @@ public struct RetroPlayRootView: View {
                 prompt: "Games"
             )
             .searchFocused($searchFocused)
+            .onSubmit(of: .search) { recordSearch() }
             .navigationDestination(item: $searchPlayGame) { game in
                 PlayView(game: game, romURL: store.absoluteURL(for: game))
             }
+        }
+    }
+
+    private var recentSearches: [String] {
+        RecentSearches.decode(recentSearchesRaw)
+    }
+
+    private func recordSearch() {
+        recentSearchesRaw = RecentSearches.encode(RecentSearches.adding(searchQuery, to: recentSearches))
+    }
+
+    private var recentSearchesList: some View {
+        List {
+            Section {
+                ForEach(recentSearches, id: \.self) { query in
+                    Button {
+                        searchQuery = query
+                        recordSearch()
+                    } label: {
+                        Label(query, systemImage: "clock.arrow.circlepath")
+                            .font(RetroPlayFont.caption)
+                            .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                    }
+                    .accessibilityHint("Searches for \(query)")
+                }
+                .onDelete { offsets in
+                    var list = recentSearches
+                    list.remove(atOffsets: offsets)
+                    recentSearchesRaw = RecentSearches.encode(list)
+                }
+            } header: {
+                HStack {
+                    Text("RECENT SEARCHES")
+                        .font(RetroPlayFont.caption2)
+                        .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
+                    Spacer()
+                    Button("Clear") { recentSearchesRaw = "" }
+                        .font(RetroPlayFont.caption2)
+                        .accessibilityLabel("Clear recent searches")
+                }
+            }
+            .listRowBackground(RetroPlayTheme.card(for: colorScheme))
+        }
+        .scrollContentBackground(.hidden)
+    }
+
+    /// Tab selection that also reports a tap on the tab that's already showing (SwiftUI sets
+    /// the same value again). The UIKit tab bar delegate isn't consulted by iOS 26's tab bar.
+    private var tabSelection: Binding<RootTab> {
+        Binding(
+            get: { selectedTab },
+            set: { tab in
+                if tab == selectedTab { reselect(tab) }
+                selectedTab = tab
+            }
+        )
+    }
+
+    private func reselect(_ tab: RootTab) {
+        // A second tap on Search (already showing) brings up the keyboard.
+        if tab == .search {
+            isSearchPresented = true
+            searchFocused = true
         }
     }
 
@@ -488,6 +551,7 @@ public struct RetroPlayRootView: View {
             missingGame = game
             showMissingGame = true
         } else if fromSearch {
+            recordSearch()
             searchPlayGame = game
         } else {
             playGame = game
