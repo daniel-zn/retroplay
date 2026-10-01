@@ -293,6 +293,7 @@ struct SettingsIconLabel: View {
     let title: String
     let symbol: String
     let color: Color
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(_ title: String, symbol: String, color: Color) {
         self.title = title
@@ -311,8 +312,8 @@ struct SettingsIconLabel: View {
             Text(title)
                 .font(RetroPlayFont.caption)
                 .foregroundStyle(.primary)
-                .lineLimit(2)
-                .minimumScaleFactor(0.75)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+                .minimumScaleFactor(0.6)
         }
     }
 }

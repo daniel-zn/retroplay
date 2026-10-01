@@ -403,6 +403,9 @@ public struct RetroPlayRootView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("RetroPlay")
                 .font(RetroPlayFont.largeTitle)
+                // One line: at accessibility sizes the pixel face would split the word.
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                 .accessibilityAddTraits(.isHeader)
             if !store.games.isEmpty {

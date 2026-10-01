@@ -157,6 +157,8 @@ struct SectionHeading: View {
             Spacer()
             if let trailing {
                 Text(trailing)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .font(RetroPlayFont.caption2)
                     .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
             }
