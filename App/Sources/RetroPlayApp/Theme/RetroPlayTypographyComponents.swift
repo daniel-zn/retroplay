@@ -52,10 +52,18 @@ private struct RetroPlayAlertModifier: ViewModifier {
                                 .font(RetroPlayFont.title3)
                                 .multilineTextAlignment(.center)
 
-                            Text(message)
-                                .font(RetroPlayFont.body)
-                                .multilineTextAlignment(.center)
-                                .foregroundStyle(.secondary)
+                            // A long message scrolls inside the card so the buttons always stay
+                            // on screen (the views behind are disabled while this is up).
+                            ViewThatFits(in: .vertical) {
+                                messageText
+                                ScrollView {
+                                    messageText
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .scrollBounceBehavior(.basedOnSize)
+                                .scrollIndicatorsFlash(onAppear: true)
+                                .frame(maxHeight: 360)
+                            }
 
                             HStack(spacing: 10) {
                                 ForEach(actions) { action in
@@ -89,6 +97,13 @@ private struct RetroPlayAlertModifier: ViewModifier {
                 }
             }
             .animation(.easeOut(duration: 0.16), value: isPresented)
+    }
+
+    private var messageText: some View {
+        Text(message)
+            .font(RetroPlayFont.body)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(.secondary)
     }
 
     private func tint(for role: RetroPlayAlertAction.Role) -> Color {
