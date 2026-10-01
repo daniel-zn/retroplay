@@ -3,13 +3,27 @@ import CryptoKit
 import Foundation
 import Combine
 
+/// A picked file that could not be copied in. The rest of its batch still imports.
+public struct LibraryImportFailure: Sendable, Equatable {
+    public var fileName: String
+    public var reason: String
+
+    public init(fileName: String, reason: String) {
+        self.fileName = fileName
+        self.reason = reason
+    }
+}
+
 /// What one import pass did with the picked files.
 public struct LibraryImportSummary: Sendable, Equatable {
     public var added: [LibraryGame] = []
-    /// Picked files skipped because the same game file is already in the library.
+    /// Picked files skipped because the same game file is already in the library, earlier in the
+    /// same pick, or already in Documents/Games (the folder scan adds those).
     public var duplicates: [String] = []
     /// Picked files skipped because no bundled core plays them.
     public var unsupported: [String] = []
+    /// Picked files that could not be read or copied.
+    public var failed: [LibraryImportFailure] = []
 
     public init() {}
 }
@@ -38,6 +52,9 @@ public final class LibraryStore: ObservableObject {
     /// Games/ file names claimed by an in-flight import or scan, so neither picks them twice.
     private var reservedFileNames: Set<String> = []
     private var isScanningGamesFolder = false
+    /// The latest `importInBackground` batch. Each batch waits for the one before it, so its
+    /// duplicate check sees every file an earlier, still-running batch adds.
+    private var lastImportBatch: Task<Void, Never>?
 
     public init(
         fileManager: FileManager = .default,
@@ -174,17 +191,21 @@ public final class LibraryStore: ObservableObject {
         try importSummary(from: urls).added
     }
 
-    /// Synchronous import with skip details. Prefer `importInBackground` from UI code.
+    /// Synchronous import with skip details. Prefer `importInBackground` from UI code: this path
+    /// does not wait for a background batch that is still copying.
     public func importSummary(from urls: [URL]) throws -> LibraryImportSummary {
         try ensureDirectories()
         let plan = planImport(urls)
         defer { releaseReservations(plan.jobs) }
-        let staged = try Self.stage(plan.jobs, existing: existingLibraryFiles(), paths: savePaths, importer: importer)
-        return try commit(staged, unsupported: plan.unsupported)
+        let staged = Self.stage(plan.jobs, existing: existingLibraryFiles(), paths: savePaths, importer: importer)
+        return try commit(staged, plan: plan)
     }
 
     /// Copies and reads game metadata off the main actor; rows publish on the main actor when
-    /// the whole batch is in. Security-scoped access stays open until each copy finishes.
+    /// the whole batch is in. Security-scoped access stays open until each copy finishes. A file
+    /// that cannot be read or copied lands in `failed` and the rest of the batch still imports;
+    /// only a failed library save rolls the batch back. Batches run one after another, so a pick
+    /// made while an earlier import is still copying is checked against that import's files.
     public func importInBackground(from urls: [URL]) async throws -> LibraryImportSummary {
         try ensureDirectories()
         let plan = planImport(urls)
@@ -193,14 +214,26 @@ public final class LibraryStore: ObservableObject {
             importsInProgress -= plan.jobs.count
             releaseReservations(plan.jobs)
         }
-        let jobs = plan.jobs
-        let existing = existingLibraryFiles()
-        let paths = savePaths
-        let importer = importer
-        let staged = try await Task.detached(priority: .userInitiated) {
-            try Self.stage(jobs, existing: existing, paths: paths, importer: importer)
-        }.value
-        return try commit(staged, unsupported: plan.unsupported)
+        let previous = lastImportBatch
+        let batch = Task { () async throws -> LibraryImportSummary in
+            await previous?.value
+            let jobs = plan.jobs
+            // Read after the previous batch committed, so its rows count as existing.
+            let existing = self.existingLibraryFiles()
+            let paths = self.savePaths
+            let importer = self.importer
+            let staged = await Task.detached(priority: .userInitiated) {
+                Self.stage(jobs, existing: existing, paths: paths, importer: importer)
+            }.value
+            return try self.commit(staged, plan: plan)
+        }
+        lastImportBatch = Task { _ = await batch.result }
+        let summary = try await batch.value
+        if !plan.inGamesFolder.isEmpty {
+            // Picks already in Games/ were not copied; the scan gives any new one its row.
+            await reconcileWithGamesFolder()
+        }
+        return summary
     }
 
     struct ImportJob: Sendable {
@@ -208,6 +241,14 @@ public final class LibraryStore: ObservableObject {
         let originalName: String
         let destinationName: String
         let fileExtension: String
+    }
+
+    struct ImportPlan: Sendable {
+        var jobs: [ImportJob] = []
+        var unsupported: [String] = []
+        /// Picks that already are top-level files in Games/ (Files → RetroPlay → Games). They are
+        /// never copied next to themselves; the folder scan owns them.
+        var inGamesFolder: [String] = []
     }
 
     struct ExistingFile: Sendable {
@@ -218,13 +259,14 @@ public final class LibraryStore: ObservableObject {
     enum StagedFile: Sendable {
         case added(LibraryGame, URL)
         case duplicate(String)
+        case failed(LibraryImportFailure)
     }
 
     /// Picks each destination name on the main actor and reserves it.
-    private func planImport(_ urls: [URL]) -> (jobs: [ImportJob], unsupported: [String]) {
-        var jobs: [ImportJob] = []
-        var unsupported: [String] = []
+    private func planImport(_ urls: [URL]) -> ImportPlan {
+        var plan = ImportPlan()
         var taken = takenBaseNames()
+        let gamesFolder = Self.resolvedPath(of: gamesDirectoryURL)
         for url in urls {
             let ext = url.pathExtension.lowercased()
             let originalName = url.lastPathComponent
@@ -232,20 +274,30 @@ public final class LibraryStore: ObservableObject {
                   importer.classify(fileExtension: ext) != nil,
                   SavePaths.isSafeFileName(originalName)
             else {
-                unsupported.append(originalName)
+                plan.unsupported.append(originalName)
+                continue
+            }
+            if Self.resolvedPath(of: url.deletingLastPathComponent()) == gamesFolder {
+                plan.inGamesFolder.append(originalName)
                 continue
             }
             let name = Self.uniqueFileName(for: originalName, takenBaseNames: taken)
             taken.insert(GameArtifactCleanup.baseName(of: name))
             reservedFileNames.insert(name)
-            jobs.append(ImportJob(
+            plan.jobs.append(ImportJob(
                 source: url,
                 originalName: originalName,
                 destinationName: name,
                 fileExtension: ext
             ))
         }
-        return (jobs, unsupported)
+        return plan
+    }
+
+    /// Absolute path with `..` and symlinks resolved (the picker may hand back `/private/var/…`
+    /// for a sandbox folder this app knows as `/var/…`).
+    nonisolated static func resolvedPath(of url: URL) -> String {
+        url.standardizedFileURL.resolvingSymlinksInPath().path
     }
 
     private func releaseReservations(_ jobs: [ImportJob]) {
@@ -287,28 +339,52 @@ public final class LibraryStore: ObservableObject {
         return candidate
     }
 
-    /// Off-main work: duplicate check, copy, product ID, cover. Rolls back its own copies on error.
+    /// Off-main work, one file at a time: duplicate check, copy, product ID, cover. A file that
+    /// cannot be read or copied becomes `.failed` and leaves nothing behind; the others go on.
+    /// Each copied file joins the duplicate check, so a game picked twice is added once.
     nonisolated static func stage(
         _ jobs: [ImportJob],
         existing: [ExistingFile],
         paths: SavePaths,
         importer: ROMImporter
-    ) throws -> [StagedFile] {
+    ) -> [StagedFile] {
         let fileManager = FileManager.default
         let covers = CoverArtStore(fileManager: fileManager, paths: paths)
+        var known = existing
         var staged: [StagedFile] = []
-        do {
-            for job in jobs {
-                let accessed = job.source.startAccessingSecurityScopedResource()
-                defer {
-                    if accessed {
-                        job.source.stopAccessingSecurityScopedResource()
-                    }
-                }
+        for job in jobs {
+            let result = stageFile(job, known: known, paths: paths, importer: importer, fileManager: fileManager)
+            if case .added(let entry, let destination) = result {
+                known.append(ExistingFile(url: destination, name: job.destinationName))
+                _ = try? covers.installFromGameFile(
+                    gameID: entry.id,
+                    fileURL: destination,
+                    system: entry.systemID
+                )
+            }
+            staged.append(result)
+        }
+        return staged
+    }
 
-                if isDuplicate(job, of: existing, fileManager: fileManager) {
-                    staged.append(.duplicate(job.originalName))
-                    continue
+    nonisolated private static func stageFile(
+        _ job: ImportJob,
+        known: [ExistingFile],
+        paths: SavePaths,
+        importer: ROMImporter,
+        fileManager: FileManager
+    ) -> StagedFile {
+        let accessed = job.source.startAccessingSecurityScopedResource()
+        defer {
+            if accessed {
+                job.source.stopAccessingSecurityScopedResource()
+            }
+        }
+        do {
+            // A coordinated read makes iCloud Drive download a placeholder before it is read.
+            return try coordinatedRead(of: job.source) { source -> StagedFile in
+                if Self.isDuplicate(source, originalName: job.originalName, of: known) {
+                    return .duplicate(job.originalName)
                 }
 
                 let destination = paths.gamesDirectory.appendingPathComponent(job.destinationName)
@@ -316,37 +392,46 @@ public final class LibraryStore: ObservableObject {
                 let temporary = paths.gamesDirectory
                     .appendingPathComponent(".importing-\(UUID().uuidString)-\(job.destinationName)")
                 do {
-                    try fileManager.copyItem(at: job.source, to: temporary)
+                    try fileManager.copyItem(at: source, to: temporary)
                     try fileManager.moveItem(at: temporary, to: destination)
                 } catch {
                     try? fileManager.removeItem(at: temporary)
                     throw error
                 }
 
-                let entry: LibraryGame
                 do {
-                    entry = try importer.makeLibraryEntry(
+                    let entry = try importer.makeLibraryEntry(
                         originalFileName: job.originalName,
                         sandboxRelativePath: job.destinationName,
                         fileExtension: job.fileExtension,
                         sandboxFileURL: destination
                     )
+                    return .added(entry, destination)
                 } catch {
                     try? fileManager.removeItem(at: destination)
                     throw error
                 }
-                staged.append(.added(entry, destination))
-                _ = try? covers.installFromGameFile(
-                    gameID: entry.id,
-                    fileURL: destination,
-                    system: entry.systemID
-                )
             }
-            return staged
         } catch {
-            rollBack(staged, paths: paths)
-            throw error
+            return .failed(LibraryImportFailure(fileName: job.originalName, reason: error.localizedDescription))
         }
+    }
+
+    /// Runs `body` inside an `NSFileCoordinator` read of `url`, passing the URL to read from.
+    nonisolated static func coordinatedRead<T>(of url: URL, _ body: (URL) throws -> T) throws -> T {
+        var coordinationError: NSError?
+        var outcome: Result<T, Error>?
+        NSFileCoordinator(filePresenter: nil).coordinate(
+            readingItemAt: url,
+            options: [],
+            error: &coordinationError
+        ) { readURL in
+            outcome = Result { try body(readURL) }
+        }
+        if let outcome {
+            return try outcome.get()
+        }
+        throw coordinationError ?? CocoaError(.fileReadUnknown)
     }
 
     nonisolated private static func rollBack(_ staged: [StagedFile], paths: SavePaths) {
@@ -358,9 +443,10 @@ public final class LibraryStore: ObservableObject {
         }
     }
 
-    private func commit(_ staged: [StagedFile], unsupported: [String]) throws -> LibraryImportSummary {
+    private func commit(_ staged: [StagedFile], plan: ImportPlan) throws -> LibraryImportSummary {
         var summary = LibraryImportSummary()
-        summary.unsupported = unsupported
+        summary.unsupported = plan.unsupported
+        summary.duplicates = plan.inGamesFolder
         for item in staged {
             switch item {
             case .added(let entry, _):
@@ -368,6 +454,8 @@ public final class LibraryStore: ObservableObject {
                 summary.added.append(entry)
             case .duplicate(let name):
                 summary.duplicates.append(name)
+            case .failed(let failure):
+                summary.failed.append(failure)
             }
         }
         guard !summary.added.isEmpty else { return summary }
@@ -385,14 +473,14 @@ public final class LibraryStore: ObservableObject {
     // MARK: - Duplicate detection
 
     /// Same size and name as a library file, or same size and same first/last 64 KB.
-    nonisolated static func isDuplicate(_ job: ImportJob, of existing: [ExistingFile], fileManager: FileManager) -> Bool {
-        guard let size = fileSize(job.source) else { return false }
+    nonisolated static func isDuplicate(_ source: URL, originalName: String, of existing: [ExistingFile]) -> Bool {
+        guard let size = fileSize(source) else { return false }
         var sourcePrint: Data?
         for file in existing {
             guard fileSize(file.url) == size else { continue }
-            if file.name == job.originalName { return true }
+            if file.name == originalName { return true }
             if sourcePrint == nil {
-                sourcePrint = fingerprint(of: job.source)
+                sourcePrint = fingerprint(of: source)
                 if sourcePrint == nil { return false }
             }
             if fingerprint(of: file.url) == sourcePrint { return true }

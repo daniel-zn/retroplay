@@ -29,6 +29,10 @@ public struct RetroPlayRootView: View {
     @State private var showLibraryLoadError = false
     @State private var importNotice: String?
     @State private var showImportNotice = false
+    /// Import results that came in while a game was open; shown once it closes.
+    @State private var pendingImportResults: [ImportResultAlert] = []
+    /// Settings → Import Games…: open the picker once the Settings sheet is gone.
+    @State private var importAfterSettingsDismiss = false
     @State private var missingGame: LibraryGame?
     @State private var showMissingGame = false
     @Environment(\.colorScheme) private var colorScheme
@@ -165,10 +169,16 @@ public struct RetroPlayRootView: View {
         }
         // Back from a game (it auto-saved) or the library changed: refresh "last played".
         .onChange(of: playGame) { _, game in
-            if game == nil { refreshActivity() }
+            if game == nil {
+                refreshActivity()
+                showPendingImportResults()
+            }
         }
         .onChange(of: searchPlayGame) { _, game in
-            if game == nil { refreshActivity() }
+            if game == nil {
+                refreshActivity()
+                showPendingImportResults()
+            }
         }
         .onChange(of: store.games) { _, _ in
             refreshActivity()
@@ -199,14 +209,20 @@ public struct RetroPlayRootView: View {
         ) { result in
             handleImport(result)
         }
-        .sheet(isPresented: $showSettings) {
+        .sheet(isPresented: $showSettings, onDismiss: {
+            // Presenting the picker in the same update that dismisses the sheet can drop it.
+            if importAfterSettingsDismiss {
+                importAfterSettingsDismiss = false
+                showImporter = true
+            }
+        }) {
             SettingsView(
                 appearanceRaw: $appearanceRaw,
                 gameCounts: tabCounts,
                 storageDirectories: store.storageDirectoryURLs,
                 onImport: {
+                    importAfterSettingsDismiss = true
                     showSettings = false
-                    showImporter = true
                 }
             )
         }
@@ -505,8 +521,7 @@ public struct RetroPlayRootView: View {
     private func handleImport(_ result: Result<[URL], Error>) {
         switch result {
         case .failure(let error):
-            importErrorMessage = error.localizedDescription
-            showImportError = true
+            presentImportResult(.error(error.localizedDescription))
         case .success(let urls):
             // Copies run off the main actor; the toolbar shows progress until rows appear.
             Task {
@@ -520,32 +535,99 @@ public struct RetroPlayRootView: View {
                     } else if systems.count > 1 {
                         systemTab = .all
                     }
-                    var notices: [String] = []
-                    if !summary.duplicates.isEmpty {
-                        let names = summary.duplicates.joined(separator: ", ")
-                        notices.append(summary.duplicates.count == 1
-                            ? "\(names) is already in your library, so it was not copied again."
-                            : "These are already in your library, so they were not copied again: \(names).")
-                    }
-                    if !summary.unsupported.isEmpty, !summary.added.isEmpty || !summary.duplicates.isEmpty {
-                        let names = summary.unsupported.joined(separator: ", ")
-                        notices.append(summary.unsupported.count == 1
-                            ? "\(names) was skipped: RetroPlay plays Game Boy Advance, Nintendo 64, Nintendo DS and PSP games."
-                            : "These were skipped because RetroPlay plays Game Boy Advance, Nintendo 64, Nintendo DS and PSP games: \(names).")
-                    }
+                    let notices = Self.importNotices(for: summary)
                     if !notices.isEmpty {
-                        importNotice = notices.joined(separator: "\n\n")
-                        showImportNotice = true
+                        presentImportResult(.notice(notices.joined(separator: "\n\n")))
                     } else if summary.added.isEmpty, !urls.isEmpty {
-                        importErrorMessage = "No supported games in the selection. RetroPlay imports .gba, .z64/.n64/.v64, .nds and .iso/.cso/.chd/.pbp files — unzip archives first."
-                        showImportError = true
+                        presentImportResult(.error(
+                            "No supported games in the selection. RetroPlay imports .gba, .z64/.n64/.v64, .nds and .iso/.cso/.chd/.pbp files — unzip archives first."
+                        ))
                     }
                 } catch {
-                    importErrorMessage = error.localizedDescription
-                    showImportError = true
+                    presentImportResult(.error(error.localizedDescription))
                 }
             }
         }
+    }
+
+    /// What to tell the player about files that were not added. Empty when everything went in.
+    private static func importNotices(for summary: LibraryImportSummary) -> [String] {
+        var notices: [String] = []
+        if let failure = summary.failed.first, summary.failed.count == 1 {
+            notices.append("\(failure.fileName) could not be imported. \(failure.reason)")
+        } else if !summary.failed.isEmpty {
+            let names = nameList(summary.failed.map(\.fileName))
+            notices.append("These could not be imported: \(names). Make sure they are downloaded and readable, then try again.")
+        }
+        if !summary.duplicates.isEmpty {
+            let names = nameList(summary.duplicates)
+            notices.append(summary.duplicates.count == 1
+                ? "\(names) is already in your library, so it was not copied again."
+                : "These are already in your library, so they were not copied again: \(names).")
+        }
+        if !summary.unsupported.isEmpty,
+           !summary.added.isEmpty || !summary.duplicates.isEmpty || !summary.failed.isEmpty {
+            let names = nameList(summary.unsupported)
+            notices.append(summary.unsupported.count == 1
+                ? "\(names) was skipped: RetroPlay plays Game Boy Advance, Nintendo 64, Nintendo DS and PSP games."
+                : "These were skipped because RetroPlay plays Game Boy Advance, Nintendo 64, Nintendo DS and PSP games: \(names).")
+        }
+        return notices
+    }
+
+    /// "A, B, C" — or the first few and "and N more", so a big pick cannot make the alert huge.
+    private static func nameList(_ names: [String], limit: Int = 5) -> String {
+        guard names.count > limit else { return names.joined(separator: ", ") }
+        return names.prefix(limit).joined(separator: ", ") + ", and \(names.count - limit) more"
+    }
+
+    /// The alert would cover a running game and block its controls, so a result that comes in
+    /// mid-game waits until the player is back in the library.
+    private func presentImportResult(_ result: ImportResultAlert) {
+        if playGame != nil || searchPlayGame != nil {
+            pendingImportResults.append(result)
+        } else {
+            show(result)
+        }
+    }
+
+    private func showPendingImportResults() {
+        guard playGame == nil, searchPlayGame == nil, !pendingImportResults.isEmpty else { return }
+        let results = pendingImportResults
+        pendingImportResults = []
+        // Several imports may have finished during one game: show them in one alert.
+        let message = results.map(\.message).joined(separator: "\n\n")
+        show(results.allSatisfy(\.isError) ? .error(message) : .notice(message))
+    }
+
+    private func show(_ result: ImportResultAlert) {
+        switch result {
+        case .notice(let message):
+            importNotice = message
+            showImportNotice = true
+        case .error(let message):
+            importErrorMessage = message
+            showImportError = true
+        }
+    }
+}
+
+/// An import outcome for the "Import" notice or the "Import failed" alert.
+@available(iOS 18.0, *)
+private enum ImportResultAlert {
+    case notice(String)
+    case error(String)
+
+    var message: String {
+        switch self {
+        case .notice(let message), .error(let message):
+            return message
+        }
+    }
+
+    var isError: Bool {
+        if case .error = self { return true }
+        return false
     }
 }
 
