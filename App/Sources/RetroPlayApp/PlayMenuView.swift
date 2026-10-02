@@ -26,16 +26,16 @@ struct PlayMenuView: View {
 
     let onResume: () -> Void
     let onSave: () -> Void
-    /// Tap = latest save; long-press = older saves, Restart from Scratch.
+    /// A save row loads that save; Reset deletes every save state and starts over.
     let onLoadCommand: (PlayLoadCommand) -> Void
     let onImportSave: () -> Void
     let onFastForward: () -> Void
     let onReset: () -> Void
     let onQuit: () -> Void
 
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var confirmReset = false
     @State private var confirmRestart = false
+    @State private var showSaves = false
     @State private var showOptions = false
 
     var body: some View {
@@ -50,18 +50,18 @@ struct PlayMenuView: View {
         }
         .environment(\.colorScheme, .dark)
         .retroPlayAlert(
-            "Reset Game?",
-            message: "Unsaved progress is lost.",
+            "Restart Game?",
+            message: "Unsaved progress is lost. Your saves are kept.",
             isPresented: $confirmReset,
-            actions: [.cancel("Cancel"), .destructive("Reset") { onReset() }]
+            actions: [.cancel("Cancel"), .destructive("Restart") { onReset() }]
         )
         .retroPlayAlert(
-            "Restart from Scratch?",
+            "Reset Game?",
             message: "Every save state for this game is deleted and it starts over. In-game saves are kept.",
             isPresented: $confirmRestart,
             actions: [
                 .cancel("Cancel"),
-                .destructive("Restart") { onLoadCommand(.restartFromScratch) }
+                .destructive("Reset") { onLoadCommand(.restartFromScratch) }
             ]
         )
     }
@@ -88,42 +88,6 @@ struct PlayMenuView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
 
-            // The pixel face is ~1 em per letter, so at accessibility sizes Save and Load
-            // stack instead of squeezing side by side. AnyLayout keeps the UIKit Load control.
-            saveLoadLayout {
-                Button(action: onSave) {
-                    Label("Save", systemImage: "square.and.arrow.down")
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(MenuTileButtonStyle())
-                .disabled(!supportsSaveState || busy)
-                // UIKit button: SwiftUI Menu(primaryAction:) drops its row actions on iOS 26.
-                PlayLoadMenuControlView(
-                    entries: saveEntries,
-                    busy: busy,
-                    onCommand: { command in
-                        // Deletes every save state: confirm first, like Reset.
-                        if command == .restartFromScratch {
-                            confirmRestart = true
-                        } else {
-                            onLoadCommand(command)
-                        }
-                    },
-                    onImport: onImportSave
-                )
-                .frame(maxWidth: .infinity)
-            }
-            .frame(minHeight: MenuTileButtonStyle.height)
-
-            if let latest = saveEntries.first?.modifiedAt {
-                Text("Saved \(latest, format: .relative(presentation: .named)) · hold Load for older saves")
-                    .font(RetroPlayFont.caption2)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-            }
-
             // Quick actions: icon only, state shown by the fill.
             HStack(spacing: 14) {
                 MenuIconButton(
@@ -146,12 +110,14 @@ struct PlayMenuView: View {
                 if supportsReset {
                     MenuIconButton(
                         symbol: "arrow.counterclockwise",
-                        label: "Reset game",
+                        label: "Restart game",
                         tint: .red
                     ) { confirmReset = true }
                 }
             }
             .padding(.vertical, 4)
+
+            savesGroup
 
             DisclosureGroup(isExpanded: $showOptions) {
                 VStack(spacing: 10) {
@@ -211,10 +177,118 @@ struct PlayMenuView: View {
 }
 
 extension PlayMenuView {
-    private var saveLoadLayout: AnyLayout {
-        dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(spacing: 10))
-            : AnyLayout(HStackLayout(spacing: 10))
+    /// Saves dropdown: Save, every save state (newest first), Reset, battery-save import.
+    private var savesGroup: some View {
+        DisclosureGroup(isExpanded: $showSaves) {
+            VStack(spacing: 8) {
+                Button(action: onSave) {
+                    Label(PlaySavesMenuContent.saveTitle, systemImage: "square.and.arrow.down")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(MenuTileButtonStyle())
+                .disabled(!supportsSaveState || busy)
+
+                if saveEntries.isEmpty {
+                    Text(PlaySavesMenuContent.emptyTitle)
+                        .font(RetroPlayFont.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                } else {
+                    ForEach(saveEntries) { entry in
+                        Button {
+                            onLoadCommand(.loadEntry(entry))
+                        } label: {
+                            SaveRowLabel(entry: entry)
+                        }
+                        .buttonStyle(SaveRowButtonStyle())
+                        .disabled(!supportsSaveState || busy)
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    Button {
+                        confirmRestart = true
+                    } label: {
+                        Label(PlaySavesMenuContent.resetTitle, systemImage: "arrow.counterclockwise")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MenuTileButtonStyle(foreground: .red))
+                    .disabled(busy)
+                    Button(action: onImportSave) {
+                        Label("Import", systemImage: "square.and.arrow.down.on.square")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MenuTileButtonStyle())
+                    .accessibilityLabel(PlaySavesMenuContent.importTitle)
+                }
+            }
+            .padding(.top, 8)
+        } label: {
+            Label(PlaySavesMenuContent.title, systemImage: "tray.full")
+                .foregroundStyle(.white)
+        }
+        .font(RetroPlayFont.subheadline)
+        .padding(.horizontal, 4)
+    }
+}
+
+/// One save state: its name and when it was made.
+@available(iOS 18.0, *)
+private struct SaveRowLabel: View {
+    let entry: SaveStateStore.Entry
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: entry.slot == 0 ? "clock.fill" : "clock.arrow.circlepath")
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 22)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(PlaySavesMenuContent.name(for: entry))
+                    .font(RetroPlayFont.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                if let date = entry.modifiedAt {
+                    Text(date, format: .dateTime.month(.abbreviated).day().hour().minute())
+                        .font(RetroPlayFont.caption2)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.4))
+                .accessibilityHidden(true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Loads this save")
+    }
+}
+
+/// Save row: same glass fill as the tiles, left-aligned, a little shorter.
+@available(iOS 18.0, *)
+private struct SaveRowButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.white.opacity(isEnabled ? 1 : 0.35))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(
+                Color.white.opacity(configuration.isPressed ? 0.22 : 0.08),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

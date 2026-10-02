@@ -280,9 +280,7 @@ final class PlayLoadCommandTests: XCTestCase {
         try Data("older".utf8).write(to: older)
         host.refresh()
 
-        XCTAssertTrue(host.button.invokeMenuAction(
-            identifier: PlayLoadMenuContent.entryIdentifier(slot: 1)
-        ))
+        XCTAssertTrue(host.loadSlot(1))
         await waitUntil { host.statusLine == "Loaded previous save 1" }
 
         XCTAssertEqual(host.coreRecorder.loadedURL, older)
@@ -292,7 +290,7 @@ final class PlayLoadCommandTests: XCTestCase {
     }
 
     @MainActor
-    func testPrimaryTapQuickLoadsLatestSave() async throws {
+    func testQuickLoadLoadsLatestSave() async throws {
         let (paths, cleanup) = try makeSandboxPaths()
         defer { cleanup() }
         let host = try makeHost(paths: paths)
@@ -300,7 +298,7 @@ final class PlayLoadCommandTests: XCTestCase {
         try Data("latest".utf8).write(to: latest)
         host.refresh()
 
-        host.button.invokePrimaryTap()
+        host.submit(.quickLoad)
         await waitUntil { host.statusLine == "Quick load OK" }
 
         XCTAssertEqual(host.coreRecorder.loadedURL, latest)
@@ -316,11 +314,11 @@ final class PlayLoadCommandTests: XCTestCase {
         try Data("state".utf8).write(to: quick)
         host.refresh()
 
-        XCTAssertTrue(host.button.invokeMenuAction(identifier: PlayLoadMenuContent.restartIdentifier))
+        host.submit(.restartFromScratch)
         await waitUntil { host.bootCount == 1 }
 
         XCTAssertTrue(host.coreRecorder.stopCalled)
-        XCTAssertEqual(host.statusLine, "Restarting from scratch…")
+        XCTAssertEqual(host.statusLine, "Resetting…")
         XCTAssertTrue(SaveStateStore.entries(system: .psp, gameID: host.gameID, paths: paths).isEmpty)
         XCTAssertFalse(host.saveBusy)
     }
@@ -335,9 +333,7 @@ final class PlayLoadCommandTests: XCTestCase {
         host.refresh()
         try FileManager.default.removeItem(at: latest)
 
-        XCTAssertTrue(host.button.invokeMenuAction(
-            identifier: PlayLoadMenuContent.entryIdentifier(slot: 0)
-        ))
+        XCTAssertTrue(host.loadSlot(0))
         await waitUntil { host.alerts.isEmpty == false }
 
         XCTAssertEqual(host.alerts, [PlayLoadReducer.missingSaveMessage()])
@@ -356,9 +352,7 @@ final class PlayLoadCommandTests: XCTestCase {
         host.refresh()
         host.coreRecorder.loadError = EmulatorCoreError.romLoadFailed("corrupt state")
 
-        XCTAssertTrue(host.button.invokeMenuAction(
-            identifier: PlayLoadMenuContent.entryIdentifier(slot: 0)
-        ))
+        XCTAssertTrue(host.loadSlot(0))
         await waitUntil { host.alerts.isEmpty == false }
 
         XCTAssertEqual(host.alerts, ["corrupt state"])
@@ -403,61 +397,44 @@ final class PlayLoadCommandTests: XCTestCase {
         let host = try makeHost(paths: paths)
         host.core = nil
 
-        XCTAssertTrue(host.button.invokeMenuAction(identifier: PlayLoadMenuContent.restartIdentifier))
+        host.submit(.restartFromScratch)
         await waitUntil { host.statusLine == "Game is not running" }
         XCTAssertEqual(host.bootCount, 0)
         XCTAssertFalse(host.coreRecorder.stopCalled)
 
         host.core = host.coreRecorder
         host.saveBusy = true
-        host.button.invokeMenuAction(identifier: PlayLoadMenuContent.restartIdentifier)
+        host.submit(.restartFromScratch)
         await waitUntil { host.statusLine == "Wait for save/load to finish" }
         XCTAssertEqual(host.bootCount, 0)
 
         host.saveBusy = false
-        host.button.invokePrimaryTap()
+        host.submit(.quickLoad)
         await waitUntil { host.statusLine == "No save state yet" }
 
         let latest = try SaveStateStore.quickSaveURL(system: .gba, gameID: host.gameID, paths: paths)
         try Data("latest".utf8).write(to: latest)
         host.coreRecorder.supportsSaveState = false
-        host.button.invokePrimaryTap()
+        host.submit(.quickLoad)
         await waitUntil { host.statusLine == "Save states not available" }
         XCTAssertFalse(host.coreRecorder.loadStateCalled)
     }
 
     @MainActor
-    func testImportMenuActionIsSeparateFromLoad() async throws {
-        let (paths, cleanup) = try makeSandboxPaths()
-        defer { cleanup() }
-        let host = try makeHost(paths: paths)
-
-        XCTAssertTrue(host.button.invokeMenuAction(identifier: PlayLoadMenuContent.importIdentifier))
-        XCTAssertTrue(host.imported)
-        XCTAssertFalse(host.coreRecorder.loadStateCalled)
-        XCTAssertEqual(host.bootCount, 0)
-        XCTAssertEqual(host.statusLine, "")
-    }
-
-    @MainActor
-    func testEmptySaveRowIsDisabledAndRestartStillRuns() async throws {
+    func testResetRunsWithNoSaves() async throws {
         let (paths, cleanup) = try makeSandboxPaths()
         defer { cleanup() }
         let host = try makeHost(paths: paths)
         host.refresh()
 
-        XCTAssertEqual(
-            host.button.menuActionAttributes(identifier: PlayLoadMenuContent.emptyIdentifier),
-            .disabled
-        )
-        XCTAssertFalse(host.button.invokeMenuAction(identifier: PlayLoadMenuContent.emptyIdentifier))
-        XCTAssertTrue(host.button.invokeMenuAction(identifier: PlayLoadMenuContent.restartIdentifier))
+        XCTAssertTrue(host.entries.isEmpty)
+        host.submit(.restartFromScratch)
         await waitUntil { host.bootCount == 1 }
         XCTAssertTrue(host.coreRecorder.stopCalled)
     }
 
     @MainActor
-    func testMenuRebuildDoesNotCancelAnAcceptedLoad() async throws {
+    func testEntriesChangingDoesNotCancelAnAcceptedLoad() async throws {
         let (paths, cleanup) = try makeSandboxPaths()
         defer { cleanup() }
         let host = try makeHost(paths: paths)
@@ -466,9 +443,7 @@ final class PlayLoadCommandTests: XCTestCase {
         host.refresh()
         host.coreRecorder.holdNanoseconds = 250_000_000
 
-        XCTAssertTrue(host.button.invokeMenuAction(
-            identifier: PlayLoadMenuContent.entryIdentifier(slot: 0)
-        ))
+        XCTAssertTrue(host.loadSlot(0))
         await waitUntil { host.coreRecorder.loadStateCalled }
         var rebuilt = host.entries
         rebuilt.append(
@@ -478,8 +453,7 @@ final class PlayLoadCommandTests: XCTestCase {
                 modifiedAt: nil
             )
         )
-        host.button.setEntries(rebuilt)
-        host.button.onCommand = { host.submit($0) }
+        host.entries = rebuilt
 
         await waitUntil { host.statusLine == "Quick load OK" }
         XCTAssertEqual(host.coreRecorder.loadedURL, latest)
@@ -494,7 +468,7 @@ final class PlayLoadCommandTests: XCTestCase {
         host.refresh()
 
         let parent = Task { @MainActor in
-            XCTAssertTrue(host.button.invokeMenuAction(identifier: PlayLoadMenuContent.restartIdentifier))
+            host.submit(.restartFromScratch)
         }
         await parent.value
         parent.cancel()
@@ -502,7 +476,7 @@ final class PlayLoadCommandTests: XCTestCase {
 
         XCTAssertEqual(host.bootCount, 1)
         XCTAssertTrue(host.coreRecorder.stopCalled)
-        XCTAssertEqual(host.statusLine, "Restarting from scratch…")
+        XCTAssertEqual(host.statusLine, "Resetting…")
     }
 
     @MainActor
@@ -515,9 +489,7 @@ final class PlayLoadCommandTests: XCTestCase {
         host.refresh()
         host.coreRecorder.holdNanoseconds = 800_000_000
 
-        XCTAssertTrue(host.button.invokeMenuAction(
-            identifier: PlayLoadMenuContent.entryIdentifier(slot: 0)
-        ))
+        XCTAssertTrue(host.loadSlot(0))
         await waitUntil { host.coreRecorder.loadStateCalled }
         host.coordinator.cancel()
         host.coordinatorCancelCount += 1
@@ -537,7 +509,7 @@ final class PlayLoadCommandTests: XCTestCase {
         host.refresh()
         host.delayBoot = true
 
-        XCTAssertTrue(host.button.invokeMenuAction(identifier: PlayLoadMenuContent.restartIdentifier))
+        host.submit(.restartFromScratch)
         await waitUntil { host.bootStarted }
         host.coordinator.cancel()
         await waitUntil { host.saveBusy == false }
@@ -643,7 +615,6 @@ private final class LoadRecordingCore: TestEmulatorCore, @unchecked Sendable {
 
 @MainActor
 private final class PlayLoadHarness {
-    let button = PlayLoadMenuButton()
     let coordinator = PlayLoadActionCoordinator()
     let paths: SavePaths
     let system: SystemID
@@ -657,7 +628,6 @@ private final class PlayLoadHarness {
     var bootCount = 0
     var bootStarted = false
     var delayBoot = false
-    var imported = false
     var coordinatorCancelCount = 0
 
     init(paths: SavePaths, system: SystemID) {
@@ -665,17 +635,17 @@ private final class PlayLoadHarness {
         self.system = system
         coreRecorder = LoadRecordingCore(systemID: system)
         core = coreRecorder
-        button.onCommand = { [weak self] command in
-            self?.submit(command)
-        }
-        button.onImportSave = { [weak self] in
-            self?.imported = true
-        }
     }
 
     func refresh() {
         entries = SaveStateStore.resolvedEntries(system: system, gameID: gameID, paths: paths)
-        button.setEntries(entries)
+    }
+
+    /// A Saves-menu row: loads the save in `slot`, if the menu lists one.
+    func loadSlot(_ slot: Int) -> Bool {
+        guard let entry = entries.first(where: { $0.slot == slot }) else { return false }
+        submit(.loadEntry(entry))
+        return true
     }
 
     func submit(_ command: PlayLoadCommand) {
@@ -727,5 +697,14 @@ private final class PlayLoadHarness {
         }
         bootCount += 1
         core = nil
+    }
+}
+
+final class PlaySavesMenuContentTests: XCTestCase {
+    func testSaveRowNames() {
+        let url = URL(fileURLWithPath: "/tmp/quick.state")
+        XCTAssertEqual(PlaySavesMenuContent.name(for: .init(slot: 0, url: url, modifiedAt: nil)), "Latest Save")
+        XCTAssertEqual(PlaySavesMenuContent.name(for: .init(slot: 3, url: url, modifiedAt: nil)), "Previous Save 3")
+        XCTAssertEqual(PlaySavesMenuContent.resetTitle, "Reset")
     }
 }

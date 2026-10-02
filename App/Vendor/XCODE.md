@@ -25,6 +25,6 @@ Tests: `xcodebuild test -project RetroPlay.xcodeproj -scheme RetroPlay -destinat
 ## Save states and fast-forward
 
 - Quick saves live under `Documents/States/<system>/<game UUID>/`: `quick.state` is the latest and
-  `quick-1.state` … `quick-4.state` are older ones (long-press Load). Restart from Scratch removes them.
+  `quick-1.state` … `quick-4.state` are older ones (pause menu → Saves). Saves → Reset removes them.
 - Save and load run on the emulation thread between frames.
 - Fast-forward runs three emulated frames per tick (`docs/PLAY-RUNTIME.md`).

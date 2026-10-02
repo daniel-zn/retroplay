@@ -255,7 +255,7 @@ public struct PlayView: View {
                 .frame(width: screenWidth, height: screenHeight)
                 .frame(maxWidth: .infinity)
             // Own row, so menu / fast-forward never sit inside a pad control's touch area.
-            quickButtons(scale: scale)
+            quickButtons()
                 .frame(height: barHeight)
             ZStack {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -323,7 +323,8 @@ public struct PlayView: View {
                         pad.rightShoulders
                             .opacity(padOpacity)
                         // Beyond R's 14 pt touch slop, so pause / fast-forward taps reach the buttons.
-                        quickButtons(scale: scale)
+                        quickButtons(maxWidth: pad.landscapeColumnWidth)
+                            .frame(width: pad.landscapeColumnWidth)
                             .opacity(chromeOpacity)
                             .padding(.top, 18)
                         Spacer(minLength: 6)
@@ -345,7 +346,7 @@ public struct PlayView: View {
                 controllerConnectedNote
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 8)
-                quickButtons(scale: scale)
+                quickButtons()
                     .opacity(chromeOpacity)
                     .frame(maxHeight: .infinity, alignment: .top)
                     .padding(.top, 4)
@@ -380,29 +381,40 @@ public struct PlayView: View {
         .accessibilityLabel("\(game.displayName) screen")
     }
 
-    /// Menu + fast-forward, reachable without covering the game.
-    private func quickButtons(scale: CGFloat) -> some View {
-        HStack(spacing: 10) {
-            chromeButton(fastForward ? "forward.fill" : "forward", tint: fastForward ? .orange : .white) {
+    /// Save, fast-forward and pause: one size, centred, reachable without covering the game.
+    /// `maxWidth` is the room they get (a landscape control column); they shrink to fit it.
+    private func quickButtons(maxWidth: CGFloat = .infinity) -> some View {
+        let spacing: CGFloat = 10
+        let width = min(48, (maxWidth - 2 * spacing) / 3)
+        return HStack(spacing: spacing) {
+            chromeButton("square.and.arrow.down", tint: .white, width: width) {
+                Task { await quickSave() }
+            }
+            .disabled(!(core?.supportsSaveState ?? false) || busy)
+            .accessibilityLabel("Save state")
+            chromeButton("forward.fill", tint: fastForward ? .black : .white, width: width,
+                         fill: fastForward ? .orange : nil) {
                 setFastForward(!fastForward)
             }
             .accessibilityLabel(fastForward ? "Fast forward on" : "Fast forward off")
-            chromeButton("pause.fill", tint: .white) {
+            chromeButton("pause.fill", tint: .white, width: width) {
                 menuOpen = true
             }
             .accessibilityLabel("Pause menu")
         }
+        .frame(maxWidth: .infinity)
         .disabled(core == nil || phase != .running)
     }
 
-    private func chromeButton(_ symbol: String, tint: Color, action: @escaping () -> Void) -> some View {
+    private func chromeButton(
+        _ symbol: String,
+        tint: Color,
+        width: CGFloat,
+        fill: Color? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 44, height: 32)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
+            ChromeButtonLabel(symbol: symbol, tint: tint, width: width, fill: fill)
         }
         .buttonStyle(.plain)
     }
@@ -624,7 +636,7 @@ public struct PlayView: View {
         }
     }
 
-    /// Restart from Scratch: states are already deleted; boot again without auto-resume.
+    /// Reset (Saves menu): states are already deleted; boot again without auto-resume.
     private func restartFromScratch() async {
         menuOpen = false
         await reboot(autoResume: false)
@@ -1007,5 +1019,31 @@ private final class BackgroundTask {
         guard id != .invalid else { return }
         UIApplication.shared.endBackgroundTask(id)
         id = .invalid
+    }
+}
+
+/// One in-game chrome button: a glass capsule, or filled when the button is on.
+@available(iOS 18.0, *)
+private struct ChromeButtonLabel: View {
+    let symbol: String
+    let tint: Color
+    let width: CGFloat
+    let fill: Color?
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(tint.opacity(isEnabled ? 1 : 0.4))
+            .frame(width: width, height: 32)
+            .background {
+                if let fill {
+                    Capsule().fill(fill)
+                } else {
+                    Capsule().fill(.ultraThinMaterial)
+                }
+            }
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
+            .contentShape(Capsule())
     }
 }
