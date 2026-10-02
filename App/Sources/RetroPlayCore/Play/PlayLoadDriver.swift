@@ -4,7 +4,6 @@ import Foundation
 /// Names shown in the pause menu's Saves dropdown.
 public enum PlaySavesMenuContent {
     public static let title = "Saves"
-    public static let saveTitle = "Save"
     public static let resetTitle = "Reset"
     public static let importTitle = "Import Battery Save…"
     public static let emptyTitle = "No saves yet"

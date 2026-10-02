@@ -8,16 +8,13 @@ struct PlayMenuView: View {
     let title: String
     let systemName: String
     let supportsSaveState: Bool
-    let supportsReset: Bool
     /// Newest first; slot 0 is the latest save.
     let saveEntries: [SaveStateStore.Entry]
     let busy: Bool
     /// Quit was chosen and the exit save is running: the menu is locked and says so.
     let leaving: Bool
-    let fastForward: Bool
     let hasController: Bool
 
-    @Binding var soundOn: Bool
     @Binding var haptics: Bool
     @Binding var padOpacity: Double
     @Binding var smoothScreen: Bool
@@ -29,11 +26,8 @@ struct PlayMenuView: View {
     /// A save row loads that save; Reset deletes every save state and starts over.
     let onLoadCommand: (PlayLoadCommand) -> Void
     let onImportSave: () -> Void
-    let onFastForward: () -> Void
-    let onReset: () -> Void
     let onQuit: () -> Void
 
-    @State private var confirmReset = false
     @State private var confirmRestart = false
     @State private var showSaves = false
     @State private var showOptions = false
@@ -49,12 +43,6 @@ struct PlayMenuView: View {
             .frame(maxWidth: 380)
         }
         .environment(\.colorScheme, .dark)
-        .retroPlayAlert(
-            "Restart Game?",
-            message: "Unsaved progress is lost. Your saves are kept.",
-            isPresented: $confirmReset,
-            actions: [.cancel("Cancel"), .destructive("Restart") { onReset() }]
-        )
         .retroPlayAlert(
             "Reset Game?",
             message: "Every save state for this game is deleted and it starts over. In-game saves are kept.",
@@ -88,32 +76,18 @@ struct PlayMenuView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
 
-            // Quick actions: icon only, state shown by the fill.
+            // Quick actions: icon only.
             HStack(spacing: 14) {
                 MenuIconButton(
-                    symbol: "forward.fill",
-                    label: fastForward ? "Normal speed" : "Fast forward",
-                    active: fastForward,
-                    activeColor: .orange,
-                    action: onFastForward
+                    symbol: "square.and.arrow.down",
+                    label: "Save state",
+                    action: onSave
                 )
-                MenuIconButton(
-                    symbol: soundOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
-                    label: soundOn ? "Sound on" : "Sound off",
-                    active: soundOn,
-                    activeColor: RetroPlayTheme.accent
-                ) { soundOn.toggle() }
+                .disabled(!supportsSaveState || busy)
                 AirPlayRoutePicker()
                     .frame(width: MenuIconButton.size, height: MenuIconButton.size)
                     .background(Color.white.opacity(0.12), in: Circle())
                     .accessibilityLabel("AirPlay display")
-                if supportsReset {
-                    MenuIconButton(
-                        symbol: "arrow.counterclockwise",
-                        label: "Restart game",
-                        tint: .red
-                    ) { confirmReset = true }
-                }
             }
             .padding(.vertical, 4)
 
@@ -177,19 +151,10 @@ struct PlayMenuView: View {
 }
 
 extension PlayMenuView {
-    /// Saves dropdown: Save, every save state (newest first), Reset, battery-save import.
+    /// Saves dropdown: every save state (newest first), Reset, battery-save import.
     private var savesGroup: some View {
         DisclosureGroup(isExpanded: $showSaves) {
             VStack(spacing: 8) {
-                Button(action: onSave) {
-                    Label(PlaySavesMenuContent.saveTitle, systemImage: "square.and.arrow.down")
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(MenuTileButtonStyle())
-                .disabled(!supportsSaveState || busy)
-
                 if saveEntries.isEmpty {
                     Text(PlaySavesMenuContent.emptyTitle)
                         .font(RetroPlayFont.caption)
@@ -323,6 +288,7 @@ struct MenuIconButton: View {
     var activeColor: Color = RetroPlayTheme.accent
     var tint: Color = .white
     let action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         Button(action: action) {
@@ -332,6 +298,7 @@ struct MenuIconButton: View {
                 .frame(width: Self.size, height: Self.size)
                 .background(active ? activeColor : Color.white.opacity(0.12), in: Circle())
                 .contentShape(Circle())
+                .opacity(isEnabled ? 1 : 0.4)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

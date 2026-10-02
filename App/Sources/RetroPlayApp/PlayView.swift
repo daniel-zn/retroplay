@@ -381,11 +381,11 @@ public struct PlayView: View {
         .accessibilityLabel("\(game.displayName) screen")
     }
 
-    /// Save, fast-forward and pause: one size, centred, reachable without covering the game.
+    /// Save, fast-forward, pause and sound: one size, centred, reachable without covering the game.
     /// `maxWidth` is the room they get (a landscape control column); they shrink to fit it.
     private func quickButtons(maxWidth: CGFloat = .infinity) -> some View {
-        let spacing: CGFloat = 10
-        let width = min(48, (maxWidth - 2 * spacing) / 3)
+        let spacing: CGFloat = maxWidth.isFinite ? 6 : 10
+        let width = min(48, (maxWidth - 3 * spacing) / 4)
         return HStack(spacing: spacing) {
             chromeButton("square.and.arrow.down", tint: .white, width: width) {
                 Task { await quickSave() }
@@ -401,6 +401,10 @@ public struct PlayView: View {
                 menuOpen = true
             }
             .accessibilityLabel("Pause menu")
+            chromeButton(soundOn ? "speaker.wave.2.fill" : "speaker.slash.fill", tint: .white, width: width) {
+                soundOn.toggle()
+            }
+            .accessibilityLabel(soundOn ? "Sound on" : "Sound off")
         }
         .frame(maxWidth: .infinity)
         .disabled(core == nil || phase != .running)
@@ -519,13 +523,10 @@ public struct PlayView: View {
                 title: game.displayName,
                 systemName: system.displayName,
                 supportsSaveState: core?.supportsSaveState ?? false,
-                supportsReset: core?.supportsReset ?? false,
                 saveEntries: saveEntries,
                 busy: busy || leaving,
                 leaving: leaving,
-                fastForward: fastForward,
                 hasController: controllers.hasController,
-                soundOn: $soundOn,
                 haptics: $haptics,
                 padOpacity: $padOpacity,
                 smoothScreen: $smoothScreen,
@@ -535,12 +536,6 @@ public struct PlayView: View {
                 onSave: { Task { await quickSave() } },
                 onLoadCommand: { submitLoadCommand($0) },
                 onImportSave: { showSaveImporter = true },
-                onFastForward: { setFastForward(!fastForward); menuOpen = false },
-                onReset: {
-                    core?.reset()
-                    menuOpen = false
-                    showToast("Reset")
-                },
                 onQuit: { Task { await leave(autoSave: true) } }
             )
             .padding(20)
