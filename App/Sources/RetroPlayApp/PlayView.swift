@@ -230,25 +230,14 @@ public struct PlayView: View {
 
     // MARK: - Layouts
 
-    /// Rough pad height at scale 1 per system (portrait), used to size the pad to the phone.
-    private var portraitPadHeight: CGFloat {
-        switch system {
-        case .gba: return 290
-        case .nds: return 290
-        case .psp: return 370
-        case .n64: return 370
-        }
-    }
-
     private func portraitLayout(size: CGSize) -> some View {
         let aspect = CGFloat(system.screenAspect)
-        // DS screens are tall; cap them so the pad keeps a usable area.
-        let maxScreenHeight = size.height * (system == .nds ? 0.56 : 0.5)
+        // DS screens are tall; cap them so the pad keeps room for full-size controls.
+        let maxScreenHeight = size.height * (system == .nds ? 0.54 : 0.5)
         let screenHeight = min(size.width / aspect, maxScreenHeight)
         let screenWidth = screenHeight * aspect
         let barHeight: CGFloat = 44
         let padHeight = max(0, size.height - screenHeight - barHeight)
-        let scale = min(max(min(size.width / 390, padHeight / portraitPadHeight), 0.62), 1.25)
 
         return VStack(spacing: 0) {
             screen
@@ -266,7 +255,7 @@ public struct PlayView: View {
                     }
                     .padding(.horizontal, 6)
                 if showTouchControls {
-                    ConsolePadPortrait(system: system, scale: scale)
+                    ConsolePadPortrait(system: system, size: CGSize(width: size.width, height: padHeight))
                         // Button letters mirror the hardware; past xxxLarge they overflow the pad.
                         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 } else {
@@ -279,7 +268,7 @@ public struct PlayView: View {
 
     private func landscapeLayout(size: CGSize, safeArea: EdgeInsets) -> some View {
         let aspect = CGFloat(system.screenAspect)
-        let scale = min(max(size.height / 390, 0.66), 1.15)
+        let scale = ConsolePad.landscapeScale(for: system, in: size)
         let pad = ConsolePad(system: system, scale: scale)
         let edgeInset: CGFloat = 8
         // Fit: the screen sits between the two control columns so no control covers the
