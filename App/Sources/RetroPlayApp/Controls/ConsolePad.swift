@@ -13,6 +13,9 @@ struct ConsolePad {
     /// Full-size controls: taller shoulders, larger clusters and SELECT / START. Portrait
     /// always uses them; landscape does when the phone's height leaves room.
     var large = false
+    /// Landscape side columns: gaps inside a cluster are tighter, so full-size
+    /// controls fit the phone's height.
+    var landscape = false
 
     // MARK: Shoulders
 
@@ -60,7 +63,7 @@ struct ConsolePad {
             )
         case .psp:
             // Real PSP: D-pad above, analog nub below.
-            VStack(spacing: (large ? 18 : 10) * scale) {
+            VStack(spacing: (large && !landscape ? 18 : landscape ? 6 : 10) * scale) {
                 PadDPad(
                     size: (large ? 144 : 136) * scale,
                     up: PSPInput.up.rawValue, down: PSPInput.down.rawValue,
@@ -85,7 +88,7 @@ struct ConsolePad {
         case .n64:
             // The Control Stick is what N64 games are played with, so it takes the low spot
             // where the thumb rests; the rarely used D-pad sits above it.
-            VStack(spacing: (large ? 16 : 10) * scale) {
+            VStack(spacing: (large && !landscape ? 16 : landscape ? 6 : 10) * scale) {
                 PadDPad(
                     size: (large ? 108 : 100) * scale,
                     up: N64Input.dpadUp.rawValue, down: N64Input.dpadDown.rawValue,
@@ -128,7 +131,7 @@ struct ConsolePad {
                 diameter: (large ? 60 : 54) * scale
             )
         case .n64:
-            VStack(spacing: (large ? 14 : 6) * scale) {
+            VStack(spacing: (large && !landscape ? 14 : 6) * scale) {
                 PadDiamond(
                     top: .init(title: "▲", bits: N64Input.cUp.rawValue, fill: PadPalette.N64.c, ink: PadPalette.N64.inkDark, name: "C Up"),
                     right: .init(title: "▶", bits: N64Input.cRight.rawValue, fill: PadPalette.N64.c, ink: PadPalette.N64.inkDark, name: "C Right"),
@@ -187,32 +190,53 @@ struct ConsolePad {
         }
     }
 
-    /// Height of the taller landscape side column at scale 1 (shoulders, pause row,
-    /// thumb cluster, SELECT / START and the gaps between them), with a little margin.
-    private static func landscapeColumnHeight(_ system: SystemID, large: Bool) -> CGFloat {
+    /// Gap above SELECT / START in a landscape column, clear of the D-pad / face buttons'
+    /// 14 pt touch slop at compact size; full-size pills are taller and need less.
+    var landscapePillGap: CGFloat { (large ? 8 : 14) * scale }
+
+    /// Each landscape column's height as `perScale × scale + fixed`: shoulders, thumb
+    /// cluster, gap and SELECT / START grow with the scale; the edge padding and the
+    /// pause row don't. Mirrors `PlayView.landscapeLayout`.
+    private static func landscapeColumns(_ system: SystemID, large: Bool) -> [(perScale: CGFloat, fixed: CGFloat)] {
+        // Shoulder, gap above SELECT / START, the pill itself (26 + 2 × 8 touch padding).
+        let top: CGFloat = large ? 42 : 40
+        let bottom: CGFloat = large ? 8 + 42 * 1.25 : 14 + 42
+        // Left: 2 × 6 edge padding + 6 spacer. Right adds the 18 + 32 pause row.
+        let left: CGFloat = 18, right: CGFloat = 18 + 50
+        let leftCluster: CGFloat, rightCluster: CGFloat
         switch (system, large) {
-        case (.gba, false): return 300
-        case (.nds, false): return 315
-        case (.psp, false): return 355
-        case (.n64, false): return 385
-        case (.gba, true): return 326
-        case (.nds, true): return 356
-        case (.psp, true): return 402
-        case (.n64, true): return 437
+        case (.gba, false): (leftCluster, rightCluster) = (150, 74 * 1.84)
+        case (.gba, true): (leftCluster, rightCluster) = (156, 78 * 1.84)
+        case (.nds, false): (leftCluster, rightCluster) = (146, 54 * 2.8)
+        case (.nds, true): (leftCluster, rightCluster) = (152, 60 * 2.8)
+        case (.psp, false): (leftCluster, rightCluster) = (136 + 6 + 96, 54 * 2.8)
+        case (.psp, true): (leftCluster, rightCluster) = (144 + 6 + 108, 60 * 2.8)
+        case (.n64, false): (leftCluster, rightCluster) = (100 + 6 + 128, 40 * 2.8 + 6 + 104)
+        case (.n64, true): (leftCluster, rightCluster) = (108 + 6 + 136, 44 * 2.8 + 6 + 108 * 1.08)
         }
+        // N64 has no SELECT; its left column ends at the stick.
+        let leftBottom = system == .n64 ? (large ? 8 : 14) : bottom
+        return [
+            (top + leftCluster + leftBottom, left),
+            (top + rightCluster + bottom, right),
+        ]
     }
 
-    /// Landscape controls: the portrait size when the column still fits the phone's height,
-    /// else as large as the height allows. Falls back to the compact sizes when those come
-    /// out bigger (a tall column, like N64's, on a short phone).
+    /// Landscape controls: the portrait size when both columns fit the phone's height
+    /// (`size` includes the home-indicator strip), else as large as the height allows.
+    /// Falls back to the compact sizes when those come out bigger (N64's tall right column).
     static func landscapeLayout(
         for system: SystemID,
         in size: CGSize,
         portraitScale: CGFloat
     ) -> (scale: CGFloat, large: Bool) {
-        let usable = size.height - 12
-        let largeScale = min(portraitScale, usable / landscapeColumnHeight(system, large: true))
-        let compactScale = min(max(size.height / 390, 0.66), 1.15, usable / landscapeColumnHeight(system, large: false))
+        func fit(_ large: Bool) -> CGFloat {
+            landscapeColumns(system, large: large)
+                .map { (size.height - $0.fixed - 4) / $0.perScale }
+                .min() ?? 1
+        }
+        let largeScale = min(portraitScale, fit(true))
+        let compactScale = min(max(size.height / 390, 0.66), 1.15, fit(false))
         // Full-size controls are about 7% bigger at the same scale.
         return largeScale * 1.07 >= compactScale ? (largeScale, true) : (compactScale, false)
     }
@@ -251,7 +275,7 @@ struct ConsolePad {
         let widen: CGFloat = large && width == 92 ? 112 / 92 : 1
         return PadShoulderButton(
             title: title, bits: bits,
-            width: width * widen * scale, height: (large ? 48 : 40) * scale,
+            width: width * widen * scale, height: (large ? (landscape ? 42 : 48) : 40) * scale,
             fill: fill, ink: ink
         )
     }

@@ -286,13 +286,14 @@ public struct PlayView: View {
 
     private func landscapeLayout(size: CGSize, safeArea: EdgeInsets) -> some View {
         let aspect = CGFloat(system.screenAspect)
+        // The controls also use the home-indicator strip (it's hidden while playing).
         let sizing = ConsolePad.landscapeLayout(
             for: system,
-            in: size,
+            in: CGSize(width: size.width, height: size.height + safeArea.bottom),
             portraitScale: Self.portraitScale(system, landscape: size, safeArea: safeArea)
         )
         let scale = sizing.scale
-        let pad = ConsolePad(system: system, scale: scale, large: sizing.large)
+        let pad = ConsolePad(system: system, scale: scale, large: sizing.large, landscape: true)
         let edgeInset: CGFloat = 8
         // Fit: the screen sits between the two control columns so no control covers the
         // game. Fill: it runs the full height (through the home-indicator strip) under the pad.
@@ -325,7 +326,7 @@ public struct PlayView: View {
                         pad.selectButton
                             .opacity(padOpacity)
                             .frame(width: pad.landscapeColumnWidth)
-                            .padding(.top, 14 * scale)
+                            .padding(.top, pad.landscapePillGap)
                         Spacer(minLength: 0)
                             .frame(maxHeight: 8)
                     }
@@ -345,7 +346,7 @@ public struct PlayView: View {
                         pad.startButton
                             .opacity(padOpacity)
                             .frame(width: pad.landscapeColumnWidth)
-                            .padding(.top, 14 * scale)
+                            .padding(.top, pad.landscapePillGap)
                         Spacer(minLength: 0)
                             .frame(maxHeight: 8)
                     }
@@ -353,6 +354,7 @@ public struct PlayView: View {
                 }
                 .padding(.horizontal, edgeInset)
                 .padding(.vertical, 6)
+                .ignoresSafeArea(edges: .bottom)
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 // Over the game every control is see-through, light ones included.
                 .environment(\.padGlass, true)
@@ -395,19 +397,15 @@ public struct PlayView: View {
         .accessibilityLabel("\(game.displayName) screen")
     }
 
-    /// Save, fast-forward, pause and sound: one size, centred, reachable without covering the game.
+    /// Fast-forward, pause and sound: one size, centred, reachable without covering the game.
     /// `maxWidth` is the room they get (a landscape control column); they shrink to fit it.
     private func quickButtons(maxWidth: CGFloat = .infinity) -> some View {
-        let spacing: CGFloat = maxWidth.isFinite ? 6 : 10
-        let width = min(48, (maxWidth - 3 * spacing) / 4)
+        let spacing: CGFloat = 10
+        let width = min(48, (maxWidth - 2 * spacing) / 3)
         return HStack(spacing: spacing) {
-            chromeButton("square.and.arrow.down", tint: .white, width: width) {
-                Task { await quickSave() }
-            }
-            .disabled(!(core?.supportsSaveState ?? false) || busy)
-            .accessibilityLabel("Save state")
+            // On: inverted (white fill, dark glyph).
             chromeButton("forward.fill", tint: fastForward ? .black : .white, width: width,
-                         fill: fastForward ? .orange : nil) {
+                         fill: fastForward ? .white : nil) {
                 setFastForward(!fastForward)
             }
             .accessibilityLabel(fastForward ? "Fast forward on" : "Fast forward off")

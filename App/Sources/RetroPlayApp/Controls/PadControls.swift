@@ -107,14 +107,15 @@ struct PadPillButton: View {
         let held = input.isHeld(bits)
         Text(title)
             .font(RetroPlayFont.sized(max(8, 10 * scale), relativeTo: .caption2))
-            .foregroundStyle(ink)
+            // Over the game the capsule is mostly see-through, so a dark label would vanish.
+            .foregroundStyle(glass ? Color.white.opacity(0.9) : ink)
             .lineLimit(1)
             // The label grows with Dynamic Type, so the capsule sizes to it instead of a fixed width.
             .fixedSize()
             .padding(.horizontal, 12 * scale)
             .padding(.vertical, 4 * scale)
             .frame(minWidth: 74 * scale, minHeight: 26 * scale)
-            .background { Capsule().fill(fill.padFill(glass: glass)).brightness(held ? 0.15 : 0) }
+            .background { Capsule().fill(glass ? fill.opacity(0.3) : fill).brightness(held ? 0.15 : 0) }
             .overlay { Capsule().strokeBorder(Color.white.opacity(held ? 0.5 : 0.2), lineWidth: 1) }
             .scaleEffect(held ? 0.94 : 1)
             .animation(pressAnimation, value: held)
