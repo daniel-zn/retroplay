@@ -9,9 +9,20 @@ import RetroPlayCore
 
 private let pressAnimation = Animation.easeOut(duration: 0.06)
 
+extension EnvironmentValues {
+    /// Controls drawn over the game (landscape): fills are see-through so the picture shows.
+    @Entry var padGlass = false
+}
+
+extension Color {
+    /// This fill, see-through when the pad is drawn over the game.
+    func padFill(glass: Bool) -> Color { glass ? opacity(0.65) : self }
+}
+
 @available(iOS 18.0, *)
 struct PadFaceButton: View {
     @Environment(PadInputModel.self) private var input
+    @Environment(\.padGlass) private var glass
     let title: String
     let bits: UInt32
     var diameter: CGFloat = 56
@@ -28,7 +39,7 @@ struct PadFaceButton: View {
             .frame(width: diameter, height: diameter)
             .background {
                 Circle()
-                    .fill(fill)
+                    .fill(fill.padFill(glass: glass))
                     .brightness(held ? 0.12 : 0)
                     .shadow(color: .black.opacity(held ? 0.08 : 0.3), radius: held ? 1 : 3, y: held ? 0 : 2)
             }
@@ -48,6 +59,7 @@ struct PadFaceButton: View {
 @available(iOS 18.0, *)
 struct PadShoulderButton: View {
     @Environment(PadInputModel.self) private var input
+    @Environment(\.padGlass) private var glass
     let title: String
     let bits: UInt32
     var width: CGFloat = 84
@@ -63,7 +75,7 @@ struct PadShoulderButton: View {
             .frame(width: width, height: height)
             .background {
                 RoundedRectangle(cornerRadius: height * 0.42, style: .continuous)
-                    .fill(fill)
+                    .fill(fill.padFill(glass: glass))
                     .brightness(held ? 0.12 : 0)
             }
             .overlay {
@@ -84,6 +96,7 @@ struct PadShoulderButton: View {
 @available(iOS 18.0, *)
 struct PadPillButton: View {
     @Environment(PadInputModel.self) private var input
+    @Environment(\.padGlass) private var glass
     let title: String
     let bits: UInt32
     var scale: CGFloat = 1
@@ -101,7 +114,7 @@ struct PadPillButton: View {
             .padding(.horizontal, 12 * scale)
             .padding(.vertical, 4 * scale)
             .frame(minWidth: 74 * scale, minHeight: 26 * scale)
-            .background { Capsule().fill(fill).brightness(held ? 0.15 : 0) }
+            .background { Capsule().fill(fill.padFill(glass: glass)).brightness(held ? 0.15 : 0) }
             .overlay { Capsule().strokeBorder(Color.white.opacity(held ? 0.5 : 0.2), lineWidth: 1) }
             .scaleEffect(held ? 0.94 : 1)
             .animation(pressAnimation, value: held)
@@ -119,6 +132,7 @@ struct PadPillButton: View {
 @available(iOS 18.0, *)
 struct PadDPad: View {
     @Environment(PadInputModel.self) private var input
+    @Environment(\.padGlass) private var glass
     var size: CGFloat = 150
     let up: UInt32
     let down: UInt32
@@ -133,7 +147,7 @@ struct PadDPad: View {
         let travel = (size - armWidth) / 2
         ZStack {
             PlusShape(armThickness: armWidth)
-                .fill(fill)
+                .fill(fill.padFill(glass: glass))
                 .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
             PlusShape(armThickness: armWidth)
                 .stroke(Color.white.opacity(0.16), lineWidth: 1)
@@ -175,6 +189,7 @@ struct PadDPad: View {
 @available(iOS 18.0, *)
 struct PadStick: View {
     @Environment(PadInputModel.self) private var input
+    @Environment(\.padGlass) private var glass
     var size: CGFloat = 110
     var gateFill: Color
     var nubFill: Color
@@ -187,10 +202,10 @@ struct PadStick: View {
         let stick = input.stick
         ZStack {
             if octagonal {
-                RegularOctagon().fill(gateFill)
+                RegularOctagon().fill(gateFill.padFill(glass: glass))
                 RegularOctagon().stroke(Color.white.opacity(0.18), lineWidth: 1.2)
             } else {
-                Circle().fill(gateFill)
+                Circle().fill(gateFill.padFill(glass: glass))
                 Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1.2)
             }
             Circle()

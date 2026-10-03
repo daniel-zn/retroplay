@@ -230,13 +230,31 @@ public struct PlayView: View {
 
     // MARK: - Layouts
 
+    private static let portraitBarHeight: CGFloat = 44
+
+    /// Portrait game screen height: full width, but DS screens are tall, so they're capped
+    /// to leave the pad room for full-size controls.
+    private static func portraitScreenHeight(_ system: SystemID, in size: CGSize) -> CGFloat {
+        let maxScreenHeight = size.height * (system == .nds ? 0.54 : 0.5)
+        return min(size.width / CGFloat(system.screenAspect), maxScreenHeight)
+    }
+
+    /// The controls' portrait scale on this phone, worked out from the landscape geometry
+    /// (Face ID iPhones: about 59 pt top and 34 pt bottom safe area in portrait).
+    private static func portraitScale(_ system: SystemID, landscape size: CGSize, safeArea: EdgeInsets) -> CGFloat {
+        let portrait = CGSize(
+            width: size.height + safeArea.top + safeArea.bottom,
+            height: size.width + safeArea.leading + safeArea.trailing - 93
+        )
+        let padHeight = portrait.height - portraitScreenHeight(system, in: portrait) - portraitBarHeight
+        return ConsolePadPortrait.scale(for: system, in: CGSize(width: portrait.width, height: padHeight))
+    }
+
     private func portraitLayout(size: CGSize) -> some View {
         let aspect = CGFloat(system.screenAspect)
-        // DS screens are tall; cap them so the pad keeps room for full-size controls.
-        let maxScreenHeight = size.height * (system == .nds ? 0.54 : 0.5)
-        let screenHeight = min(size.width / aspect, maxScreenHeight)
+        let screenHeight = Self.portraitScreenHeight(system, in: size)
         let screenWidth = screenHeight * aspect
-        let barHeight: CGFloat = 44
+        let barHeight = Self.portraitBarHeight
         let padHeight = max(0, size.height - screenHeight - barHeight)
 
         return VStack(spacing: 0) {
@@ -268,8 +286,13 @@ public struct PlayView: View {
 
     private func landscapeLayout(size: CGSize, safeArea: EdgeInsets) -> some View {
         let aspect = CGFloat(system.screenAspect)
-        let scale = ConsolePad.landscapeScale(for: system, in: size)
-        let pad = ConsolePad(system: system, scale: scale)
+        let sizing = ConsolePad.landscapeLayout(
+            for: system,
+            in: size,
+            portraitScale: Self.portraitScale(system, landscape: size, safeArea: safeArea)
+        )
+        let scale = sizing.scale
+        let pad = ConsolePad(system: system, scale: scale, large: sizing.large)
         let edgeInset: CGFloat = 8
         // Fit: the screen sits between the two control columns so no control covers the
         // game. Fill: it runs the full height (through the home-indicator strip) under the pad.
@@ -331,6 +354,8 @@ public struct PlayView: View {
                 .padding(.horizontal, edgeInset)
                 .padding(.vertical, 6)
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                // Over the game every control is see-through, light ones included.
+                .environment(\.padGlass, true)
             } else {
                 controllerConnectedNote
                     .frame(maxHeight: .infinity, alignment: .bottom)
