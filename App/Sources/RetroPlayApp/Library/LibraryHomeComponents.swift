@@ -68,80 +68,6 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Continue playing
-
-/// Horizontal row of wide cards for the most recently played games.
-@available(iOS 18.0, *)
-struct ContinuePlayingRow: View {
-    let games: [LibraryGame]
-    let lastPlayed: [UUID: Date]
-    let artworkProvider: (LibraryGame) -> UIImage?
-    let onPlay: (LibraryGame) -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionHeading(title: "Continue Playing")
-                .padding(.horizontal, 16)
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(games) { game in
-                        Button {
-                            onPlay(game)
-                        } label: {
-                            card(game)
-                        }
-                        .buttonStyle(RetroPlayPressStyle())
-                        .accessibilityLabel("Continue \(game.displayName), \(game.systemID.displayName)")
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 2)
-            }
-            .scrollClipDisabled()
-        }
-    }
-
-    private func card(_ game: LibraryGame) -> some View {
-        HStack(spacing: 12) {
-            GameArtworkView(game: game, artwork: artworkProvider(game), cornerRadius: 10, labelTitleSize: 9)
-                .frame(width: 72, height: 96)
-            VStack(alignment: .leading, spacing: 8) {
-                SystemBadge(system: game.systemID)
-                Text(game.displayName)
-                    .font(RetroPlayFont.caption)
-                    .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
-                    .lineLimit(2)
-                    .lineSpacing(2)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
-                HStack(spacing: 6) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11, weight: .bold))
-                    if let date = lastPlayed[game.id] {
-                        Text(date.formatted(.relative(presentation: .named, unitsStyle: .abbreviated)))
-                            .font(RetroPlayFont.caption2)
-                            .lineLimit(1)
-                    }
-                }
-                .foregroundStyle(RetroPlayTheme.accent)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(10)
-        // Fixed size at normal text sizes; wider and as tall as needed at accessibility sizes.
-        .frame(width: dynamicTypeSize.isAccessibilitySize ? 320 : 270)
-        .frame(minHeight: 116)
-        .background(RetroPlayTheme.card(for: colorScheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(RetroPlayTheme.cardStroke(for: colorScheme), lineWidth: 1)
-        }
-    }
-}
-
 @available(iOS 18.0, *)
 struct SectionHeading: View {
     let title: String
@@ -360,4 +286,22 @@ struct EmptyFilterView: View {
 /// "1 game" / "3 games" for labels and VoiceOver.
 func gameCountText(_ count: Int) -> String {
     count == 1 ? "1 game" : "\(count) games"
+}
+
+// MARK: - Keyboard
+
+extension View {
+    /// A downward swipe hides the keyboard, for screens with nothing to scroll
+    /// (scrolling screens use `.scrollDismissesKeyboard`).
+    func keyboardSwipeDownDismiss(_ dismiss: @escaping () -> Void) -> some View {
+        contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 20).onEnded { value in
+                    if value.translation.height > 30,
+                       value.translation.height > abs(value.translation.width) {
+                        dismiss()
+                    }
+                }
+            )
+    }
 }

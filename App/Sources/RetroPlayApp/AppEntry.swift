@@ -21,6 +21,10 @@ public struct RetroPlayRootView: View {
     /// Keyboard focus for the search field. isSearchPresented alone can't re-show the
     /// keyboard once it's already true (after Search or switching tabs).
     @FocusState private var searchFocused: Bool
+    /// Search results' scroll offset, and where the current drag started: a pull down
+    /// hides the keyboard.
+    @State private var searchScrollOffset: CGFloat = 0
+    @State private var searchDragStart: CGFloat?
     @State private var libraryTitleCollapsed = false
     @State private var importErrorMessage: String?
     @State private var showImportError = false
@@ -75,12 +79,6 @@ public struct RetroPlayRootView: View {
             }
         }
         return counts
-    }
-
-    /// Up to eight most recently played games in the current filter.
-    private var recentGames: [LibraryGame] {
-        let played = store.games(matching: systemTab.systemID).filter { lastPlayed[$0.id] != nil }
-        return Array(LibrarySort.recentlyPlayed.sorted(played, lastPlayed: lastPlayed).prefix(8))
     }
 
     private func refreshActivity() {
@@ -313,16 +311,6 @@ public struct RetroPlayRootView: View {
                         missingGameIDs: store.missingGameIDs
                     ) {
                         libraryTitle
-                        if !recentGames.isEmpty {
-                            ContinuePlayingRow(
-                                games: recentGames,
-                                lastPlayed: lastPlayed,
-                                artworkProvider: { loadCover(for: $0) },
-                                onPlay: { play($0) }
-                            )
-                            .padding(.top, 6)
-                            .padding(.bottom, 18)
-                        }
                         LibraryFilterBar(selection: $systemTab, sort: sortBinding, counts: tabCounts)
                             .padding(.bottom, 12)
                         if filteredGames.isEmpty {
@@ -431,6 +419,7 @@ public struct RetroPlayRootView: View {
                             systemImage: "magnifyingglass",
                             description: "Find games you already imported into RetroPlay."
                         )
+                        .keyboardSwipeDownDismiss { searchFocused = false }
                     } else {
                         recentSearchesList
                     }
@@ -440,6 +429,7 @@ public struct RetroPlayRootView: View {
                         systemImage: "magnifyingglass",
                         description: "No games match “\(searchQuery)”."
                     )
+                    .keyboardSwipeDownDismiss { searchFocused = false }
                 } else {
                     LibraryGridView(
                         games: searchResults,
@@ -462,6 +452,21 @@ public struct RetroPlayRootView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(RetroPlayTheme.canvas(for: colorScheme))
+            // Dragging the results down pulls the keyboard away with the finger, and a pull
+            // down of a short list (nothing to scroll) hides it too.
+            .scrollDismissesKeyboard(.interactively)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, offset in
+                searchScrollOffset = offset
+                if let start = searchDragStart, offset < start - 24 {
+                    searchFocused = false
+                    searchDragStart = nil
+                }
+            }
+            .onScrollPhaseChange { _, phase in
+                searchDragStart = phase == .interacting ? searchScrollOffset : nil
+            }
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.large)
             // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
