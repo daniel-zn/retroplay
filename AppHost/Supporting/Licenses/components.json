@@ -700,5 +700,410 @@
   "source": "https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248",
   "version": "v1.5.7",
   "licenseFile": "Zstandard-BSD-3-Clause.txt"
+ },
+ {
+  "name": "Nestopia UE",
+  "usedBy": "NES core (Nestopia UE)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright (C) 2003-2008 Martin Freij; Copyright (C) 2018 Phil Smith; Copyright (C) 2020-2026 Rupert Carmichael",
+  "source": "https://github.com/libretro/nestopia/tree/135dfa6dfda5e7603d61e751b9ddd0cc42546bc3",
+  "version": "git 135dfa6dfda5e7603d61e751b9ddd0cc42546bc3",
+  "licenseFile": "Nestopia-UE-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "libretro-common",
+  "usedBy": "NES core (Nestopia UE)",
+  "license": "MIT",
+  "copyright": "Copyright (C) 2010-2020/2010-2024 The RetroArch team",
+  "source": "https://github.com/libretro/nestopia/tree/135dfa6dfda5e7603d61e751b9ddd0cc42546bc3",
+  "version": "bundled @ 135dfa6",
+  "licenseFile": "libretro-common-MIT.txt"
+ },
+ {
+  "name": "nes_ntsc",
+  "usedBy": "NES core (Nestopia UE)",
+  "license": "LGPL-2.1-or-later",
+  "copyright": "Copyright (C) 2006-2007 Shay Green",
+  "source": "https://github.com/libretro/nestopia/tree/135dfa6dfda5e7603d61e751b9ddd0cc42546bc3",
+  "version": "0.2.2",
+  "licenseFile": "blip-buf-LGPL-2-1-or-later.txt"
+ },
+ {
+  "name": "SHA-1",
+  "usedBy": "NES core (Nestopia UE)",
+  "license": "LicenseRef-PublicDomain",
+  "copyright": "Based on public domain code written by Steve Reid",
+  "source": "https://github.com/libretro/nestopia/tree/135dfa6dfda5e7603d61e751b9ddd0cc42546bc3",
+  "version": "n/a",
+  "licenseFile": "SHA-1-LicenseRef-PublicDomain.txt"
+ },
+ {
+  "name": "bsnes (SNES core, libretro target)",
+  "usedBy": "SNES core (bsnes)",
+  "license": "GPL-3.0-only",
+  "copyright": "Copyright © 2004-2019 byuu",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "git 63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "licenseFile": "bsnes-SNES-core-libretro-target-GPL-3-0-only.txt"
+ },
+ {
+  "name": "DSP-4 emulator code",
+  "usedBy": "SNES core (bsnes)",
+  "license": "LicenseRef-NoLicenseStatement",
+  "copyright": "Copyright (c) 2004-2006 Dreamer Nom, John Weidman, Kris Bleakley, Nach, z80 gaiden",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "n/a",
+  "licenseFile": "DSP-4-emulator-code-LicenseRef-NoLicenseStatement.txt"
+ },
+ {
+  "name": "libco",
+  "usedBy": "SNES core (bsnes)",
+  "license": "ISC",
+  "copyright": "Copyright © 2006-2019 byuu",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "bundled @ 63ee22f",
+  "licenseFile": "libco-ISC.txt"
+ },
+ {
+  "name": "libretro.h API header",
+  "usedBy": "SNES core (bsnes)",
+  "license": "MIT",
+  "copyright": "Copyright (C) 2010-2018 The RetroArch team",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "bundled @ 63ee22f",
+  "licenseFile": "libretro-common-MIT.txt"
+ },
+ {
+  "name": "LZMA SDK (bsnes/lzma, 7z reader)",
+  "usedBy": "SNES core (bsnes)",
+  "license": "LicenseRef-LZMA-SDK-PublicDomain",
+  "copyright": "Igor Pavlov (public domain)",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "19.00",
+  "licenseFile": "LZMA-SDK-bsnes-lzma-7z-reader-LicenseRef-LZMA-SDK-PublicDoma.txt"
+ },
+ {
+  "name": "nall",
+  "usedBy": "SNES core (bsnes)",
+  "license": "ISC",
+  "copyright": "Copyright © 2006-2019 byuu",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "bundled @ 63ee22f",
+  "licenseFile": "libco-ISC.txt"
+ },
+ {
+  "name": "S-DD1 decompressor",
+  "usedBy": "SNES core (bsnes)",
+  "license": "LicenseRef-PublicDomain",
+  "copyright": "original code written by Andreas Naive (public domain license); bsnes port by byuu",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "n/a",
+  "licenseFile": "S-DD1-decompressor-LicenseRef-PublicDomain.txt"
+ },
+ {
+  "name": "SameBoy",
+  "usedBy": "SNES core (bsnes)",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2015-2019 Lior Halphon",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "2019-10-22 master snapshot (bsnes/gb/README)",
+  "licenseFile": "SameBoy-MIT.txt"
+ },
+ {
+  "name": "snes_ntsc (bsnes/filter/snes_ntsc)",
+  "usedBy": "SNES core (bsnes)",
+  "license": "LGPL-2.1-or-later",
+  "copyright": "Copyright (C) 2006-2007 Shay Green",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "0.2.2",
+  "licenseFile": "snes-ntsc-bsnes-filter-snes-ntsc-LGPL-2-1-or-later.txt"
+ },
+ {
+  "name": "snes_spc S-DSP",
+  "usedBy": "SNES core (bsnes)",
+  "license": "LGPL-2.1-or-later",
+  "copyright": "Copyright (C) 2007 Shay Green",
+  "source": "https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+  "version": "snes_spc 0.9.0",
+  "licenseFile": "snes-spc-S-DSP-LGPL-2-1-or-later.txt"
+ },
+ {
+  "name": "ProSystem",
+  "usedBy": "Atari 7800 core (ProSystem)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright 2003-2005 Greg Stanton",
+  "source": "https://github.com/libretro/prosystem-libretro/tree/8a88014287c7a01cd568067e5a557d0a2b2a051f",
+  "version": "git 8a88014287c7a01cd568067e5a557d0a2b2a051f",
+  "licenseFile": "ProSystem-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "BupBoop / CoreTone",
+  "usedBy": "Atari 7800 core (ProSystem)",
+  "license": "Zlib",
+  "copyright": "Copyright (C) 2015 - 2016 Osman Celimli",
+  "source": "https://github.com/libretro/prosystem-libretro/tree/8a88014287c7a01cd568067e5a557d0a2b2a051f",
+  "version": "1.2.2cz (2016-11-26)",
+  "licenseFile": "BupBoop-CoreTone-Zlib.txt"
+ },
+ {
+  "name": "libretro-common",
+  "usedBy": "Atari 7800 core (ProSystem)",
+  "license": "MIT",
+  "copyright": "Copyright (C) 2010-2020/2010-2021 The RetroArch team",
+  "source": "https://github.com/libretro/prosystem-libretro/tree/8a88014287c7a01cd568067e5a557d0a2b2a051f",
+  "version": "bundled @ 8a88014",
+  "licenseFile": "libretro-common-MIT.txt"
+ },
+ {
+  "name": "TiaSound and PokeySound",
+  "usedBy": "Atari 7800 core (ProSystem)",
+  "license": "LGPL-2.0-only",
+  "copyright": "TiaSound is Copyright(c) 1997 by Ron Fries; PokeySound is Copyright(c) 1997 by Ron Fries",
+  "source": "https://github.com/libretro/prosystem-libretro/tree/8a88014287c7a01cd568067e5a557d0a2b2a051f",
+  "version": "n/a",
+  "licenseFile": "TiaSound-and-PokeySound-LGPL-2-0-only.txt"
+ },
+ {
+  "name": "clownmdemu",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "AGPL-3.0-or-later",
+  "copyright": "Copyright (C) Clownacy",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "core @ 88ef45a6585556e2247dd26b6c937d6b9fb4a12d",
+  "licenseFile": "clownmdemu-AGPL-3-0-or-later.txt"
+ },
+ {
+  "name": "clown68000",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "AGPL-3.0-or-later",
+  "copyright": "Copyright (C) 2021-2025 Clownacy",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "bb198386ae3ee0cd6d246ff917f9941b02b5be6a",
+  "licenseFile": "clownmdemu-AGPL-3-0-or-later.txt"
+ },
+ {
+  "name": "ClownCD",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "0BSD",
+  "copyright": "Copyright (c) 2021-2023 Clownacy",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "6ac52d0f3e8c55e591de6c445c034b0f12e95033",
+  "licenseFile": "ClownCD-0BSD.txt"
+ },
+ {
+  "name": "clowncommon (header-only helpers)",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "0BSD",
+  "copyright": "Copyright (c) 2021-2023 Clownacy",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "ecee31f / ddeff17 / 8edd476",
+  "licenseFile": "ClownCD-0BSD.txt"
+ },
+ {
+  "name": "clownmdemu-libretro frontend and clownmdemu-frontend-common",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "AGPL-3.0-or-later",
+  "copyright": "Copyright (C) Clownacy",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "frontend d43c2708b0a31c285ce16724b6c4a2e92af07346; common @ 347ea31f9971eeaaa28c607e75f7156dd17db7bd",
+  "licenseFile": "clownmdemu-AGPL-3-0-or-later.txt"
+ },
+ {
+  "name": "clownresampler",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "0BSD",
+  "copyright": "Copyright (c) 2022 Clownacy",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "916b7a7f8d9cf77d2910d9b36988bec07f25d4d3",
+  "licenseFile": "clownresampler-0BSD.txt"
+ },
+ {
+  "name": "clownz80 (Z80 interpreter)",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "AGPL-3.0-only",
+  "copyright": "Copyright (C) Clownacy",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "aa4cae3127a5893ba7066bcc2d9e9ba8e88e1c3b",
+  "licenseFile": "clownmdemu-AGPL-3-0-or-later.txt"
+ },
+ {
+  "name": "dr_flac",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "Unlicense OR MIT-0",
+  "copyright": "Copyright 2023 David Reid",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "0.13.3",
+  "licenseFile": "dr-flac-bundled-in-libchdr-Unlicense-OR-MIT-0.txt"
+ },
+ {
+  "name": "dr_mp3",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "(Unlicense OR MIT-0) AND CC0-1.0",
+  "copyright": "Copyright 2023 David Reid; minimp3 by lieff (CC0)",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "0.7.3",
+  "licenseFile": "dr-mp3-Unlicense-OR-MIT-0-AND-CC0-1-0.txt"
+ },
+ {
+  "name": "dr_wav",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "Unlicense OR MIT-0",
+  "copyright": "Copyright 2023 David Reid",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "0.14.4",
+  "licenseFile": "dr-wav-Unlicense-OR-MIT-0.txt"
+ },
+ {
+  "name": "libchdr",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright Romain Tisserand",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "7d039c34cd1b887bc5e87ae14af62f1db3db9e96 (Clownacy clowncd-new branch)",
+  "licenseFile": "libchdr-BSD-3-Clause.txt"
+ },
+ {
+  "name": "libretro-common headers",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "MIT",
+  "copyright": "Copyright (C) 2010-2024 The RetroArch team",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "e9a4ccc4a6b05f136ef5358218a5a94ebeccb7cb",
+  "licenseFile": "libretro-common-MIT.txt"
+ },
+ {
+  "name": "LZMA SDK",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "LicenseRef-LZMA-SDK-PublicDomain",
+  "copyright": "Igor Pavlov (public domain)",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "25.01",
+  "licenseFile": "LZMA-SDK-LicenseRef-LZMA-SDK-PublicDomain.txt"
+ },
+ {
+  "name": "miniz",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "MIT",
+  "copyright": "Copyright 2013-2014 RAD Game Tools and Valve Software; Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "3.1.1",
+  "licenseFile": "miniz-MIT.txt"
+ },
+ {
+  "name": "stb_vorbis",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "MIT OR Unlicense",
+  "copyright": "Copyright (c) 2017 Sean Barrett",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "1.22",
+  "licenseFile": "stb-vorbis-MIT-OR-Unlicense.txt"
+ },
+ {
+  "name": "Zstandard",
+  "usedBy": "Genesis core (clownmdemu)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright (c) Meta Platforms, Inc. and affiliates",
+  "source": "https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346",
+  "version": "v1.5.7",
+  "licenseFile": "Zstandard-BSD-3-Clause.txt"
+ },
+ {
+  "name": "PCSX-ReARMed",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright (C) 1999-2016 PCSX Team; Copyright (C) 2005-2009 PCSX-df Team (Ryan Schultz et al.); Copyright (C) 2009-2010 PCSX-Revolution Dev Team; Copyright (C) 2009 Wei Mingzhi; (C) 2010-2026 Gražvydas \"notaz\" Ignotas",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "git c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "licenseFile": "PCSX-ReARMed-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "dr_flac",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "Unlicense OR MIT-0",
+  "copyright": "Copyright 2023 David Reid",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "0.13.3",
+  "licenseFile": "dr-flac-bundled-in-libchdr-Unlicense-OR-MIT-0.txt"
+ },
+ {
+  "name": "GTE divider",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright 2003-2013 smf",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "n/a",
+  "licenseFile": "GTE-divider-BSD-3-Clause.txt"
+ },
+ {
+  "name": "libchdr",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright Romain Tisserand",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "upstream 9ccd3a78e239246ee6e1166e1be82ab0ff0dcddb (git subrepo)",
+  "licenseFile": "libchdr-BSD-3-Clause.txt"
+ },
+ {
+  "name": "libretro-common",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "MIT",
+  "copyright": "Copyright (C) 2010-2026 The RetroArch team",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "bundled @ c881679",
+  "licenseFile": "libretro-common-MIT.txt"
+ },
+ {
+  "name": "LZMA SDK",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "LicenseRef-LZMA-SDK-PublicDomain",
+  "copyright": "Igor Pavlov (public domain)",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "26.02",
+  "licenseFile": "LZMA-SDK-LicenseRef-LZMA-SDK-PublicDomain.txt"
+ },
+ {
+  "name": "miniz",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "MIT",
+  "copyright": "Copyright 2013-2014 RAD Game Tools and Valve Software; Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "3.1.2",
+  "licenseFile": "miniz-MIT.txt"
+ },
+ {
+  "name": "P.E.Op.S. SPU plugin",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright (C) 2002 Pete Bernert; Copyright (C) 2003 Chris Moeller; portions (C) Gražvydas \"notaz\" Ignotas 2010-2015, SPU2-X/gigaherz/PCSX2 Development Team",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "bundled @ c881679",
+  "licenseFile": "PCSX-ReARMed-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "psx_gpu NEON GPU renderer",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "GPL-2.0-or-later",
+  "copyright": "Copyright (C) 2011 Gilead Kutnick \"Exophase\"; Copyright (C) 2011-2022 Gražvydas \"notaz\" Ignotas",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "bundled @ c881679",
+  "licenseFile": "PCSX-ReARMed-GPL-2-0-or-later.txt"
+ },
+ {
+  "name": "Shift-JIS BIOS font",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "LicenseRef-PublicDomain",
+  "copyright": "k14goth by Yasuyuki Furukawa (Public Domain); (c) /efont/ -- Efont Open Laboratory 2001; converted by Wei Mingzhi",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "n/a",
+  "licenseFile": "Shift-JIS-BIOS-font-LicenseRef-PublicDomain.txt"
+ },
+ {
+  "name": "Zstandard",
+  "usedBy": "PS1 core (PCSX-ReARMed)",
+  "license": "BSD-3-Clause",
+  "copyright": "Copyright (c) Meta Platforms, Inc. and affiliates",
+  "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "version": "v1.5.7",
+  "licenseFile": "Zstandard-BSD-3-Clause.txt"
  }
 ]

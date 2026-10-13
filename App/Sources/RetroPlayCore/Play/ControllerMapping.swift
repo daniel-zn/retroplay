@@ -128,7 +128,63 @@ public enum ControllerMapping {
             if c.contains(.left) { b.insert(.cLeft) }
             if c.contains(.right) { b.insert(.cRight) }
             return (b.rawValue, pad.leftStickX, pad.leftStickY)
+
+        case .nes, .snes, .genesis, .atari7800, .ps1:
+            var b = retroPadFace(r, for: system)
+            if r.contains(.start) { b.insert(.start) }
+            if r.contains(.select) { b.insert(.select) }
+            let d = r.union(stickDirs)
+            if d.contains(.up) { b.insert(.up) }
+            if d.contains(.down) { b.insert(.down) }
+            if d.contains(.left) { b.insert(.left) }
+            if d.contains(.right) { b.insert(.right) }
+            return (b.rawValue, 0, 0)
         }
+    }
+
+    /// Face and shoulder buttons for the libretro systems, by position on the pad.
+    static func retroPadFace(_ r: PadRole, for system: SystemID) -> RetroPadInput {
+        var b: RetroPadInput = []
+        func on(_ role: PadRole, _ input: RetroPadInput) { if r.contains(role) { b.insert(input) } }
+        switch system {
+        case .nes:
+            on(.east, RetroPadInput.NES.a)
+            on(.south, RetroPadInput.NES.b)
+            on(.north, RetroPadInput.NES.a)
+            on(.west, RetroPadInput.NES.b)
+        case .snes:
+            on(.east, RetroPadInput.SNES.a)
+            on(.south, RetroPadInput.SNES.b)
+            on(.north, RetroPadInput.SNES.x)
+            on(.west, RetroPadInput.SNES.y)
+            on(.leftShoulder, .l); on(.leftTrigger, .l)
+            on(.rightShoulder, .r); on(.rightTrigger, .r)
+        case .genesis:
+            // A B C along the bottom row as on the pad; X Y Z on the shoulders and top button.
+            on(.west, RetroPadInput.Genesis.a)
+            on(.south, RetroPadInput.Genesis.b)
+            on(.east, RetroPadInput.Genesis.c)
+            on(.leftShoulder, RetroPadInput.Genesis.x)
+            on(.north, RetroPadInput.Genesis.y)
+            on(.rightShoulder, RetroPadInput.Genesis.z)
+        case .atari7800:
+            on(.south, RetroPadInput.Atari7800.button1)
+            on(.east, RetroPadInput.Atari7800.button2)
+            on(.west, RetroPadInput.Atari7800.button1)
+            on(.north, RetroPadInput.Atari7800.button2)
+        case .ps1:
+            on(.south, RetroPadInput.PS1.cross)
+            on(.east, RetroPadInput.PS1.circle)
+            on(.west, RetroPadInput.PS1.square)
+            on(.north, RetroPadInput.PS1.triangle)
+            on(.leftShoulder, RetroPadInput.PS1.l1)
+            on(.rightShoulder, RetroPadInput.PS1.r1)
+            on(.leftTrigger, RetroPadInput.PS1.l2)
+            on(.rightTrigger, RetroPadInput.PS1.r2)
+        case .gba, .n64, .nds, .psp:
+            break
+        }
+        return b
     }
 
     /// Stick → digital directions (8-way, threshold on each axis).

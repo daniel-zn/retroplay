@@ -74,8 +74,18 @@ public struct ROMImporter: Sendable {
         fileExtension: String,
         sandboxFileURL: URL? = nil
     ) throws -> LibraryGame {
-        guard let system = classify(fileExtension: fileExtension) else {
-            throw EmulatorCoreError.romLoadFailed("Unsupported extension: \(fileExtension)")
+        // Shared extensions (iso / chd / pbp / bin) are decided by the file's contents.
+        let detected = sandboxFileURL.map {
+            DiscSniffer.system(forFileAt: $0, fileExtension: fileExtension)
+        } ?? classify(fileExtension: fileExtension)
+        guard let system = detected else {
+            let reason: String
+            switch fileExtension.lowercased() {
+            case "bin": reason = "\(originalFileName) is neither a Genesis game nor a PlayStation disc"
+            case "exe": reason = "\(originalFileName) isn't a PlayStation program"
+            default: reason = "Unsupported extension: \(fileExtension)"
+            }
+            throw EmulatorCoreError.romLoadFailed(reason)
         }
         let name = Self.displayName(fromFileName: originalFileName)
         var pspProductID: String?

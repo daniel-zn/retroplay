@@ -69,6 +69,9 @@ public struct SaveGameImporter: Sendable {
 
     private static let n64CombinedSRMSize = 296_960
 
+    /// Largest SAVE_RAM any libretro system here uses (PS1 memory card: 128 KiB) with room to spare.
+    private static let retroSaveMaxSize = 1 << 20
+
     private static let gbaAllowedSizes: Set<Int> = [
         512, 8_192, 32_768, 65_536, 131_072, 136_192, 137_216,
     ]
@@ -153,6 +156,14 @@ public struct SaveGameImporter: Sendable {
             return plan(dest: dest, source: sourceURL.lastPathComponent, fileManager: fileManager)
         case .nds:
             try validateNDSSize(data.count)
+            let dest = paths.sramURL(forRelativeROMPath: game.relativePath)
+            return plan(dest: dest, source: sourceURL.lastPathComponent, fileManager: fileManager)
+        case .nes, .snes, .genesis, .atari7800, .ps1:
+            // The libretro cores keep one SAVE_RAM block (cartridge battery RAM, or the PS1
+            // memory card); its size depends on the game, so only absurd sizes are refused.
+            guard data.count > 0, data.count <= Self.retroSaveMaxSize else {
+                throw SaveGameImportError.invalidSize(system: game.systemID, bytes: data.count)
+            }
             let dest = paths.sramURL(forRelativeROMPath: game.relativePath)
             return plan(dest: dest, source: sourceURL.lastPathComponent, fileManager: fileManager)
         case .psp:

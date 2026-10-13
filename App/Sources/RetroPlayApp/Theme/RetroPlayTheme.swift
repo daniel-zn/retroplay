@@ -42,6 +42,11 @@ enum RetroPlayTheme {
         case .n64: return Color(red: 0.55, green: 0.85, blue: 0.45)
         case .nds: return Color(red: 0.85, green: 0.45, blue: 0.55)
         case .psp: return Color(red: 0.45, green: 0.75, blue: 0.90)
+        case .nes: return Color(red: 0.90, green: 0.38, blue: 0.36)
+        case .snes: return Color(red: 0.66, green: 0.56, blue: 0.92)
+        case .genesis: return Color(red: 0.40, green: 0.56, blue: 0.98)
+        case .atari7800: return Color(red: 0.95, green: 0.62, blue: 0.30)
+        case .ps1: return Color(red: 0.72, green: 0.74, blue: 0.80)
         }
     }
 
@@ -51,6 +56,11 @@ enum RetroPlayTheme {
         case .n64: return "n.circle.fill"
         case .nds: return "rectangle.split.2x1.fill"
         case .psp: return "ipod"
+        case .nes: return "dpad.fill"
+        case .snes: return "s.circle.fill"
+        case .genesis: return "g.circle.fill"
+        case .atari7800: return "a.circle.fill"
+        case .ps1: return "opticaldisc.fill"
         }
     }
 
@@ -60,6 +70,11 @@ enum RetroPlayTheme {
         case .n64: return "N64"
         case .nds: return "NDS"
         case .psp: return "PSP"
+        case .nes: return "NES"
+        case .snes: return "SNES"
+        case .genesis: return "Genesis"
+        case .atari7800: return "7800"
+        case .ps1: return "PS1"
         }
     }
 
@@ -70,6 +85,11 @@ enum RetroPlayTheme {
         case .n64: return Color(red: 0.10, green: 0.24, blue: 0.14)
         case .nds: return Color(red: 0.30, green: 0.11, blue: 0.17)
         case .psp: return Color(red: 0.08, green: 0.18, blue: 0.26)
+        case .nes: return Color(red: 0.32, green: 0.10, blue: 0.10)
+        case .snes: return Color(red: 0.22, green: 0.18, blue: 0.36)
+        case .genesis: return Color(red: 0.08, green: 0.12, blue: 0.30)
+        case .atari7800: return Color(red: 0.32, green: 0.18, blue: 0.06)
+        case .ps1: return Color(red: 0.18, green: 0.19, blue: 0.22)
         }
     }
 

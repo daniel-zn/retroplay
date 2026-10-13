@@ -32,7 +32,9 @@ final class LicenseBundleTests: XCTestCase {
         let data = try Data(contentsOf: licensesDirectory.appendingPathComponent("components.json"))
         let components = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
         let groups = Set(components.compactMap { $0["usedBy"] as? String })
-        for core in ["GBA core (mGBA)", "DS core (melonDS)", "N64 core (mupen64plus-next)", "PSP core (PPSSPP)"] {
+        for core in ["GBA core (mGBA)", "DS core (melonDS)", "N64 core (mupen64plus-next)", "PSP core (PPSSPP)",
+                     "NES core (Nestopia UE)", "SNES core (bsnes)", "Atari 7800 core (ProSystem)",
+                     "Genesis core (clownmdemu)", "PS1 core (PCSX-ReARMed)"] {
             XCTAssertTrue(groups.contains(core), "no components listed for \(core)")
         }
         let gpl = try String(contentsOf: licensesDirectory.appendingPathComponent("GPL-3.0.txt"), encoding: .utf8)

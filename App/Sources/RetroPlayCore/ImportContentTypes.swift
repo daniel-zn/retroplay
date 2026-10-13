@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import UniformTypeIdentifiers
 
-/// P0 ROM / disc extensions accepted by the Files importer.
+/// ROM / disc extensions accepted by the Files importer.
 public enum ImportContentTypes {
     public static let fileExtensions: [String] = [
         "gba", "agb", "mb",
         "n64", "z64", "v64",
         "nds", "dsi",
         "iso", "cso", "chd", "pbp",
+        "nes", "unf", "unif",
+        "sfc", "smc",
+        "md", "gen", "smd", "bin",
+        "a78",
+        "cue", "exe",
     ]
 
     /// Broad types plus per-extension UTTypes so `.fileImporter` surfaces ROMs in Files.

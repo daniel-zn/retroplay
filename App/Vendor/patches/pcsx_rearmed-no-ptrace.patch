@@ -1,0 +1,16 @@
+diff --git a/frontend/libretro.c b/frontend/libretro.c
+index 9dd3502c..6d671837 100644
+--- a/frontend/libretro.c
++++ b/frontend/libretro.c
+@@ -3916,8 +3916,10 @@ void retro_init(void)
+    msg_interface_version = 0;
+    environ_cb(RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION, &msg_interface_version);
+ 
+-#if defined(__MACH__) && !defined(TVOS)
++#if defined(__MACH__) && !defined(TVOS) && !defined(RETROPLAY)
+    // magic sauce to make the dynarec work on iOS
++   // Modified by RetroPlay: skipped (RETROPLAY defined). RetroPlay builds without the
++   // dynarec, and PTRACE_TRACEME leaves the app traced so iOS can't stop or relaunch it.
+    syscall(SYS_ptrace, 0 /*PTRACE_TRACEME*/, 0, 0, 0);
+ #endif
+ 

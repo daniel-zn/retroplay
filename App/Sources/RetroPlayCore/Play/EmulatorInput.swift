@@ -164,3 +164,74 @@ public struct NDSTouch: Sendable, Hashable {
 
     public static let idle = NDSTouch(x: 0, y: 0, pressed: false)
 }
+
+/// libretro RetroPad bits (bit n = `RETRO_DEVICE_ID_JOYPAD_n`). The libretro cores (NES,
+/// SNES, Genesis, Atari 7800, PS1) read this mask as is; each system names the buttons
+/// after its own pad (`RetroPadInput.NES.a`, `.Genesis.c`, …).
+public struct RetroPadInput: OptionSet, Sendable, Hashable {
+    public let rawValue: UInt32
+    public init(rawValue: UInt32) { self.rawValue = rawValue }
+
+    public static let b      = RetroPadInput(rawValue: 1 << 0)
+    public static let y      = RetroPadInput(rawValue: 1 << 1)
+    public static let select = RetroPadInput(rawValue: 1 << 2)
+    public static let start  = RetroPadInput(rawValue: 1 << 3)
+    public static let up     = RetroPadInput(rawValue: 1 << 4)
+    public static let down   = RetroPadInput(rawValue: 1 << 5)
+    public static let left   = RetroPadInput(rawValue: 1 << 6)
+    public static let right  = RetroPadInput(rawValue: 1 << 7)
+    public static let a      = RetroPadInput(rawValue: 1 << 8)
+    public static let x      = RetroPadInput(rawValue: 1 << 9)
+    public static let l      = RetroPadInput(rawValue: 1 << 10)
+    public static let r      = RetroPadInput(rawValue: 1 << 11)
+    public static let l2     = RetroPadInput(rawValue: 1 << 12)
+    public static let r2     = RetroPadInput(rawValue: 1 << 13)
+
+    public static let dpad: RetroPadInput = [.up, .down, .left, .right]
+
+    /// Nestopia: A and B as on the NES pad.
+    public enum NES {
+        public static let a = RetroPadInput.a
+        public static let b = RetroPadInput.b
+    }
+
+    /// bsnes: the SNES pad is the RetroPad's model, so names match.
+    public enum SNES {
+        public static let a = RetroPadInput.a
+        public static let b = RetroPadInput.b
+        public static let x = RetroPadInput.x
+        public static let y = RetroPadInput.y
+    }
+
+    /// clownmdemu's mapping (libretro-interface.c): A←Y, B←B, C←A, X←L, Y←X, Z←R, Mode←Select.
+    public enum Genesis {
+        public static let a = RetroPadInput.y
+        public static let b = RetroPadInput.b
+        public static let c = RetroPadInput.a
+        public static let x = RetroPadInput.l
+        public static let y = RetroPadInput.x
+        public static let z = RetroPadInput.r
+        public static let mode = RetroPadInput.select
+    }
+
+    /// ProSystem: fire buttons 1 / 2, console Select / Pause / Reset switches.
+    public enum Atari7800 {
+        public static let button1 = RetroPadInput.b
+        public static let button2 = RetroPadInput.a
+        public static let select = RetroPadInput.select
+        public static let pause = RetroPadInput.start
+        public static let reset = RetroPadInput.x
+    }
+
+    /// PCSX-ReARMed: the RetroPad is laid out like a DualShock.
+    public enum PS1 {
+        public static let cross = RetroPadInput.b
+        public static let circle = RetroPadInput.a
+        public static let square = RetroPadInput.y
+        public static let triangle = RetroPadInput.x
+        public static let l1 = RetroPadInput.l
+        public static let r1 = RetroPadInput.r
+        public static let l2 = RetroPadInput.l2
+        public static let r2 = RetroPadInput.r2
+    }
+}

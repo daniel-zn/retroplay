@@ -239,8 +239,14 @@ public final class LibraryStore: ObservableObject {
     struct ImportJob: Sendable {
         let source: URL
         let originalName: String
+        /// Relative to Games/. A PS1 `.cue` goes in its own folder ("Folder/Game.cue") with
+        /// the track files it names.
         let destinationName: String
         let fileExtension: String
+        /// Picked files a `.cue` sheet names, copied next to it without rows of their own.
+        var companions: [URL] = []
+        /// Track names the sheet lists, to report any that weren't picked.
+        var expectedCompanions: [String] = []
     }
 
     struct ImportPlan: Sendable {
@@ -267,7 +273,20 @@ public final class LibraryStore: ObservableObject {
         var plan = ImportPlan()
         var taken = takenBaseNames()
         let gamesFolder = Self.resolvedPath(of: gamesDirectoryURL)
-        for url in urls {
+        // A PS1 disc picked as .cue + .bin: the tracks travel with their sheet.
+        var tracksForCue: [URL: (picked: [URL], expected: [String])] = [:]
+        var companionPaths = Set<String>()
+        for cue in urls where cue.pathExtension.lowercased() == "cue" {
+            let accessed = cue.startAccessingSecurityScopedResource()
+            let names = CueSheet.referencedFiles(at: cue)
+            if accessed { cue.stopAccessingSecurityScopedResource() }
+            let picked = names.compactMap { name in
+                urls.first { $0.lastPathComponent.lowercased() == name.lowercased() }
+            }
+            tracksForCue[cue] = (picked, names)
+            companionPaths.formUnion(picked.map(\.path))
+        }
+        for url in urls where !companionPaths.contains(url.path) {
             let ext = url.pathExtension.lowercased()
             let originalName = url.lastPathComponent
             guard ImportContentTypes.isSupportedExtension(ext),
@@ -279,6 +298,21 @@ public final class LibraryStore: ObservableObject {
             }
             if Self.resolvedPath(of: url.deletingLastPathComponent()) == gamesFolder {
                 plan.inGamesFolder.append(originalName)
+                continue
+            }
+            if let tracks = tracksForCue[url] {
+                let base = (originalName as NSString).deletingPathExtension
+                let folder = Self.uniqueFileName(for: base, takenBaseNames: taken)
+                taken.insert(GameArtifactCleanup.baseName(of: folder))
+                reservedFileNames.insert(folder)
+                plan.jobs.append(ImportJob(
+                    source: url,
+                    originalName: originalName,
+                    destinationName: "\(folder)/\(originalName)",
+                    fileExtension: ext,
+                    companions: tracks.picked,
+                    expectedCompanions: tracks.expected
+                ))
                 continue
             }
             let name = Self.uniqueFileName(for: originalName, takenBaseNames: taken)
@@ -302,7 +336,8 @@ public final class LibraryStore: ObservableObject {
 
     private func releaseReservations(_ jobs: [ImportJob]) {
         for job in jobs {
-            reservedFileNames.remove(job.destinationName)
+            // A disc folder job reserved its folder ("Folder/Game.cue" → "Folder").
+            reservedFileNames.remove(job.destinationName.split(separator: "/").first.map(String.init) ?? job.destinationName)
         }
     }
 
@@ -388,15 +423,19 @@ public final class LibraryStore: ObservableObject {
                 }
 
                 let destination = paths.gamesDirectory.appendingPathComponent(job.destinationName)
-                // Copy under a hidden name first so a Games/ scan never sees a partial file.
-                let temporary = paths.gamesDirectory
-                    .appendingPathComponent(".importing-\(UUID().uuidString)-\(job.destinationName)")
-                do {
-                    try fileManager.copyItem(at: source, to: temporary)
-                    try fileManager.moveItem(at: temporary, to: destination)
-                } catch {
-                    try? fileManager.removeItem(at: temporary)
-                    throw error
+                if job.destinationName.contains("/") {
+                    try copyDiscFolder(job, sheet: source, to: destination, fileManager: fileManager)
+                } else {
+                    // Copy under a hidden name first so a Games/ scan never sees a partial file.
+                    let temporary = paths.gamesDirectory
+                        .appendingPathComponent(".importing-\(UUID().uuidString)-\(job.destinationName)")
+                    do {
+                        try fileManager.copyItem(at: source, to: temporary)
+                        try fileManager.moveItem(at: temporary, to: destination)
+                    } catch {
+                        try? fileManager.removeItem(at: temporary)
+                        throw error
+                    }
                 }
 
                 do {
@@ -409,11 +448,51 @@ public final class LibraryStore: ObservableObject {
                     return .added(entry, destination)
                 } catch {
                     try? fileManager.removeItem(at: destination)
+                    if job.destinationName.contains("/") {
+                        try? fileManager.removeItem(at: destination.deletingLastPathComponent())
+                    }
                     throw error
                 }
             }
         } catch {
             return .failed(LibraryImportFailure(fileName: job.originalName, reason: error.localizedDescription))
+        }
+    }
+
+    /// A `.cue` sheet and the tracks it names, copied into the game's own folder. Built under
+    /// a hidden name and moved in whole, so a Games/ scan never sees half a disc.
+    nonisolated private static func copyDiscFolder(
+        _ job: ImportJob,
+        sheet: URL,
+        to destination: URL,
+        fileManager: FileManager
+    ) throws {
+        let pickedNames = Set(job.companions.map { $0.lastPathComponent.lowercased() })
+        let missing = job.expectedCompanions.filter { !pickedNames.contains($0.lowercased()) }
+        guard !job.expectedCompanions.isEmpty, missing.isEmpty else {
+            throw CocoaError(.fileReadNoSuchFile, userInfo: [
+                NSLocalizedDescriptionKey: missing.isEmpty
+                    ? "\(job.originalName) doesn't name any track files."
+                    : "Pick \(job.originalName) together with its track files (missing: \(missing.joined(separator: ", ")))."
+            ])
+        }
+        let folder = destination.deletingLastPathComponent()
+        let temporary = folder.deletingLastPathComponent()
+            .appendingPathComponent(".importing-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try fileManager.createDirectory(at: temporary, withIntermediateDirectories: true)
+            try fileManager.copyItem(at: sheet, to: temporary.appendingPathComponent(job.originalName))
+            for track in job.companions {
+                let accessed = track.startAccessingSecurityScopedResource()
+                defer { if accessed { track.stopAccessingSecurityScopedResource() } }
+                try coordinatedRead(of: track) { readURL in
+                    try fileManager.copyItem(at: readURL, to: temporary.appendingPathComponent(track.lastPathComponent))
+                }
+            }
+            try fileManager.moveItem(at: temporary, to: folder)
+        } catch {
+            try? fileManager.removeItem(at: temporary)
+            throw error
         }
     }
 
@@ -439,6 +518,9 @@ public final class LibraryStore: ObservableObject {
         let covers = CoverArtStore(fileManager: fileManager, paths: paths)
         for case .added(let entry, let destination) in staged {
             try? fileManager.removeItem(at: destination)
+            if entry.relativePath.contains("/") {
+                try? fileManager.removeItem(at: destination.deletingLastPathComponent())
+            }
             try? covers.removeCover(forGameID: entry.id)
         }
     }
@@ -566,9 +648,17 @@ public final class LibraryStore: ObservableObject {
         let visible = names.filter { !$0.hasPrefix(".") }
         let onDiskBases = Set(visible.map { GameArtifactCleanup.baseName(of: $0) })
 
+        // Track files a top-level .cue sheet names belong to that sheet's game.
+        let cueTracks = Set(visible
+            .filter { ($0 as NSString).pathExtension.lowercased() == "cue" }
+            .flatMap { CueSheet.referencedFiles(at: gamesDirectoryURL.appendingPathComponent($0)) }
+            .map { $0.lowercased() })
+
         var jobs: [ImportJob] = []
         for name in visible.sorted() {
-            guard !known.contains(name.lowercased()), !reservedFileNames.contains(name) else { continue }
+            guard !known.contains(name.lowercased()), !reservedFileNames.contains(name),
+                  !cueTracks.contains(name.lowercased())
+            else { continue }
             let ext = (name as NSString).pathExtension.lowercased()
             let url = gamesDirectoryURL.appendingPathComponent(name)
             var isDir: ObjCBool = false

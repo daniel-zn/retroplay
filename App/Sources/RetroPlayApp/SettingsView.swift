@@ -325,6 +325,11 @@ extension SystemTab {
         case .n64: self = .n64
         case .nds: self = .nds
         case .psp: self = .psp
+        case .nes: self = .nes
+        case .snes: self = .snes
+        case .genesis: self = .genesis
+        case .atari7800: self = .atari7800
+        case .ps1: self = .ps1
         }
     }
 }

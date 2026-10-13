@@ -1,0 +1,6 @@
+Notice copied verbatim from bsnes/bsnes/lzma/LzmaDec.c (lines 1-2):
+
+/* LzmaDec.c -- LZMA Decoder
+2018-07-04 : Igor Pavlov : Public domain */
+
+[Every LZMA SDK file in bsnes/bsnes/lzma carries the same 'Igor Pavlov : Public domain' line; the SDK has no separate license file in this checkout.]

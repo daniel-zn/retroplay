@@ -17,6 +17,11 @@ repos={
  'melonDS':('DS core (melonDS)','https://github.com/melonDS-emu/melonDS/tree/906e9ebb27da8c6a715cd7abab4abfe8a8d29427'),
  'mupen64plus-next':('N64 core (mupen64plus-next)','https://github.com/libretro/mupen64plus-libretro-nx/tree/f275caf4b2bfa1e6d1c51636746ea793f3d80320'),
  'PPSSPP':('PSP core (PPSSPP)','https://github.com/hrydgard/ppsspp/tree/98e70c8ca3435d532a059add0b4fb90a4a091248'),
+ 'Nestopia UE':('NES core (Nestopia UE)','https://github.com/libretro/nestopia/tree/135dfa6dfda5e7603d61e751b9ddd0cc42546bc3'),
+ 'bsnes':('SNES core (bsnes)','https://github.com/libretro/bsnes/tree/63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7'),
+ 'ProSystem':('Atari 7800 core (ProSystem)','https://github.com/libretro/prosystem-libretro/tree/8a88014287c7a01cd568067e5a557d0a2b2a051f'),
+ 'clownmdemu':('Genesis core (clownmdemu)','https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346'),
+ 'PCSX-ReARMed':('PS1 core (PCSX-ReARMed)','https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a'),
  'RetroPlay app resources':('App','https://github.com/google/fonts/tree/dbd72d6ef9ebea750d33c02c7189633e972d6a40/ofl/pressstart2p'),
 }
 agent_files=[f for f in os.listdir(L) if f.endswith('.txt')]
@@ -69,8 +74,9 @@ entries.append(dict(name='PPSSPP data files (PPGe atlas, VFPU tables, compat.ini
     usedBy='PSP core (PPSSPP)', license='GPL-2.0-or-later', copyright='Copyright (C) 2012- PPSSPP Project and contributors',
     source=repos['PPSSPP'][1]+'/assets', version='98e70c8ca3', licenseFile=add_text(os.path.join(PARENT,'ppsspp/LICENSE.TXT'),'PPSSPP-GPL-2.0-or-later')))
 shutil.copy('LICENSE', os.path.join(OUT,'GPL-3.0.txt'))
-order=['App','GBA core (mGBA)','DS core (melonDS)','N64 core (mupen64plus-next)','PSP core (PPSSPP)']
-main={'mGBA','melonDS','mupen64plus-next','PPSSPP'}
+order=['App','GBA core (mGBA)','DS core (melonDS)','N64 core (mupen64plus-next)','PSP core (PPSSPP)',
+       'NES core (Nestopia UE)','SNES core (bsnes)','Atari 7800 core (ProSystem)','Genesis core (clownmdemu)','PS1 core (PCSX-ReARMed)']
+main={'mGBA','melonDS','mupen64plus-next','PPSSPP','Nestopia','bsnes','ProSystem','clownmdemu','PCSX-ReARMed'}
 entries.sort(key=lambda x:(order.index(x['usedBy']), 0 if x['name'].split(' ')[0] in main else 1, x['name'].lower()))
 json.dump(entries, open(os.path.join(OUT,'components.json'),'w'), indent=1, ensure_ascii=False)
 print(len(entries),'components;', len(os.listdir(OUT))-1,'license files; skipped:',skipped)

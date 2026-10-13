@@ -49,6 +49,62 @@ enum PadPalette {
         static let inkDark = Color(red: 0.12, green: 0.12, blue: 0.14)
     }
 
+    enum NES {
+        static let chassis = Color(red: 0.30, green: 0.30, blue: 0.32)
+        static let chassisStroke = Color(red: 0.70, green: 0.70, blue: 0.72)
+        static let dpad = Color(red: 0.10, green: 0.10, blue: 0.11)
+        static let dpadHeld = Color(red: 0.30, green: 0.30, blue: 0.32)
+        static let face = Color(red: 0.80, green: 0.16, blue: 0.18)
+        static let pill = Color(red: 0.16, green: 0.16, blue: 0.17)
+        static let ink = Color.white.opacity(0.94)
+    }
+
+    enum SNES {
+        static let chassis = Color(red: 0.50, green: 0.50, blue: 0.56)
+        static let chassisStroke = Color(red: 0.78, green: 0.78, blue: 0.84)
+        static let dpad = Color(red: 0.20, green: 0.20, blue: 0.23)
+        static let a = Color(red: 0.82, green: 0.22, blue: 0.24)
+        static let b = Color(red: 0.92, green: 0.74, blue: 0.20)
+        static let x = Color(red: 0.24, green: 0.40, blue: 0.84)
+        static let y = Color(red: 0.20, green: 0.62, blue: 0.36)
+        static let shoulder = Color(red: 0.62, green: 0.62, blue: 0.68)
+        static let pill = Color(red: 0.30, green: 0.30, blue: 0.34)
+        static let ink = Color.white.opacity(0.94)
+        static let inkDark = Color(red: 0.12, green: 0.12, blue: 0.14)
+    }
+
+    enum Genesis {
+        static let chassis = Color(red: 0.14, green: 0.14, blue: 0.15)
+        static let chassisStroke = Color(red: 0.46, green: 0.46, blue: 0.50)
+        static let dpad = Color(red: 0.22, green: 0.22, blue: 0.24)
+        static let face = Color(red: 0.24, green: 0.24, blue: 0.26)
+        static let faceTop = Color(red: 0.32, green: 0.32, blue: 0.35)
+        static let start = Color(red: 0.30, green: 0.30, blue: 0.33)
+        static let accent = Color(red: 0.86, green: 0.20, blue: 0.20)
+        static let ink = Color.white.opacity(0.94)
+    }
+
+    enum Atari7800 {
+        static let chassis = Color(red: 0.16, green: 0.15, blue: 0.15)
+        static let chassisStroke = Color(red: 0.62, green: 0.52, blue: 0.40)
+        static let stick = Color(red: 0.12, green: 0.12, blue: 0.12)
+        static let stickHeld = Color(red: 0.36, green: 0.30, blue: 0.24)
+        static let fire = Color(red: 0.86, green: 0.36, blue: 0.14)
+        static let switchFill = Color(red: 0.62, green: 0.56, blue: 0.48)
+        static let ink = Color.white.opacity(0.94)
+        static let inkDark = Color(red: 0.12, green: 0.12, blue: 0.12)
+    }
+
+    enum PS1 {
+        static let chassis = Color(red: 0.56, green: 0.56, blue: 0.60)
+        static let chassisStroke = Color(red: 0.80, green: 0.80, blue: 0.84)
+        static let dpad = Color(red: 0.30, green: 0.30, blue: 0.33)
+        static let face = Color(red: 0.20, green: 0.20, blue: 0.22)
+        static let shoulder = Color(red: 0.36, green: 0.36, blue: 0.40)
+        static let pill = Color(red: 0.26, green: 0.26, blue: 0.29)
+        static let ink = Color.white.opacity(0.94)
+    }
+
     enum PSP {
         static let chassis = Color(red: 0.08, green: 0.08, blue: 0.09)
         static let chassisStroke = Color(red: 0.72, green: 0.74, blue: 0.78)

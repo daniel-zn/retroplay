@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 /// Battery-save / memstick artifacts accepted by the Files importer (not quick-states).
 public enum SaveImportContentTypes {
     public static let batteryExtensions: [String] = [
-        "sav", "srm", "eep", "fla", "sra", "mpk",
+        "sav", "srm", "eep", "fla", "sra", "mpk", "mcr",
     ]
 
     public static var allowedContentTypes: [UTType] {

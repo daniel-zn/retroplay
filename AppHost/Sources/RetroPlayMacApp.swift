@@ -9,6 +9,7 @@ struct RetroPlayMacApp: App {
         MGBANativeBootstrap.registerIfAvailable()
         PPSSPPNativeBootstrap.registerIfAvailable()
         N64NativeBootstrap.registerIfAvailable()
+        LibretroNativeBootstrap.registerIfAvailable()
         MelonDSNativeBootstrap.registerIfAvailable()
     }
 

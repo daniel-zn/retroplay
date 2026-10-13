@@ -47,7 +47,7 @@ targets:
         INFOPLIST_FILE: AppHost/Supporting/Info.plist
         GENERATE_INFOPLIST_FILE: false
         SWIFT_OBJC_BRIDGING_HEADER: AppHost/Supporting/RetroPlay-Bridging-Header.h
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS"
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS RETROPLAY_HAS_LIBRETRO"
         CLANG_CXX_LANGUAGE_STANDARD: "c++20"
         CLANG_ENABLE_MODULES: "YES"
         ENABLE_PREVIEWS: false
@@ -64,9 +64,9 @@ targets:
         OTHER_LDFLAGS: "$(inherited) -lc++ -ObjC -lz"
       configs:
         Debug:
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS RETROPLAY_HAS_LIBRETRO"
         Release:
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "RETROPLAY_HAS_MGBA RETROPLAY_HAS_PPSSPP RETROPLAY_HAS_N64 RETROPLAY_HAS_MELONDS RETROPLAY_HAS_LIBRETRO"
     dependencies:
       - package: RetroPlayPackage
         product: RetroPlayCore
@@ -80,6 +80,23 @@ targets:
         embed: true
       - framework: App/Vendor/Output/melonDS.xcframework
         embed: false
+      # libretro cores: embedded, not linked. LibretroHost dlopens each one, so their
+      # identical retro_* symbols never meet.
+      - framework: App/Vendor/Output/nestopia.xcframework
+        embed: true
+        link: false
+      - framework: App/Vendor/Output/bsnes.xcframework
+        embed: true
+        link: false
+      - framework: App/Vendor/Output/clownmdemu.xcframework
+        embed: true
+        link: false
+      - framework: App/Vendor/Output/prosystem.xcframework
+        embed: true
+        link: false
+      - framework: App/Vendor/Output/pcsx_rearmed.xcframework
+        embed: true
+        link: false
       - sdk: UIKit.framework
       - sdk: Foundation.framework
       - sdk: Metal.framework

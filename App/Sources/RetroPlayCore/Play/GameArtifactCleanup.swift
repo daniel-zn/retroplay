@@ -43,8 +43,25 @@ public enum GameArtifactCleanup: Sendable {
 
         let others = otherGames.filter { $0.id != game.id }
         let romURL = paths.gameROMURL(forRelativePath: game.relativePath)
+        // A PS1 .cue sheet's track files sit next to it (in the game's own folder).
+        let tracks = romURL.pathExtension.lowercased() == "cue"
+            ? CueSheet.referencedFiles(at: romURL)
+            : []
         attempt("game file") {
             try removeItemIfPresent(romURL, fileManager: fileManager)
+        }
+        for track in tracks {
+            attempt("disc track") {
+                try removeItemIfPresent(
+                    romURL.deletingLastPathComponent().appendingPathComponent(track),
+                    fileManager: fileManager
+                )
+            }
+        }
+        let folder = romURL.deletingLastPathComponent()
+        if folder.standardizedFileURL != paths.gamesDirectory.standardizedFileURL,
+           (try? fileManager.contentsOfDirectory(atPath: folder.path))?.isEmpty == true {
+            attempt("game folder") { try fileManager.removeItem(at: folder) }
         }
 
         // Saves, states and cheats are keyed by ROM base name. Rows imported by older builds
@@ -60,7 +77,7 @@ public enum GameArtifactCleanup: Sendable {
                         fileManager: fileManager
                     )
                 }
-            case .gba, .nds:
+            case .gba, .nds, .nes, .snes, .genesis, .atari7800, .ps1:
                 attempt("battery save") {
                     try removeItemIfPresent(
                         paths.sramURL(forRelativeROMPath: game.relativePath),

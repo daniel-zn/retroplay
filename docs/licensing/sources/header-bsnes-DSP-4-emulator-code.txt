@@ -1,0 +1,11 @@
+Notice copied verbatim from bsnes/bsnes/sfc/coprocessor/dsp4/dsp4emu.c (lines 3-9):
+
+//DSP-4 emulator code
+//Copyright (c) 2004-2006 Dreamer Nom, John Weidman, Kris Bleakley, Nach, z80 gaiden
+
+/*
+Due recognition and credit are given on Overload's DSP website.
+Thank those contributors for their hard work on this chip.
+
+
+[No license statement accompanies this code in the bsnes checkout. It is distributed as part of bsnes (GPL-3.0-only).]

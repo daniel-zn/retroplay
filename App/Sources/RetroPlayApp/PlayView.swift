@@ -978,12 +978,25 @@ public struct PlayView: View {
             || UserDefaults.standard.object(forKey: "RetroPlaySmokeSystem") != nil
         else { return }
         NSLog("RP_SMOKE play first frame system=%@ rom=%@", system.rawValue, romURL.lastPathComponent)
+        // `-RetroPlaySmokeLandscape YES`: turn to landscape, for layout screenshots.
+        if UserDefaults.standard.bool(forKey: "RetroPlaySmokeLandscape") {
+            for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { _ in }
+            }
+        } else if UserDefaults.standard.bool(forKey: "RetroPlaySmokePortrait") {
+            for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
+            }
+        }
         let presses: [UInt32]
         switch system {
         case .gba: presses = [GBAInput.start.bits, GBAInput.a.bits]
         case .nds: presses = [NDSInput.start.rawValue, NDSInput.a.rawValue]
         case .n64: presses = [N64Input.start.rawValue, N64Input.a.rawValue]
         case .psp: presses = [PSPInput.start.rawValue, PSPInput.cross.rawValue]
+        case .nes, .snes, .atari7800: presses = [RetroPadInput.start.rawValue, RetroPadInput.a.rawValue]
+        case .genesis: presses = [RetroPadInput.start.rawValue, RetroPadInput.Genesis.a.rawValue]
+        case .ps1: presses = [RetroPadInput.start.rawValue, RetroPadInput.PS1.cross.rawValue]
         }
         Task { @MainActor in
             for bits in presses {

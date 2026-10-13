@@ -1,7 +1,7 @@
 # RetroPlay: open-source license inventory (2026-09-29)
 
 Files in this folder:
-- `inventory.json`: 88 entries, 56 of which need their notice text shipped. It merges the per-core files `inventory-ppsspp.json`, `inventory-mupen64plus.json` and the mGBA/melonDS/font entries.
+- `inventory.json`: 133 entries, 88 of which need their notice text shipped. It merges the per-core files `inventory-ppsspp.json`, `inventory-mupen64plus.json`, the mGBA/melonDS/font entries and (added 2026-10-12) the five libretro cores below.
 - `notes-ppsspp.md` and `notes-mupen64plus.md`: detailed evidence for those two cores.
 - License texts, named `<component>-<SPDX>.txt`. These are exact copies of the files in each checkout. Where a component has no license file, the text is its source-header comment copied verbatim; the inventory says so for each one.
 
@@ -62,6 +62,36 @@ Not linked: zlib (it comes from the iOS system `libz`) and discord-rpc (even tho
 
 **FFmpeg is LGPL-only.** The strings in the shipped library read `lib* license: LGPL version 2.1 or later`, and there are 0 hits for `--enable-gpl`, `--enable-nonfree` or `--enable-version3`. It is upstream's old prebuilt FFmpeg (version 537ef3b0e3, the 3.0.x line, built with the iPhoneOS 10.2 SDK). Because it is linked statically, the LGPL requires that users be able to relink it: ship the source plus build scripts, or the object files.
 
+### Libretro cores (added 2026-10-12)
+Built by `App/Vendor/build-libretro-cores-ios.sh` from unmodified checkouts (commits in `App/Vendor/SOURCES.md`). "Compiled" below means the files a `clang -M` dependency scan reports for every compile command of `make -n` with the script's exact flags; no binary symbol check was done (the cores were not rebuilt for this inventory).
+
+**Nestopia UE** (GPL-2.0-or-later; headers say "version 2 of the License, or (at your option) any later version").
+- Linked: Nestopia core + NstDatabase.xml (embedded), nes_ntsc 0.2.2 (LGPL-2.1-or-later, Shay Green), NstSha1 (Steve Reid public domain), libretro-common (MIT).
+- Not linked: zlib (`-DNST_NO_ZLIB`).
+- `libretro/nesfont.h` (8x8 font for the NSF player) has no origin or notice; treated as part of Nestopia.
+
+**bsnes** (GPL-3.0-only: `LICENSE.txt` says "specifically version 3 of the License and no other version").
+- Linked: bsnes, libco and nall (ISC, byuu), SameBoy (MIT, Lior Halphon), snes_spc S-DSP and snes_ntsc (LGPL-2.1-or-later, Shay Green), LZMA SDK 19.00 (public domain), S-DD1 decompressor (Andreas Naive, public domain), libretro.h (MIT).
+- DSP-4 emulator code (`sfc/coprocessor/dsp4/dsp4emu.c`, "Copyright (c) 2004-2006 Dreamer Nom, John Weidman, Kris Bleakley, Nach, z80 gaiden") has no license statement; see red flag 9.
+- `filter/` (2xSaI, Super Eagle, hq2x/lq2x, scale2x) and `nall/decode/inflate.hpp` ("a bad implementation of inflate from zlib/minizip") have no third-party notices; recorded as part of bsnes/nall.
+- Not compiled: ruby, hiro, target-bsnes, `bsnes/gb` outside `Core/`.
+
+**ProSystem** (GPL-2.0-or-later; every core file: "either version 2 of the License, or (at your option) any later version").
+- Linked: ProSystem, TiaSound and PokeySound (Ron Fries, LGPL-2.0-only "Library GPL version 2"; s.3 allows conversion to GPL), BupBoop/CoreTone (Zlib), libretro-common (MIT).
+- The LGPL-2.0 full text is not in the checkout; the shipped copy comes from `pcsx_rearmed/deps/lightrec/COPYING`.
+
+**clownmdemu** (AGPL-3.0-or-later: README "AGPLv3 (or any later version)"; clown68000 headers say the same).
+- Linked (one `unity.c` translation unit): clownmdemu core, libretro frontend + frontend-common, clown68000, clownz80 (README says only "AGPLv3"; recorded as AGPL-3.0-only), ClownCD, clownresampler, clowncommon (0BSD), libchdr (BSD-3-Clause), LZMA SDK 25.01 (public domain), miniz 3.1.1 (MIT), zstd 1.5.7 decoder (BSD-3-Clause chosen), dr_flac / dr_wav (Unlicense OR MIT-0), dr_mp3 (same, plus minimp3 CC0-1.0), stb_vorbis 1.22 (MIT OR Unlicense), libretro-common headers (MIT).
+- Nested submodule commits are pinned in `App/Vendor/pins/clownmdemu-libretro-submodules.txt`.
+
+**PCSX-ReARMed** (GPL-2.0-or-later; headers "either version 2 ... or (at your option) any later version" or "GNU GPLv2 or later").
+- Build: `Makefile.libretro`, `DYNAREC=0` (`-DDRC_DISABLE`), `BUILTIN_GPU=neon`, `HAVE_CHD`, `USE_MINIZ`.
+- Linked: libpcsxcore, libretro frontend, P.E.Op.S. SPU (Pete Bernert), psx_gpu NEON renderer (Exophase) and gpulib (notaz; GPL-2.0-or-later or LGPL-2.1-or-later), GTE divider from MAME (BSD-3-Clause, smf), Shift-JIS BIOS font (Shinonome k14goth, public domain), libchdr (BSD-3-Clause), LZMA SDK 26.02 incl. arm64 asm (public domain), miniz 3.1.2 (MIT), zstd 1.5.7 decoder (BSD-3-Clause), dr_flac (Unlicense OR MIT-0), libretro-common (MIT).
+- Not linked: lightrec/GNU lightning (only two declaration-only headers are included), new_dynarec (only `emu_if.c` with `DRC_DISABLE`), libpicofe, zlib (link line is `-lpthread -lm -ldl`).
+- `gte_divider.c` says only "Licensed under the BSD-3-Clause"; the shipped text is the SPDX BSD-3-Clause template with smf's copyright line.
+
+**Compatibility.** Every new license combines with GPL-3.0: the GPL-2.0-or-later and LGPL cores upgrade to v3, bsnes is GPL-3.0 itself, and GPLv3 s.13 explicitly allows linking with AGPLv3 code (clownmdemu). The AGPL's extra s.13 duty (offer source to users who interact over a network) does not apply to an offline emulator, and the app already publishes its complete source. Nothing is non-commercial. See red flags 9-11.
+
 ### App resources
 - **Press Start 2P** (OFL-1.1). The SHA-256 matches `SOURCE.md`. The OFL and FONTLOG files are bundled.
 - **PPSSPP assets.** All are byte-identical to ppsspp@98e70c8ca3. Provenance is in `notes-ppsspp.md`.
@@ -92,3 +122,6 @@ Not linked: zlib (it comes from the iOS system `libz`) and discord-rpc (even tho
    - The libpng `pngpriv.h` edit has no "modified" marking, which both the libpng and zlib licenses require.
    - `SOURCES.md` gives the commit date as 2026-08-06, but git shows 2026-05-25.
 8. **Build provenance.** mGBA and PPSSPP were built from `~/src/*` checkouts that no longer exist. PPSSPP's `build-ios-device` references `~/src/ppsspp`, so its exact source state could not be verified beyond the asset matches.
+9. **bsnes DSP-4 code has no license statement.** `dsp4emu.c` names its authors (Dreamer Nom, John Weidman, Kris Bleakley, Nach, z80 gaiden) but no license. It came from the ZSNES/Snes9x DSP-4 work and has shipped in bsnes/higan under the GPL for years; I could not confirm a grant from those authors. The inventory records it as `LicenseRef-NoLicenseStatement`.
+10. **More GPL-3.0-only code next to GPL-2.0-only GLideN64.** bsnes is GPL-3.0-only, the same conflict as red flag 1. It also means the combined app can only be distributed under GPL-3.0 (not "or later"), whatever `COPYRIGHT.md` says.
+11. **AGPL-3.0 (clownmdemu) in an App Store app.** It is legally compatible with GPL-3.0, but the same App Store "further restrictions" question as red flag 2 applies, and AGPL authors may be stricter about it.

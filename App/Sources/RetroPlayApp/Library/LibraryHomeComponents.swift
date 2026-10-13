@@ -244,6 +244,11 @@ struct LibraryOnboardingView: View {
         case .n64: return ".z64 .n64 .v64"
         case .nds: return ".nds"
         case .psp: return ".iso .cso .chd .pbp"
+        case .nes: return ".nes"
+        case .snes: return ".sfc .smc"
+        case .genesis: return ".md .gen .bin"
+        case .atari7800: return ".a78"
+        case .ps1: return ".chd .pbp .cue/.bin .exe"
         }
     }
 }

@@ -127,7 +127,8 @@ public struct RetroPlayRootView: View {
             RetroPlayNavigationBarChrome.apply(colorScheme: colorScheme)
             showLibraryLoadError = store.libraryLoadFailureMessage != nil
             #if DEBUG
-            // Debug builds only — Mac/sim smoke: -RetroPlaySmokeSystem nds|n64|gba|psp
+            // Debug builds only — Mac/sim smoke: -RetroPlaySmokeSystem <SystemID raw value>,
+            // optionally -RetroPlaySmokeGame <part of the title> to pick one of that system's games.
             // simctl launch maps "-Key value" into UserDefaults as well as argv.
             if playGame == nil {
                 let args = ProcessInfo.processInfo.arguments
@@ -139,9 +140,12 @@ public struct RetroPlayRootView: View {
                 if raw == nil {
                     raw = UserDefaults.standard.string(forKey: "RetroPlaySmokeSystem")
                 }
+                let title = UserDefaults.standard.string(forKey: "RetroPlaySmokeGame")
                 if let raw,
                    let sys = SystemID(rawValue: raw),
-                   let game = store.games.first(where: { $0.systemID == sys }) {
+                   let game = store.games.first(where: {
+                       $0.systemID == sys && (title.map($0.displayName.localizedCaseInsensitiveContains) ?? true)
+                   }) {
                     playGame = game
                     NSLog("RP_SMOKE autoplay system=%@ game=%@", raw, game.displayName)
                 } else if let raw {

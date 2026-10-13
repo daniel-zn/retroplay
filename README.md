@@ -6,18 +6,26 @@ you.
 
 | System | Core |
 |---|---|
-| Game Boy Advance | [mGBA](https://mgba.io) |
+| Nintendo Entertainment System | [Nestopia UE](https://github.com/libretro/nestopia) |
+| Super Nintendo | [bsnes](https://github.com/libretro/bsnes) |
 | Nintendo 64 | [mupen64plus-next](https://github.com/libretro/mupen64plus-libretro-nx) (GLideN64, cached interpreter) |
+| Game Boy Advance | [mGBA](https://mgba.io) |
 | Nintendo DS | [melonDS](https://melonds.kuribo64.net) |
+| Sega Genesis / Mega Drive | [clownmdemu](https://github.com/Clownacy/clownmdemu-libretro) |
+| PlayStation | [PCSX-ReARMed](https://github.com/libretro/pcsx_rearmed) (interpreter) |
 | PlayStation Portable | [PPSSPP](https://www.ppsspp.org) (IR interpreter) |
+| Atari 7800 | [ProSystem](https://github.com/libretro/prosystem-libretro) |
 
-All cores run without JIT, as iOS requires. RetroPlay includes on-screen controls modelled on
+All cores run without JIT, as iOS requires. The NES, SNES, Genesis, PlayStation and
+Atari 7800 cores are libretro cores, each loaded from its own framework. RetroPlay includes on-screen controls modelled on
 each console, game controller and keyboard support, save states with auto-resume, AirPlay, and
 cover art read from the games themselves.
 
 ## No games included
 
-RetroPlay does not include, sell, host or link to games, BIOS or firmware. Only import software
+RetroPlay does not include, sell, host or link to games, BIOS or firmware. A PlayStation BIOS you
+dump from your own console goes in Files → RetroPlay → BIOS; without one, PCSX-ReARMed uses its
+built-in replacement. Only import software
 you have the right to use. Please don't open issues or pull requests containing game files.
 
 ## License
@@ -39,7 +47,8 @@ Ninja.
 1. Fetch the exact core sources next to this repository and apply RetroPlay's patches:
    `App/Vendor/fetch-core-sources.sh`
 2. Build the cores into `App/Vendor/Output/` with the `App/Vendor/build-*-ios.sh` scripts. Each
-   core's notes are in `App/Vendor/` (`mGBA.md`, `melonDS.md`, `mupen64plus.md`, `PPSSPP.md`).
+   core's notes are in `App/Vendor/` (`mGBA.md`, `melonDS.md`, `mupen64plus.md`, `PPSSPP.md`);
+   `build-libretro-cores-ios.sh` builds the five libretro cores.
 3. Generate the Xcode project with `xcodegen generate` and open `RetroPlay.xcodeproj`.
 
 `App/` is a Swift package (`RetroPlayCore` and `RetroPlayApp`) with the tests; `AppHost/` holds the
@@ -50,5 +59,6 @@ app target and the native bridges to each core. More detail: [`SPEC.md`](SPEC.md
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-Game Boy Advance, Nintendo 64, Nintendo DS and PlayStation Portable are trademarks of their
-respective owners. RetroPlay is not affiliated with or endorsed by Nintendo or Sony.
+Nintendo Entertainment System, Super Nintendo, Nintendo 64, Game Boy Advance, Nintendo DS, Sega
+Genesis, Mega Drive, PlayStation, PlayStation Portable and Atari 7800 are trademarks of their
+respective owners. RetroPlay is not affiliated with or endorsed by Nintendo, Sega, Sony or Atari.

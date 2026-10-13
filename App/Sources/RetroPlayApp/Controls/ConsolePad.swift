@@ -34,6 +34,15 @@ struct ConsolePad {
                 shoulder("Z", N64Input.z.rawValue, PadPalette.N64.z, PadPalette.N64.inkLight, width: large ? 96 : 84)
                 shoulder("L", N64Input.l.rawValue, PadPalette.N64.shoulder, PadPalette.N64.inkLight, width: large ? 56 : 48)
             }
+        case .snes:
+            shoulder("L", RetroPadInput.l.rawValue, PadPalette.SNES.shoulder, PadPalette.SNES.inkDark)
+        case .ps1:
+            stackedShoulders(
+                top: ("L2", RetroPadInput.PS1.l2.rawValue),
+                bottom: ("L1", RetroPadInput.PS1.l1.rawValue)
+            )
+        case .nes, .genesis, .atari7800:
+            EmptyView()
         }
     }
 
@@ -47,6 +56,15 @@ struct ConsolePad {
             shoulder("R", NDSInput.r.rawValue, PadPalette.NDS.shoulder, PadPalette.NDS.ink)
         case .n64:
             shoulder("R", N64Input.r.rawValue, PadPalette.N64.shoulder, PadPalette.N64.inkLight)
+        case .snes:
+            shoulder("R", RetroPadInput.r.rawValue, PadPalette.SNES.shoulder, PadPalette.SNES.inkDark)
+        case .ps1:
+            stackedShoulders(
+                top: ("R2", RetroPadInput.PS1.r2.rawValue),
+                bottom: ("R1", RetroPadInput.PS1.r1.rawValue)
+            )
+        case .nes, .genesis, .atari7800:
+            EmptyView()
         }
     }
 
@@ -102,6 +120,17 @@ struct ConsolePad {
                     accessibilityName: "Control Stick"
                 )
             }
+        case .nes:
+            retroDPad(fill: PadPalette.NES.dpad, heldFill: PadPalette.NES.dpadHeld)
+        case .snes:
+            retroDPad(fill: PadPalette.SNES.dpad, heldFill: PadPalette.SNES.shoulder)
+        case .genesis:
+            retroDPad(fill: PadPalette.Genesis.dpad, heldFill: PadPalette.Genesis.faceTop)
+        case .atari7800:
+            // The Pro-Line joystick, as eight-way directions.
+            retroDPad(fill: PadPalette.Atari7800.stick, heldFill: PadPalette.Atari7800.stickHeld)
+        case .ps1:
+            retroDPad(fill: PadPalette.PS1.dpad, heldFill: PadPalette.PS1.shoulder)
         }
     }
 
@@ -149,6 +178,37 @@ struct ConsolePad {
                 }
                 .frame(width: 136 * k * scale, height: 108 * k * scale)
             }
+        case .nes:
+            // NES: B and A side by side, A on the right.
+            HStack(spacing: Self.nesGap * nesDiameter) {
+                PadFaceButton(title: "B", bits: RetroPadInput.NES.b.rawValue, diameter: nesDiameter, fill: PadPalette.NES.face, ink: PadPalette.NES.ink)
+                PadFaceButton(title: "A", bits: RetroPadInput.NES.a.rawValue, diameter: nesDiameter, fill: PadPalette.NES.face, ink: PadPalette.NES.ink)
+            }
+        case .snes:
+            PadDiamond(
+                top: .init(title: "X", bits: RetroPadInput.SNES.x.rawValue, fill: PadPalette.SNES.x, ink: PadPalette.SNES.ink),
+                right: .init(title: "A", bits: RetroPadInput.SNES.a.rawValue, fill: PadPalette.SNES.a, ink: PadPalette.SNES.ink),
+                bottom: .init(title: "B", bits: RetroPadInput.SNES.b.rawValue, fill: PadPalette.SNES.b, ink: PadPalette.SNES.inkDark),
+                left: .init(title: "Y", bits: RetroPadInput.SNES.y.rawValue, fill: PadPalette.SNES.y, ink: PadPalette.SNES.ink),
+                diameter: (large ? 60 : 54) * scale
+            )
+        case .genesis:
+            genesisFace
+        case .atari7800:
+            twoButtons(
+                primary: ("2", RetroPadInput.Atari7800.button2.rawValue, PadPalette.Atari7800.fire),
+                secondary: ("1", RetroPadInput.Atari7800.button1.rawValue, PadPalette.Atari7800.fire),
+                diameter: (large ? 78 : 74) * scale,
+                ink: PadPalette.Atari7800.ink
+            )
+        case .ps1:
+            PadDiamond(
+                top: .init(title: "△", bits: RetroPadInput.PS1.triangle.rawValue, fill: PadPalette.PS1.face, ink: PadPalette.PSP.triangle, name: "Triangle"),
+                right: .init(title: "○", bits: RetroPadInput.PS1.circle.rawValue, fill: PadPalette.PS1.face, ink: PadPalette.PSP.circle, name: "Circle"),
+                bottom: .init(title: "✕", bits: RetroPadInput.PS1.cross.rawValue, fill: PadPalette.PS1.face, ink: PadPalette.PSP.cross, name: "Cross"),
+                left: .init(title: "□", bits: RetroPadInput.PS1.square.rawValue, fill: PadPalette.PS1.face, ink: PadPalette.PSP.square, name: "Square"),
+                diameter: (large ? 60 : 54) * scale
+            )
         }
     }
 
@@ -164,6 +224,21 @@ struct ConsolePad {
             pills(select: NDSInput.select.rawValue, start: NDSInput.start.rawValue, fill: PadPalette.NDS.shoulder, ink: PadPalette.NDS.ink)
         case .n64:
             PadPillButton(title: "START", bits: N64Input.start.rawValue, scale: pillScale, fill: PadPalette.N64.start, ink: PadPalette.N64.inkLight)
+        case .nes:
+            pills(select: RetroPadInput.select.rawValue, start: RetroPadInput.start.rawValue, fill: PadPalette.NES.pill, ink: PadPalette.NES.ink)
+        case .snes:
+            pills(select: RetroPadInput.select.rawValue, start: RetroPadInput.start.rawValue, fill: PadPalette.SNES.pill, ink: PadPalette.SNES.ink)
+        case .genesis:
+            PadPillButton(title: "START", bits: RetroPadInput.start.rawValue, scale: pillScale, fill: PadPalette.Genesis.start, ink: PadPalette.Genesis.ink)
+        case .atari7800:
+            // The console's switches; most games start on Reset or Pause.
+            HStack(spacing: 14 * scale) {
+                atariSwitch("SELECT", RetroPadInput.Atari7800.select)
+                atariSwitch("PAUSE", RetroPadInput.Atari7800.pause)
+                atariSwitch("RESET", RetroPadInput.Atari7800.reset)
+            }
+        case .ps1:
+            pills(select: RetroPadInput.select.rawValue, start: RetroPadInput.start.rawValue, fill: PadPalette.PS1.pill, ink: PadPalette.PS1.ink)
         }
     }
 
@@ -181,12 +256,20 @@ struct ConsolePad {
             case .gba: return 156 * scale
             case .psp, .nds: return 168 * scale
             case .n64: return 160 * scale
+            case .nes: return 168 * scale
+            case .snes, .ps1: return 168 * scale
+            case .genesis: return Self.genesisWidth(78 * 0.74) * scale
+            case .atari7800: return 156 * scale
             }
         }
         switch system {
         case .gba: return 150 * scale
         case .psp, .nds: return 151 * scale
         case .n64: return 140 * scale
+        case .nes: return 154 * scale
+        case .snes, .ps1: return 151 * scale
+        case .genesis: return Self.genesisWidth(48) * scale
+        case .atari7800: return 150 * scale
         }
     }
 
@@ -213,12 +296,32 @@ struct ConsolePad {
         case (.psp, true): (leftCluster, rightCluster) = (144 + 6 + 108, 60 * 2.8)
         case (.n64, false): (leftCluster, rightCluster) = (100 + 6 + 128, 40 * 2.8 + 6 + 104)
         case (.n64, true): (leftCluster, rightCluster) = (108 + 6 + 136, 44 * 2.8 + 6 + 108 * 1.08)
+        case (.nes, false): (leftCluster, rightCluster) = (150, 70)
+        case (.nes, true): (leftCluster, rightCluster) = (156, 76)
+        case (.snes, false), (.ps1, false): (leftCluster, rightCluster) = (150, 54 * 2.8)
+        case (.snes, true), (.ps1, true): (leftCluster, rightCluster) = (156, 60 * 2.8)
+        case (.genesis, false): (leftCluster, rightCluster) = (150, 48 * 1.9)
+        case (.genesis, true): (leftCluster, rightCluster) = (156, 78 * 0.74 * 1.9)
+        case (.atari7800, false): (leftCluster, rightCluster) = (150, 74 * 1.84)
+        case (.atari7800, true): (leftCluster, rightCluster) = (156, 78 * 1.84)
         }
-        // N64 has no SELECT; its left column ends at the stick.
-        let leftBottom = system == .n64 ? (large ? 8 : 14) : bottom
+        // Systems without shoulder buttons, and PS1's two stacked rows.
+        let shoulders: CGFloat
+        switch system {
+        case .nes, .genesis, .atari7800: shoulders = 0
+        case .ps1: shoulders = 2 * top * psShoulderRatio + 6
+        default: shoulders = top
+        }
+        // N64 and Genesis have no SELECT; the 7800 stacks SELECT over RESET on the left.
+        let leftBottom: CGFloat
+        switch system {
+        case .n64, .genesis: leftBottom = large ? 8 : 14
+        case .atari7800: leftBottom = bottom * 2
+        default: leftBottom = bottom
+        }
         return [
-            (top + leftCluster + leftBottom, left),
-            (top + rightCluster + bottom, right),
+            (shoulders + leftCluster + leftBottom, left),
+            (shoulders + rightCluster + bottom, right),
         ]
     }
 
@@ -250,7 +353,18 @@ struct ConsolePad {
             PadPillButton(title: "SELECT", bits: PSPInput.select.rawValue, scale: pillScale, fill: PadPalette.PSP.silver, ink: PadPalette.PSP.chassis)
         case .nds:
             PadPillButton(title: "SELECT", bits: NDSInput.select.rawValue, scale: pillScale, fill: PadPalette.NDS.shoulder, ink: PadPalette.NDS.ink)
-        case .n64:
+        case .nes:
+            PadPillButton(title: "SELECT", bits: RetroPadInput.select.rawValue, scale: pillScale, fill: PadPalette.NES.pill, ink: PadPalette.NES.ink)
+        case .snes:
+            PadPillButton(title: "SELECT", bits: RetroPadInput.select.rawValue, scale: pillScale, fill: PadPalette.SNES.pill, ink: PadPalette.SNES.ink)
+        case .ps1:
+            PadPillButton(title: "SELECT", bits: RetroPadInput.select.rawValue, scale: pillScale, fill: PadPalette.PS1.pill, ink: PadPalette.PS1.ink)
+        case .atari7800:
+            VStack(spacing: 4 * scale) {
+                atariSwitch("SELECT", RetroPadInput.Atari7800.select)
+                atariSwitch("RESET", RetroPadInput.Atari7800.reset)
+            }
+        case .n64, .genesis:
             EmptyView()
         }
     }
@@ -266,16 +380,90 @@ struct ConsolePad {
             PadPillButton(title: "START", bits: NDSInput.start.rawValue, scale: pillScale, fill: PadPalette.NDS.shoulder, ink: PadPalette.NDS.ink)
         case .n64:
             PadPillButton(title: "START", bits: N64Input.start.rawValue, scale: pillScale, fill: PadPalette.N64.start, ink: PadPalette.N64.inkLight)
+        case .nes:
+            PadPillButton(title: "START", bits: RetroPadInput.start.rawValue, scale: pillScale, fill: PadPalette.NES.pill, ink: PadPalette.NES.ink)
+        case .snes:
+            PadPillButton(title: "START", bits: RetroPadInput.start.rawValue, scale: pillScale, fill: PadPalette.SNES.pill, ink: PadPalette.SNES.ink)
+        case .ps1:
+            PadPillButton(title: "START", bits: RetroPadInput.start.rawValue, scale: pillScale, fill: PadPalette.PS1.pill, ink: PadPalette.PS1.ink)
+        case .genesis:
+            PadPillButton(title: "START", bits: RetroPadInput.start.rawValue, scale: pillScale, fill: PadPalette.Genesis.start, ink: PadPalette.Genesis.ink)
+        case .atari7800:
+            atariSwitch("PAUSE", RetroPadInput.Atari7800.pause)
         }
     }
 
     // MARK: Helpers
 
-    private func shoulder(_ title: String, _ bits: UInt32, _ fill: Color, _ ink: Color, width: CGFloat = 92) -> some View {
+    /// The shared D-pad for the libretro systems (RetroPad direction bits).
+    private func retroDPad(fill: Color, heldFill: Color) -> some View {
+        PadDPad(
+            size: (large ? 156 : 150) * scale,
+            up: RetroPadInput.up.rawValue, down: RetroPadInput.down.rawValue,
+            left: RetroPadInput.left.rawValue, right: RetroPadInput.right.rawValue,
+            fill: fill, heldFill: heldFill
+        )
+    }
+
+    /// NES A/B: diameter, and the gap between them as a fraction of it.
+    private var nesDiameter: CGFloat { (large ? 76 : 70) * scale }
+    private static let nesGap: CGFloat = 0.2
+
+    /// PS1 shoulders are stacked two high, each a little shorter than a single shoulder.
+    private static let psShoulderRatio: CGFloat = 0.85
+
+    private func stackedShoulders(top: (String, UInt32), bottom: (String, UInt32)) -> some View {
+        VStack(spacing: 6 * scale) {
+            shoulder(top.0, top.1, PadPalette.PS1.shoulder, PadPalette.PS1.ink, heightRatio: Self.psShoulderRatio)
+            shoulder(bottom.0, bottom.1, PadPalette.PS1.shoulder, PadPalette.PS1.ink, heightRatio: Self.psShoulderRatio)
+        }
+    }
+
+    /// Genesis six-button face: A B C along the bottom, the smaller X Y Z above, both rows
+    /// rising to the right as on the pad.
+    private var genesisFace: some View {
+        let d = (large ? 78 * 0.74 : 48) * scale
+        let top = d * 0.72
+        let gap = d * 0.16
+        func button(_ title: String, _ bits: RetroPadInput, _ diameter: CGFloat, _ fill: Color) -> some View {
+            PadFaceButton(title: title, bits: bits.rawValue, diameter: diameter, fill: fill, ink: PadPalette.Genesis.ink)
+        }
+        return VStack(alignment: .trailing, spacing: d * 0.18) {
+            HStack(alignment: .bottom, spacing: gap + (d - top)) {
+                button("X", RetroPadInput.Genesis.x, top, PadPalette.Genesis.faceTop)
+                    .offset(y: d * 0.1)
+                button("Y", RetroPadInput.Genesis.y, top, PadPalette.Genesis.faceTop)
+                button("Z", RetroPadInput.Genesis.z, top, PadPalette.Genesis.faceTop)
+                    .offset(y: -d * 0.1)
+            }
+            .padding(.trailing, (d - top) / 2)
+            HStack(spacing: gap) {
+                button("A", RetroPadInput.Genesis.a, d, PadPalette.Genesis.face)
+                    .offset(y: d * 0.1)
+                button("B", RetroPadInput.Genesis.b, d, PadPalette.Genesis.face)
+                button("C", RetroPadInput.Genesis.c, d, PadPalette.Genesis.face)
+                    .offset(y: -d * 0.1)
+            }
+        }
+        .frame(width: Self.genesisWidth(d), height: d * 1.9)
+    }
+
+    /// Width of the Genesis face for a bottom-row diameter `d` (three buttons, two gaps).
+    static func genesisWidth(_ d: CGFloat) -> CGFloat { d * 3.32 }
+
+    private func atariSwitch(_ title: String, _ bits: RetroPadInput) -> some View {
+        PadPillButton(title: title, bits: bits.rawValue, scale: pillScale, fill: PadPalette.Atari7800.switchFill, ink: PadPalette.Atari7800.inkDark)
+    }
+
+    private func shoulder(
+        _ title: String, _ bits: UInt32, _ fill: Color, _ ink: Color,
+        width: CGFloat = 92, heightRatio: CGFloat = 1
+    ) -> some View {
         let widen: CGFloat = large && width == 92 ? 112 / 92 : 1
         return PadShoulderButton(
             title: title, bits: bits,
-            width: width * widen * scale, height: (large ? (landscape ? 42 : 48) : 40) * scale,
+            width: width * widen * scale,
+            height: (large ? (landscape ? 42 : 48) : 40) * heightRatio * scale,
             fill: fill, ink: ink
         )
     }
@@ -320,6 +508,11 @@ extension SystemID {
         case .psp: return PadPalette.PSP.chassis
         case .nds: return PadPalette.NDS.chassis
         case .n64: return PadPalette.N64.chassisDark
+        case .nes: return PadPalette.NES.chassis
+        case .snes: return PadPalette.SNES.chassis
+        case .genesis: return PadPalette.Genesis.chassis
+        case .atari7800: return PadPalette.Atari7800.chassis
+        case .ps1: return PadPalette.PS1.chassis
         }
     }
 
@@ -329,6 +522,11 @@ extension SystemID {
         case .psp: return PadPalette.PSP.chassisStroke
         case .nds: return PadPalette.NDS.chassisStroke
         case .n64: return PadPalette.N64.chassisStroke
+        case .nes: return PadPalette.NES.chassisStroke
+        case .snes: return PadPalette.SNES.chassisStroke
+        case .genesis: return PadPalette.Genesis.chassisStroke
+        case .atari7800: return PadPalette.Atari7800.chassisStroke
+        case .ps1: return PadPalette.PS1.chassisStroke
         }
     }
 }
@@ -354,11 +552,20 @@ struct ConsolePadPortrait: View {
     private static func contentSize(_ system: SystemID) -> CGSize {
         // shoulder 48, SELECT/START (26 + 2 × 8 touch padding) × 1.25.
         let fixed: CGFloat = 48 + shoulderGap + pillGap + 52
+        // NES, Genesis and the 7800 have no shoulder buttons; PS1 stacks two rows.
+        let noShoulders = fixed - 48
+        let psShoulders = noShoulders + 2 * 48 * 0.85 + 6
         switch system {
         case .gba: return CGSize(width: 156 + 78 * 1.8 + clusterGap, height: fixed + 156)
         case .nds: return CGSize(width: 152 + 60 * 2.8 + clusterGap, height: fixed + 60 * 2.8)
         case .psp: return CGSize(width: 144 + 60 * 2.8 + clusterGap, height: fixed + 144 + 18 + 108)
         case .n64: return CGSize(width: 136 + 136 * 1.08 + clusterGap, height: fixed + 108 + 16 + 136)
+        case .nes: return CGSize(width: 156 + 76 * 2.2 + clusterGap, height: noShoulders + 156)
+        case .snes: return CGSize(width: 156 + 60 * 2.8 + clusterGap, height: fixed + 60 * 2.8)
+        case .genesis:
+            return CGSize(width: 156 + ConsolePad.genesisWidth(78 * 0.74) + clusterGap, height: noShoulders + 156)
+        case .atari7800: return CGSize(width: 156 + 78 * 1.8 + clusterGap, height: noShoulders + 156)
+        case .ps1: return CGSize(width: 156 + 60 * 2.8 + clusterGap, height: psShoulders + 60 * 2.8)
         }
     }
 

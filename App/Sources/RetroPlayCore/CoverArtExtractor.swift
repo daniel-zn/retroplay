@@ -9,7 +9,7 @@ public enum CoverArtExtractor: Sendable {
             return extractPSP(from: fileURL)
         case .nds:
             return extractNDSBannerPNG(from: fileURL)
-        case .gba, .n64:
+        case .gba, .n64, .nes, .snes, .genesis, .atari7800, .ps1:
             return nil
         }
     }

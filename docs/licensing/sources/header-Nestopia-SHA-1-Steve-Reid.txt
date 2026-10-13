@@ -1,0 +1,5 @@
+Notice copied verbatim from nestopia/source/core/NstSha1.cpp (lines 26-28):
+
+//
+// Based on public domain code written by Steve Reid
+//

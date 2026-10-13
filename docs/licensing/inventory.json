@@ -878,5 +878,455 @@
     "licenseFile": "ppsspp/ios/MoltenVK",
     "requiresNoticeText": false,
     "evidence": "not in libPPSSPP.a; RetroPlay project.yml does not link MoltenVK"
+  },
+  {
+    "project": "Nestopia UE",
+    "component": "Nestopia UE (libretro core, incl. NstDatabase.xml game database)",
+    "version": "git 135dfa6dfda5e7603d61e751b9ddd0cc42546bc3",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (C) 2003-2008 Martin Freij; Copyright (C) 2018 Phil Smith; Copyright (C) 2020-2026 Rupert Carmichael",
+    "licenseFile": "nestopia/COPYING",
+    "requiresNoticeText": true,
+    "evidence": "make -C libretro platform=ios-arm64 (Makefile.common SOURCES_C/SOURCES_CXX; -DNST_NO_ZLIB). clang -M dependency scan of every compile command from `make -n` with the build-libretro-cores-ios.sh flags (2026-10-12): source/core/** (605 files headed \"Copyright (C) 2003-2008 Martin Freij ... either version 2 of the License, or (at your option) any later version\"), libretro/libretro.cpp, libretro/nstdatabase.hpp (NstDatabase.xml embedded as nst_db_xml), palettes.hpp, nesfont.h (8x8 font added in 0a6e4c6 \"libretro: NSF player\", no notice; origin not stated). NstZlib.cpp compiled with NST_NO_ZLIB, so no zlib."
+  },
+  {
+    "project": "Nestopia UE",
+    "component": "nes_ntsc (NES NTSC video filter, source/nes_ntsc)",
+    "version": "0.2.2",
+    "spdx": "LGPL-2.1-or-later",
+    "copyright": "Copyright (C) 2006-2007 Shay Green",
+    "licenseFile": "nestopia/source/nes_ntsc/license.txt",
+    "requiresNoticeText": true,
+    "evidence": "NstVideoFilterNtscCfg.cpp includes ../nes_ntsc/nes_ntsc.inl; headers nes_ntsc.h/_impl.h/_config.h in the dependency scan. License header: \"either version 2.1 of the License, or (at your option) any later version\"."
+  },
+  {
+    "project": "Nestopia UE",
+    "component": "SHA-1 (source/core/NstSha1.cpp, based on Steve Reid)",
+    "version": "n/a",
+    "spdx": "LicenseRef-PublicDomain",
+    "copyright": "Based on public domain code written by Steve Reid",
+    "licenseFile": "nestopia/source/core/NstSha1.cpp",
+    "requiresNoticeText": false,
+    "evidence": "NstSha1.cpp compiled (Makefile.common). Public-domain origin; the file itself also carries the Nestopia GPL-2.0-or-later header."
+  },
+  {
+    "project": "Nestopia UE",
+    "component": "libretro-common (+ libretro.h API header; Nestopia UE copy, libretro/libretro-common)",
+    "version": "bundled @ 135dfa6",
+    "spdx": "MIT",
+    "copyright": "Copyright (C) 2010-2020/2010-2024 The RetroArch team",
+    "licenseFile": "nestopia/libretro/libretro-common/streams/file_stream.c (per-file header; no LICENSE file in libretro-common/)",
+    "requiresNoticeText": true,
+    "evidence": "Makefile.common SOURCES_C: compat_posix_string, compat_strcasestr, compat_snprintf, compat_strl, fopen_utf8, encoding_utf, file_path, file_path_io, file_stream, rtime, vfs_implementation; all MIT per-file headers."
+  },
+  {
+    "project": "bsnes",
+    "component": "bsnes (SNES core, libretro target)",
+    "version": "git 63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+    "spdx": "GPL-3.0-only",
+    "copyright": "Copyright © 2004-2019 byuu",
+    "licenseFile": "bsnes/LICENSE.txt + bsnes/GPLv3.txt",
+    "requiresNoticeText": true,
+    "evidence": "make platform=ios-arm64 IPHONEMINVER= (Makefile.common; -Wno-invalid-specialization). clang -M dependency scan of every compile command from `make -n` with the build-libretro-cores-ios.sh flags (2026-10-12): bsnes/{emulator,sfc,processor,heuristics,filter,target-libretro} plus resources.hpp (Database/*.bml boards embedded). LICENSE.txt: \"version 3 of the License and no other version\" (GPL-3.0-only, NOT or-later). bsnes/filter/sai/sai.cpp (2xSaI), hq2x.cpp, lq2x.cpp, super-eagle.cpp etc. carry no notice and are covered only by this bsnes license; their upstream origins (Derek Liauw Kie Fa 2xSaI, Maxim Stepin hq2x) are not stated in the checkout."
+  },
+  {
+    "project": "bsnes",
+    "component": "libco (bsnes copy; aarch64 backend)",
+    "version": "bundled @ 63ee22f",
+    "spdx": "ISC",
+    "copyright": "Copyright © 2006-2019 byuu",
+    "licenseFile": "bsnes/LICENSE.txt (second section)",
+    "requiresNoticeText": true,
+    "evidence": "Makefile.common compiles libco/libco.c, which includes aarch64.c on arm64 (dependency scan). libco.h: \"license: ISC\"."
+  },
+  {
+    "project": "bsnes",
+    "component": "nall (C++ template library, header-only)",
+    "version": "bundled @ 63ee22f",
+    "spdx": "ISC",
+    "copyright": "Copyright © 2006-2019 byuu",
+    "licenseFile": "bsnes/LICENSE.txt (second section)",
+    "requiresNoticeText": true,
+    "evidence": "~80 nall headers in the dependency scan (string, vfs, decode/{inflate,png,zip,bmp,rle}, hash/{crc16,crc32,sha256}, cipher/chacha20, dsp, image). nall/decode/inflate.hpp says \"a bad implementation of inflate from zlib/minizip\" with no zlib notice; treated as nall (ISC)."
+  },
+  {
+    "project": "bsnes",
+    "component": "SameBoy (Game Boy core used for Super Game Boy, bsnes/gb)",
+    "version": "2019-10-22 master snapshot (bsnes/gb/README)",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2015-2019 Lior Halphon",
+    "licenseFile": "bsnes/bsnes/gb/LICENSE",
+    "requiresNoticeText": true,
+    "evidence": "Makefile.common SOURCES_C: gb/Core/{apu,camera,display,gb,joypad,mbc,memory,printer,random,rewind,save_state,sgb,sm83_cpu,symbol_hash,timing}.c; sgb_border.inc/sgb_animation_logo.inc included."
+  },
+  {
+    "project": "bsnes",
+    "component": "snes_spc S-DSP (bsnes/sfc/dsp/SPC_DSP.cpp)",
+    "version": "snes_spc 0.9.0",
+    "spdx": "LGPL-2.1-or-later",
+    "copyright": "Copyright (C) 2007 Shay Green",
+    "licenseFile": "bsnes/bsnes/sfc/dsp/SPC_DSP.cpp (header lines 1-18)",
+    "requiresNoticeText": true,
+    "evidence": "sfc/dsp/dsp.cpp builds SPC_DSP.cpp (dependency scan); blargg_*.h headers. No license file in the checkout; LGPL 2.1 text taken from Shay Green's nes_ntsc distribution."
+  },
+  {
+    "project": "bsnes",
+    "component": "snes_ntsc (bsnes/filter/snes_ntsc)",
+    "version": "0.2.2",
+    "spdx": "LGPL-2.1-or-later",
+    "copyright": "Copyright (C) 2006-2007 Shay Green",
+    "licenseFile": "bsnes/bsnes/filter/snes_ntsc/snes_ntsc.c (header lines 1-13)",
+    "requiresNoticeText": true,
+    "evidence": "filter/filter.cpp #includes snes_ntsc/snes_ntsc.c (compiled in Makefile.common)."
+  },
+  {
+    "project": "bsnes",
+    "component": "LZMA SDK (bsnes/lzma, 7z reader)",
+    "version": "19.00",
+    "spdx": "LicenseRef-LZMA-SDK-PublicDomain",
+    "copyright": "Igor Pavlov (public domain)",
+    "licenseFile": "bsnes/bsnes/lzma/LzmaDec.c (header)",
+    "requiresNoticeText": false,
+    "evidence": "lzma/lzma.cpp #includes 7zAlloc/7zArcIn/7zBuf/7zCrc/7zCrcOpt/7zDec/7zFile/7zStream/Bcj2/Bra/Bra86/BraIA64/CpuArch/Delta/LzmaDec/Lzma2Dec .c (MY_VERSION \"19.00\")."
+  },
+  {
+    "project": "bsnes",
+    "component": "S-DD1 decompressor (sfc/coprocessor/sdd1/decompressor.cpp)",
+    "version": "n/a",
+    "spdx": "LicenseRef-PublicDomain",
+    "copyright": "original code written by Andreas Naive (public domain license); bsnes port by byuu",
+    "licenseFile": "bsnes/bsnes/sfc/coprocessor/sdd1/decompressor.cpp",
+    "requiresNoticeText": false,
+    "evidence": "coprocessor.cpp includes sdd1/sdd1.cpp -> decompressor.cpp."
+  },
+  {
+    "project": "bsnes",
+    "component": "DSP-4 emulator code (sfc/coprocessor/dsp4/dsp4emu.c)",
+    "version": "n/a",
+    "spdx": "LicenseRef-NoLicenseStatement",
+    "copyright": "Copyright (c) 2004-2006 Dreamer Nom, John Weidman, Kris Bleakley, Nach, z80 gaiden",
+    "licenseFile": "bsnes/bsnes/sfc/coprocessor/dsp4/dsp4emu.c",
+    "requiresNoticeText": true,
+    "evidence": "coprocessor.cpp includes dsp4/dsp4.cpp, which #includes dsp4emu.c. The file has a copyright line but no license statement; it comes from the ZSNES/Snes9x DSP-4 work and is distributed only as part of bsnes (GPL-3.0-only). UNCONFIRMED license: see summary.md."
+  },
+  {
+    "project": "bsnes",
+    "component": "libretro.h API header (bsnes/target-libretro/libretro.h)",
+    "version": "bundled @ 63ee22f",
+    "spdx": "MIT",
+    "copyright": "Copyright (C) 2010-2018 The RetroArch team",
+    "licenseFile": "bsnes/bsnes/target-libretro/libretro.h (header)",
+    "requiresNoticeText": true,
+    "evidence": "Included by target-libretro/libretro.cpp. bsnes uses no other libretro-common code."
+  },
+  {
+    "project": "ProSystem",
+    "component": "ProSystem (Atari 7800 core, libretro port)",
+    "version": "git 8a88014287c7a01cd568067e5a557d0a2b2a051f",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright 2003-2005 Greg Stanton",
+    "licenseFile": "prosystem-libretro/License.txt",
+    "requiresNoticeText": true,
+    "evidence": "make platform=ios-arm64 (Makefile.common). clang -M dependency scan of every compile command from `make -n` with the build-libretro-cores-ios.sh flags (2026-10-12): core/*.c, every file headed \"Copyright 2005 Greg Stanton ... either version 2 of the License, or (at your option) any later version\" (ProSystem.c: 2003,2004); core/libretro.c has no header."
+  },
+  {
+    "project": "ProSystem",
+    "component": "TiaSound and PokeySound (core/Tia.c, core/Pokey.c)",
+    "version": "n/a",
+    "spdx": "LGPL-2.0-only",
+    "copyright": "TiaSound is Copyright(c) 1997 by Ron Fries; PokeySound is Copyright(c) 1997 by Ron Fries",
+    "licenseFile": "prosystem-libretro/core/Tia.c and core/Pokey.c (header lines 23-37)",
+    "requiresNoticeText": true,
+    "evidence": "Tia.c and Pokey.c compiled (Makefile.common). Headers: \"under the terms of version 2 of the GNU Library General Public License\"; LGPL-2.0 s.3 permits relicensing to GPL-2.0-or-later. Full LGPL-2.0 text not in this checkout; copied from pcsx_rearmed/deps/lightrec/COPYING."
+  },
+  {
+    "project": "ProSystem",
+    "component": "BupBoop / CoreTone (bupboop/coretone)",
+    "version": "1.2.2cz (2016-11-26)",
+    "spdx": "Zlib",
+    "copyright": "Copyright (C) 2015 - 2016 Osman Celimli",
+    "licenseFile": "prosystem-libretro/bupboop/License.txt",
+    "requiresNoticeText": true,
+    "evidence": "core/BupChip.c uses bupboop/coretone/{channel,coretone,music,sample}.c (Makefile.common)."
+  },
+  {
+    "project": "ProSystem",
+    "component": "libretro-common (+ libretro.h API header; ProSystem copy)",
+    "version": "bundled @ 8a88014",
+    "spdx": "MIT",
+    "copyright": "Copyright (C) 2010-2020/2010-2021 The RetroArch team",
+    "licenseFile": "prosystem-libretro/libretro-common/streams/file_stream.c (per-file header)",
+    "requiresNoticeText": true,
+    "evidence": "compat_*, encoding_utf, file_path(_io), file_stream(_transforms), stdstring, rtime, vfs_implementation; core/boolean.h is also RetroArch MIT."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "clownmdemu (Mega Drive / Mega CD emulator core, common/core)",
+    "version": "core @ 88ef45a6585556e2247dd26b6c937d6b9fb4a12d",
+    "spdx": "AGPL-3.0-or-later",
+    "copyright": "Copyright (C) Clownacy",
+    "licenseFile": "clownmdemu-libretro/common/core/LICENCE.txt",
+    "requiresNoticeText": true,
+    "evidence": "make platform=ios-arm64 (single unity.c translation unit). clang -M dependency scan of every compile command from `make -n` with the build-libretro-cores-ios.sh flags (2026-10-12): common/core/source/*.c. README: \"ClownMDEmu is free software, licensed under the AGPLv3 (or any later version)\". Source files carry no per-file notices."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "clownmdemu-libretro frontend and clownmdemu-frontend-common (source/, common/)",
+    "version": "frontend d43c2708b0a31c285ce16724b6c4a2e92af07346; common @ 347ea31f9971eeaaa28c607e75f7156dd17db7bd",
+    "spdx": "AGPL-3.0-or-later",
+    "copyright": "Copyright (C) Clownacy",
+    "licenseFile": "clownmdemu-libretro/LICENCE.txt",
+    "requiresNoticeText": true,
+    "evidence": "unity.c includes source/libretro-interface.c, clowncd-callbacks.c, file-io.c and common/unity.c (cd-reader.c, cheat.c, mixer.h). Root README: \"AGPLv3 (or any later version)\"; common/LICENCE.txt is the same AGPL-3.0 text."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "clown68000 (Motorola 68000 interpreter)",
+    "version": "bb198386ae3ee0cd6d246ff917f9941b02b5be6a",
+    "spdx": "AGPL-3.0-or-later",
+    "copyright": "Copyright (C) 2021-2025 Clownacy",
+    "licenseFile": "clownmdemu-libretro/common/core/libraries/clown68000/LICENCE.txt",
+    "requiresNoticeText": true,
+    "evidence": "source/interpreter/{clown68000,microcode}.c, source/common/opcode.c; header: \"either version 3 of the License, or (at your option) any later version\"."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "clownz80 (Z80 interpreter)",
+    "version": "aa4cae3127a5893ba7066bcc2d9e9ba8e88e1c3b",
+    "spdx": "AGPL-3.0-only",
+    "copyright": "Copyright (C) Clownacy",
+    "licenseFile": "clownmdemu-libretro/common/core/libraries/clownz80/LICENCE.txt",
+    "requiresNoticeText": true,
+    "evidence": "source/{common,interpreter}.c. README says \"licensed under the AGPLv3\" with no \"or later\" and files have no headers, so recorded as AGPL-3.0-only (conservative). LICENCE.txt is the same AGPL-3.0 text."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "ClownCD (CD image reader, common/clowncd)",
+    "version": "6ac52d0f3e8c55e591de6c445c034b0f12e95033",
+    "spdx": "0BSD",
+    "copyright": "Copyright (c) 2021-2023 Clownacy",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/LICENCE.txt",
+    "requiresNoticeText": false,
+    "evidence": "clowncd/unity.c (CLOWNCD_CHD defined): audio/{flac,mp3,vorbis,wav}.c, disc/{clowncd,cue,raw,chd}.c. 0BSD needs no notice; listed for completeness."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "clownresampler",
+    "version": "916b7a7f8d9cf77d2910d9b36988bec07f25d4d3",
+    "spdx": "0BSD",
+    "copyright": "Copyright (c) 2022 Clownacy",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/libraries/clownresampler/LICENCE.txt",
+    "requiresNoticeText": false,
+    "evidence": "clowncd/unity.c includes libraries/clownresampler/clownresampler.c."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "clowncommon (header-only helpers)",
+    "version": "ecee31f / ddeff17 / 8edd476",
+    "spdx": "0BSD",
+    "copyright": "Copyright (c) 2021-2023 Clownacy",
+    "licenseFile": "clownmdemu-libretro/common/core/libraries/clowncommon/licence.txt",
+    "requiresNoticeText": false,
+    "evidence": "clowncommon.h from four submodule copies in the dependency scan; all licence.txt files identical."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "libchdr (clownmdemu copy, common/clowncd/libraries/chd/libchdr)",
+    "version": "7d039c34cd1b887bc5e87ae14af62f1db3db9e96 (Clownacy clowncd-new branch)",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright Romain Tisserand",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/libraries/chd/libchdr/LICENSE.txt",
+    "requiresNoticeText": true,
+    "evidence": "chd/libchdr/unity.c: libchdr_{bitstream,cdrom,chd,codec_*,flac,huffman}.c. LICENSE.txt identical to the PPSSPP copy."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "LZMA SDK (clownmdemu copy, libchdr/deps/lzma-25.01)",
+    "version": "25.01",
+    "spdx": "LicenseRef-LZMA-SDK-PublicDomain",
+    "copyright": "Igor Pavlov (public domain)",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/libraries/chd/libchdr/deps/lzma-25.01/LICENSE",
+    "requiresNoticeText": false,
+    "evidence": "src/LzmaDec.c (C decoder only; no asm in unity build)."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "miniz (clownmdemu copy, libchdr/deps/miniz-3.1.1)",
+    "version": "3.1.1",
+    "spdx": "MIT",
+    "copyright": "Copyright 2013-2014 RAD Game Tools and Valve Software; Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/libraries/chd/libchdr/deps/miniz-3.1.1/miniz.c (header lines 2-26)",
+    "requiresNoticeText": true,
+    "evidence": "miniz.c in the dependency scan (libchdr zlib codec)."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "Zstandard (clownmdemu copy, libchdr/deps/zstd-1.5.7 single-file decoder)",
+    "version": "v1.5.7",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (c) Meta Platforms, Inc. and affiliates",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/libraries/chd/libchdr/deps/zstd-1.5.7/zstd.h (header; LICENSE file not vendored)",
+    "requiresNoticeText": true,
+    "evidence": "zstddeclib.c in the dependency scan. Dual BSD-3-Clause OR GPL-2.0; BSD chosen. The BSD text is the upstream v1.5.7 LICENSE already recorded for PPSSPP."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "dr_flac (clownmdemu copy, bundled in libchdr)",
+    "version": "0.13.3",
+    "spdx": "Unlicense OR MIT-0",
+    "copyright": "Copyright 2023 David Reid",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/libraries/chd/libchdr/include/dr_libs/dr_flac.h",
+    "requiresNoticeText": false,
+    "evidence": "Used by libchdr FLAC codec and by ClownCD (clowncd/libraries/dr_flac.h redirects to libchdr's copy). License block identical to the PPSSPP copy."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "dr_mp3 (incl. minimp3-derived decoder)",
+    "version": "0.7.3",
+    "spdx": "(Unlicense OR MIT-0) AND CC0-1.0",
+    "copyright": "Copyright 2023 David Reid; minimp3 by lieff (CC0)",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/libraries/dr_mp3.h (license block at end)",
+    "requiresNoticeText": false,
+    "evidence": "clowncd source/audio/mp3.c includes dr_mp3.h with the implementation."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "dr_wav",
+    "version": "0.14.4",
+    "spdx": "Unlicense OR MIT-0",
+    "copyright": "Copyright 2023 David Reid",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/libraries/dr_wav.h (license block at end)",
+    "requiresNoticeText": false,
+    "evidence": "clowncd source/audio/wav.c includes dr_wav.h with the implementation."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "stb_vorbis",
+    "version": "1.22",
+    "spdx": "MIT OR Unlicense",
+    "copyright": "Copyright (c) 2017 Sean Barrett",
+    "licenseFile": "clownmdemu-libretro/common/clowncd/libraries/stb_vorbis.c (license block at end)",
+    "requiresNoticeText": true,
+    "evidence": "clowncd source/audio/vorbis.c includes stb_vorbis.c."
+  },
+  {
+    "project": "clownmdemu",
+    "component": "libretro-common headers (libretro.h, retro_endianness.h, retro_inline.h; clownmdemu copy)",
+    "version": "e9a4ccc4a6b05f136ef5358218a5a94ebeccb7cb",
+    "spdx": "MIT",
+    "copyright": "Copyright (C) 2010-2024 The RetroArch team",
+    "licenseFile": "clownmdemu-libretro/libretro-common/include/libretro.h (header)",
+    "requiresNoticeText": true,
+    "evidence": "Only these three headers are included (Makefile adds -Ilibretro-common/include; no libretro-common .c files compiled)."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "PCSX-ReARMed (PS1 core: libpcsxcore, frontend, gpulib, cspace)",
+    "version": "git c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (C) 1999-2016 PCSX Team; Copyright (C) 2005-2009 PCSX-df Team (Ryan Schultz et al.); Copyright (C) 2009-2010 PCSX-Revolution Dev Team; Copyright (C) 2009 Wei Mingzhi; (C) 2010-2026 Gražvydas \"notaz\" Ignotas",
+    "licenseFile": "pcsx_rearmed/COPYING",
+    "requiresNoticeText": true,
+    "evidence": "make -f Makefile.libretro platform=ios-arm64 MINVERSION= DYNAREC=0 (BUILTIN_GPU=neon, HAVE_CHD=1, USE_MINIZ; -DDRC_DISABLE -DGPU_NEON). clang -M dependency scan of every compile command from `make -n` with the build-libretro-cores-ios.sh flags (2026-10-12): libpcsxcore/*.c (+ gte_arm64.S, gte_nf_arm64.S, new_dynarec/emu_if.c with DRC_DISABLE), frontend/{libretro,main,plugin,cspace,pcsxr-threads}.c, plugins/gpulib/*.c. Headers: \"either version 2 of the License, or (at your option) any later version\" / \"GNU GPLv2 or later\"; gpulib and cspace.c are \"GPL-2.0-or-later or LGPL-2.1-or-later\". frontend/libpicofe is NOT compiled. lightrec (LGPL-2.1-or-later) is NOT linked: only two declaration-only headers (lightrec/plugin.h, mem.h) are included."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "P.E.Op.S. SPU plugin (plugins/dfsound)",
+    "version": "bundled @ c881679",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (C) 2002 Pete Bernert; Copyright (C) 2003 Chris Moeller; portions (C) Gražvydas \"notaz\" Ignotas 2010-2015, SPU2-X/gigaherz/PCSX2 Development Team",
+    "licenseFile": "pcsx_rearmed/COPYING",
+    "requiresNoticeText": true,
+    "evidence": "dfsound/{dma,freeze,nullsnd,out,registers,spu}.c (spu.c includes adsr.c, reverb.c, xa.c). Headers: \"either version 2 of the License, or (at your option) any later version\"."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "psx_gpu NEON GPU renderer (plugins/gpu_neon, Exophase)",
+    "version": "bundled @ c881679",
+    "spdx": "GPL-2.0-or-later",
+    "copyright": "Copyright (C) 2011 Gilead Kutnick \"Exophase\"; Copyright (C) 2011-2022 Gražvydas \"notaz\" Ignotas",
+    "licenseFile": "pcsx_rearmed/COPYING",
+    "requiresNoticeText": true,
+    "evidence": "BUILTIN_GPU=neon: gpu_neon/psx_gpu_if.c and psx_gpu/psx_gpu_simd.c (arm64 C SIMD path; psx_gpu.c, psx_gpu_parse.c, psx_gpu_4x.c included). Headers: \"either version 2 of the License, or (at your option) any later version\"."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "GTE divider (libpcsxcore/gte_divider.c, from MAME)",
+    "version": "n/a",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright 2003-2013 smf",
+    "licenseFile": "pcsx_rearmed/libpcsxcore/gte_divider.c (header lines 1-10)",
+    "requiresNoticeText": true,
+    "evidence": "gte_divider.c compiled. Header says only \"Licensed under the BSD-3-Clause\"; the full BSD-3-Clause text is the SPDX template with that copyright line (no license file in the checkout)."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "Shift-JIS BIOS font (libpcsxcore/sjisfont.h, Shinonome k14goth via /efont/)",
+    "version": "n/a",
+    "spdx": "LicenseRef-PublicDomain",
+    "copyright": "k14goth by Yasuyuki Furukawa (Public Domain); (c) /efont/ -- Efont Open Laboratory 2001; converted by Wei Mingzhi",
+    "licenseFile": "pcsx_rearmed/libpcsxcore/sjisfont.h (header lines 1-22)",
+    "requiresNoticeText": false,
+    "evidence": "psxbios.c #includes sjisfont.h (HLE BIOS font data)."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "libchdr (PCSX-ReARMed copy, deps/libchdr)",
+    "version": "upstream 9ccd3a78e239246ee6e1166e1be82ab0ff0dcddb (git subrepo)",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright Romain Tisserand",
+    "licenseFile": "pcsx_rearmed/deps/libchdr/LICENSE.txt",
+    "requiresNoticeText": true,
+    "evidence": "HAVE_CHD=1: deps/libchdr/src/libchdr_{bitstream,cdrom,chd,codec_*,flac,huffman}.c compiled. LICENSE.txt identical to the PPSSPP copy."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "LZMA SDK (PCSX-ReARMed copy, libchdr/deps/lzma-26.02)",
+    "version": "26.02",
+    "spdx": "LicenseRef-LZMA-SDK-PublicDomain",
+    "copyright": "Igor Pavlov (public domain)",
+    "licenseFile": "pcsx_rearmed/deps/libchdr/deps/lzma-26.02/LICENSE",
+    "requiresNoticeText": false,
+    "evidence": "src/LzmaDec.c and Asm/arm64/LzmaDecOpt.S compiled."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "miniz (PCSX-ReARMed copy, libchdr/deps/miniz-3.1.2)",
+    "version": "3.1.2",
+    "spdx": "MIT",
+    "copyright": "Copyright 2013-2014 RAD Game Tools and Valve Software; Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC",
+    "licenseFile": "pcsx_rearmed/deps/libchdr/deps/miniz-3.1.2/miniz.c (header lines 2-26)",
+    "requiresNoticeText": true,
+    "evidence": "USE_MINIZ: miniz.c compiled and used instead of zlib (include/zlib_wrapper.h); no system libz linked (link line: -lpthread -lm -ldl)."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "Zstandard (PCSX-ReARMed copy, libchdr/deps/zstd-1.5.7 single-file decoder)",
+    "version": "v1.5.7",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (c) Meta Platforms, Inc. and affiliates",
+    "licenseFile": "pcsx_rearmed/deps/libchdr/deps/zstd-1.5.7/zstd.h (header; LICENSE file not vendored)",
+    "requiresNoticeText": true,
+    "evidence": "zstddeclib.c compiled. Dual BSD-3-Clause OR GPL-2.0; BSD chosen."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "dr_flac (PCSX-ReARMed copy, bundled in libchdr)",
+    "version": "0.13.3",
+    "spdx": "Unlicense OR MIT-0",
+    "copyright": "Copyright 2023 David Reid",
+    "licenseFile": "pcsx_rearmed/deps/libchdr/include/dr_libs/dr_flac.h",
+    "requiresNoticeText": false,
+    "evidence": "Compiled into libchdr_flac.c. License block identical to the PPSSPP copy."
+  },
+  {
+    "project": "PCSX-ReARMed",
+    "component": "libretro-common (+ libretro.h API header; PCSX-ReARMed copy, deps/libretro-common)",
+    "version": "bundled @ c881679",
+    "spdx": "MIT",
+    "copyright": "Copyright (C) 2010-2026 The RetroArch team",
+    "licenseFile": "pcsx_rearmed/deps/libretro-common/streams/file_stream.c (per-file header)",
+    "requiresNoticeText": true,
+    "evidence": "compat_*, encoding_utf, features_cpu, file_path(_io), retro_dirent, file_stream(_transforms), rstrtod (+ generated rstrtod_pow5.inc table), stdstring, rtime, vfs_implementation, rthreads (via frontend/pcsxr-threads.c); libpcsxcore/memmap.h is also RetroArch MIT."
   }
 ]

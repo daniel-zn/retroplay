@@ -9,7 +9,7 @@ final class SystemRegistryTests: XCTestCase {
         XCTAssertEqual(SystemRegistry.system(forFileExtension: "z64"), .n64)
         XCTAssertEqual(SystemRegistry.system(forFileExtension: "nds"), .nds)
         XCTAssertEqual(SystemRegistry.system(forFileExtension: "cso"), .psp)
-        XCTAssertNil(SystemRegistry.system(forFileExtension: "exe"))
+        XCTAssertNil(SystemRegistry.system(forFileExtension: "txt"))
     }
 
     func testDefaultCoreNames() {

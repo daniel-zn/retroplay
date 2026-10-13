@@ -1,0 +1,5 @@
+Notice copied verbatim from bsnes/bsnes/sfc/coprocessor/sdd1/decompressor.cpp (lines 1-3):
+
+//S-DD1 decompression algorithm implementation
+//original code written by Andreas Naive (public domain license)
+//bsnes port written by byuu

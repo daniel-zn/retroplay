@@ -11,6 +11,11 @@ with this repository they are the complete corresponding source for a RetroPlay 
 | melonDS | https://github.com/melonDS-emu/melonDS | `906e9ebb27da8c6a715cd7abab4abfe8a8d29427` (2026-08-24) | GPL-3.0-or-later | none |
 | mupen64plus-next | https://github.com/libretro/mupen64plus-libretro-nx | `f275caf4b2bfa1e6d1c51636746ea793f3d80320` (authored 2026-05-25, committed 2026-08-06) | GPL-2.0-or-later; bundled GLideN64 is GPL-2.0-only (see below) | `patches/mupen64plus-next-ios-headers.patch` |
 | PPSSPP | https://github.com/hrydgard/ppsspp | `98e70c8ca3435d532a059add0b4fb90a4a091248` (2026-09-07) | GPL-2.0-or-later | none (submodules at the commits PPSSPP records, listed in `pins/ppsspp-submodules.txt`) |
+| Nestopia UE (NES) | https://github.com/libretro/nestopia | `135dfa6dfda5e7603d61e751b9ddd0cc42546bc3` (2026-10-11) | GPL-2.0-or-later | none |
+| bsnes (SNES) | https://github.com/libretro/bsnes | `63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7` (2026-09-04) | GPL-3.0-only ("version 3 of the License and no other version") | none (one extra compiler flag, see below) |
+| ProSystem (Atari 7800) | https://github.com/libretro/prosystem-libretro | `8a88014287c7a01cd568067e5a557d0a2b2a051f` (2026-08-22) | GPL-2.0-or-later | none |
+| clownmdemu (Genesis / Mega CD) | https://github.com/Clownacy/clownmdemu-libretro | `d43c2708b0a31c285ce16724b6c4a2e92af07346` (2026-10-02) | AGPL-3.0-or-later | none (submodules at the commits it records, e.g. `common` @ `347ea31f9971eeaaa28c607e75f7156dd17db7bd`, `libretro-common` @ `e9a4ccc4a6b05f136ef5358218a5a94ebeccb7cb`; full list in `pins/clownmdemu-libretro-submodules.txt`) |
+| PCSX-ReARMed (PS1) | https://github.com/libretro/pcsx_rearmed | `c8816799b50388e61cfe237fe2cdbb7d8175f20a` (2026-10-02) | GPL-2.0-or-later | `patches/pcsx_rearmed-no-ptrace.patch` (no PTRACE_TRACEME; built with `-DRETROPLAY`); submodule `frontend/libpicofe` @ `a2697389e76744cfa0c56c13a172845c45ede719`, not compiled into the core; `pins/pcsx_rearmed-submodules.txt`) |
 
 The PPSSPP device build links the prebuilt FFmpeg libraries from PPSSPP's `ffmpeg` submodule
 at the recorded commit. The Simulator build uses a locally rebuilt FFmpeg (`ffmpeg/ios/arm64-sim`),
@@ -46,6 +51,26 @@ reports `v1.20.4-1645-g98e70c8ca3` at boot (no `-dirty` suffix). FFmpeg is PPSSP
 LGPL-2.1-or-later build from the `ffmpeg` submodule, whose repository also holds the FFmpeg
 source and the iOS build script; because the whole app's source is published, users can
 rebuild and relink it as the LGPL requires.
+
+**Libretro cores: Nestopia UE, bsnes, ProSystem, clownmdemu, PCSX-ReARMed.** `build-libretro-cores-ios.sh`
+builds all five from unmodified checkouts at the commits above (`SRC=<folder with the checkouts>`),
+once for the device and once for the Simulator, and wraps each as `Output/<core>.xcframework`
+(install name, minimum OS and Info.plist only; the machine code is unchanged). For every core it
+overrides `CC`/`CXX` with `xcrun clang -target arm64-apple-ios$DEPLOYMENT_TARGET -isysroot <SDK>`
+and passes `IOSSDK=<SDK>`; the per-core `make` invocations are:
+
+    make -C nestopia/libretro platform=ios-arm64
+    make -C bsnes platform=ios-arm64 IPHONEMINVER=        # CC/CXX also get -Wno-invalid-specialization
+    make -C prosystem-libretro platform=ios-arm64
+    make -C clownmdemu-libretro platform=ios-arm64
+    make -C pcsx_rearmed -f Makefile.libretro platform=ios-arm64 MINVERSION= DYNAREC=0   # CC/CXX add -DRETROPLAY
+
+No core is built with a JIT: PCSX-ReARMed uses `DYNAREC=0` (interpreter only; neither
+new_dynarec nor lightrec is linked) with its default `BUILTIN_GPU=neon` renderer, CHD support
+(libchdr) and miniz instead of zlib. bsnes needs `-Wno-invalid-specialization` because newer
+libc++ rejects nall's `is_signed<int128_t>` specialisations; the source is unchanged. Exactly
+which files each core compiles, and the licenses of the bundled libraries in them, are recorded
+in `docs/licensing/inventory.json` and `docs/licensing/summary.md`.
 
 ## Known licensing issue: GLideN64
 

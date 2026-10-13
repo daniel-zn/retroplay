@@ -15,6 +15,11 @@ final class SaveGameImporterTests: XCTestCase {
         case .n64: ext = "z64"
         case .nds: ext = "nds"
         case .psp: ext = "iso"
+        case .nes: ext = "nes"
+        case .snes: ext = "sfc"
+        case .genesis: ext = "md"
+        case .atari7800: ext = "a78"
+        case .ps1: ext = "cue"
         }
         return LibraryGame(
             displayName: name,

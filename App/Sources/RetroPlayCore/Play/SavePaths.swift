@@ -48,6 +48,12 @@ public struct SavePaths: Sendable {
         documentsURL.appendingPathComponent("Cheats", isDirectory: true)
     }
 
+    /// BIOS files the player adds (Files → RetroPlay → BIOS), e.g. a PS1 `scph5501.bin`.
+    /// The libretro cores read it as their system directory.
+    public var biosDirectory: URL {
+        documentsURL.appendingPathComponent("BIOS", isDirectory: true)
+    }
+
     public var n64SavesDirectory: URL {
         savesDirectory.appendingPathComponent("n64", isDirectory: true)
     }
@@ -98,6 +104,7 @@ public struct SavePaths: Sendable {
             statesDirectory,
             cheatsDirectory,
             n64SavesDirectory,
+            biosDirectory,
             pspMemstickDirectory,
             pspSavedataDirectory,
             pspGameDirectory,
@@ -175,7 +182,7 @@ public struct SavePaths: Sendable {
         switch game.systemID {
         case .n64:
             return n64SRAMURL(forRelativeROMPath: game.relativePath)
-        case .gba, .nds:
+        case .gba, .nds, .nes, .snes, .genesis, .atari7800, .ps1:
             return sramURL(forRelativeROMPath: game.relativePath)
         case .psp:
             return pspSavedataDirectory

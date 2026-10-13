@@ -315,6 +315,9 @@ public enum BatterySaveReload: Sendable {
             return true
         case .n64:
             return true
+        // The libretro cores read SAVE_RAM once at load, so a new save needs a reload.
+        case .nes, .snes, .genesis, .atari7800, .ps1:
+            return true
         }
     }
 
