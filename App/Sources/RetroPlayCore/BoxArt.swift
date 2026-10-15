@@ -32,6 +32,56 @@ public enum BoxArt {
         indexURL(for: system).appendingPathComponent(name + ".png", isDirectory: false)
     }
 
+    /// libretro-database's disc-code list for systems whose games carry one (PSP: ULUS-10238 →
+    /// "Crush (USA) (En,Fr,Es)"), for when the file name isn't the release's title.
+    public static func serialListURL(for system: SystemID) -> URL? {
+        switch system {
+        case .psp:
+            return URL(string: "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/serial/"
+                + "Sony%20-%20PlayStation%20Portable.dat")
+        default:
+            return nil
+        }
+    }
+
+    /// Disc codes ("ULUS10238", letters and digits only) to release names, from a
+    /// clrmamepro DAT whose games have a `comment` (the name) and a `serial`.
+    public static func parseSerials(_ dat: String) -> [String: [String]] {
+        var map: [String: [String]] = [:]
+        var name: String?
+        for line in dat.split(whereSeparator: \.isNewline) {
+            let text = line.trimmingCharacters(in: .whitespaces)
+            if text.hasPrefix("game (") { name = nil }
+            if let value = quoted(after: "comment", in: text) { name = value }
+            if let serial = quoted(after: "serial", in: text), let name {
+                map[normalizedSerial(serial), default: []].append(name)
+            }
+        }
+        return map
+    }
+
+    public static func normalizedSerial(_ serial: String) -> String {
+        serial.uppercased().filter { $0.isLetter || $0.isNumber }
+    }
+
+    private static func quoted(after key: String, in line: String) -> String? {
+        guard let keyRange = line.range(of: key + " \""),
+              let close = line[keyRange.upperBound...].firstIndex(of: "\"")
+        else { return nil }
+        return String(line[keyRange.upperBound..<close])
+    }
+
+    /// The box art for a disc code: the exact release first, else its title in another region.
+    public static func match(serial: String, serials: [String: [String]], in names: [String]) -> String? {
+        guard let releases = serials[normalizedSerial(serial)] else { return nil }
+        let available = Set(names)
+        if let exact = releases.first(where: available.contains) { return exact }
+        for release in releases {
+            if let match = bestMatch(title: release, fileName: release, in: names) { return match }
+        }
+        return nil
+    }
+
     /// Release names (without ".png") listed in a folder's HTML index.
     public static func parseIndex(_ html: String) -> [String] {
         var names: [String] = []
@@ -138,7 +188,12 @@ public struct BoxArtIndexCache {
         directory.appendingPathComponent("\(system.rawValue).json")
     }
 
-    private var lookedUpURL: URL { directory.appendingPathComponent("looked-up.json") }
+    private func serialsURL(_ system: SystemID) -> URL {
+        directory.appendingPathComponent("\(system.rawValue)-serials.json")
+    }
+
+    /// Versioned: a better matcher (v2 added disc codes) looks every game up again once.
+    private var lookedUpURL: URL { directory.appendingPathComponent("looked-up-2.json") }
 
     /// The cached list when it's younger than `maxAge`.
     public func names(for system: SystemID, now: Date = Date()) -> [String]? {
@@ -148,6 +203,20 @@ public struct BoxArtIndexCache {
               let data = try? Data(contentsOf: url)
         else { return nil }
         return try? JSONDecoder().decode([String].self, from: data)
+    }
+
+    public func serials(for system: SystemID, now: Date = Date()) -> [String: [String]]? {
+        let url = serialsURL(system)
+        guard let modified = (try? fileManager.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
+              now.timeIntervalSince(modified) < Self.maxAge,
+              let data = try? Data(contentsOf: url)
+        else { return nil }
+        return try? JSONDecoder().decode([String: [String]].self, from: data)
+    }
+
+    public func store(serials: [String: [String]], for system: SystemID) {
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(serials).write(to: serialsURL(system), options: .atomic)
     }
 
     public func store(_ names: [String], for system: SystemID) {
@@ -201,6 +270,11 @@ public struct BoxArtDownloader: Sendable {
     public func index(for system: SystemID) async throws -> [String] {
         let data = try await fetch(BoxArt.indexURL(for: system))
         return BoxArt.parseIndex(String(decoding: data, as: UTF8.self))
+    }
+
+    public func serials(for system: SystemID) async throws -> [String: [String]] {
+        guard let url = BoxArt.serialListURL(for: system) else { return [:] }
+        return BoxArt.parseSerials(String(decoding: try await fetch(url), as: UTF8.self))
     }
 
     /// The cover image (PNG) for a release name.

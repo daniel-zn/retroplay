@@ -41,7 +41,7 @@
 	<true/>
 	<key>UIAppFonts</key>
 	<array>
-		<string>ShareTechMono-Regular.ttf</string>
+		<string>VT323-Regular.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

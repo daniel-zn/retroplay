@@ -62,11 +62,16 @@ final class BoxArtUpdater {
         }
         for (system, systemGames) in Dictionary(grouping: pending, by: \.systemID) {
             guard Self.isEnabled, let names = await names(for: system) else { continue }
+            let serials = systemGames.contains { $0.pspProductID != nil } ? await serials(for: system) : [:]
             var done: [UUID] = []
             for game in systemGames {
                 guard Self.isEnabled else { break }
                 let fileName = (game.relativePath as NSString).lastPathComponent
-                guard let name = BoxArt.bestMatch(title: game.displayName, fileName: fileName, in: names) else {
+                // The disc's own code names the exact release, whatever the file is called.
+                let bySerial = game.pspProductID.flatMap { BoxArt.match(serial: $0, serials: serials, in: names) }
+                guard let name = bySerial
+                    ?? BoxArt.bestMatch(title: game.displayName, fileName: fileName, in: names)
+                else {
                     done.append(game.id)
                     continue
                 }
@@ -79,6 +84,13 @@ final class BoxArtUpdater {
             }
             indexCache.markLookedUp(done)
         }
+    }
+
+    private func serials(for system: SystemID) async -> [String: [String]] {
+        if let cached = indexCache.serials(for: system) { return cached }
+        guard let serials = try? await downloader.serials(for: system), !serials.isEmpty else { return [:] }
+        indexCache.store(serials: serials, for: system)
+        return serials
     }
 
     private func names(for system: SystemID) async -> [String]? {

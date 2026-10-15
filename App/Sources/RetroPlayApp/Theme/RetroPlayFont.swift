@@ -7,12 +7,12 @@ import UIKit
 @available(iOS 18.0, *)
 @MainActor
 enum RetroPlayFont {
-    static let postScriptName = "ShareTechMono-Regular"
-    static let resourceName = "ShareTechMono-Regular"
+    static let postScriptName = "VT323-Regular"
+    static let resourceName = "VT323-Regular"
     /// Visual size correction against the system face at the same nominal point size, kept
-    /// here so tokens, controls and UIKit chrome stay aligned. Share Tech Mono's capitals are
-    /// as tall as the system font's, so none is needed.
-    static let pointSizeReduction: CGFloat = 0
+    /// here so tokens, controls and UIKit chrome stay aligned. VT323's capitals are 56% of the
+    /// em against the system font's ~70%, so it's set 25% larger.
+    static let pointSizeScale: CGFloat = 1.25
     private static var didAttemptRegistration = false
 
     static var largeTitle: Font { sized(34, relativeTo: .largeTitle) }
@@ -23,7 +23,7 @@ enum RetroPlayFont {
     static var caption2: Font { sized(11, relativeTo: .caption2) }
 
     static func sized(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
-        swiftUIFont(size: reduced(size), relativeTo: style)
+        swiftUIFont(size: adjusted(size), relativeTo: style)
     }
 
     static func registerBundledFont() {
@@ -40,7 +40,7 @@ enum RetroPlayFont {
 
     static func uiFont(size: CGFloat, textStyle: UIFont.TextStyle) -> UIFont {
         registerBundledFont()
-        guard let base = UIFont(name: postScriptName, size: reduced(size)) else {
+        guard let base = UIFont(name: postScriptName, size: adjusted(size)) else {
             // preferredFont is already scaled; scaling it again would magnify
             // the fallback twice at non-default Dynamic Type sizes.
             return UIFont.preferredFont(forTextStyle: textStyle)
@@ -48,8 +48,8 @@ enum RetroPlayFont {
         return UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base)
     }
 
-    private static func reduced(_ size: CGFloat) -> CGFloat {
-        max(8, size - pointSizeReduction)
+    private static func adjusted(_ size: CGFloat) -> CGFloat {
+        max(8, (size * pointSizeScale).rounded())
     }
 
     static func applyUIKitAppearance() {

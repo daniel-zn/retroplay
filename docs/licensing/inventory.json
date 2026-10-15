@@ -161,13 +161,13 @@
   },
   {
     "project": "RetroPlay app resources",
-    "component": "Share Tech Mono font (ShareTechMono-Regular.ttf)",
-    "version": "google/fonts @ c5a3a1b83fb771759f48d1abdee0127eaec63a97; SHA-256 9ceab1f87414829af259c0f537573ae03ef7dd3147c0b27a36a1a0beb6732677",
+    "component": "VT323 font (VT323-Regular.ttf)",
+    "version": "google/fonts @ 2da41909d08a7bfeab32cfc163edb7be0c34395d; SHA-256 cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
     "spdx": "OFL-1.1",
-    "copyright": "Copyright (c) 2012, Carrois Type Design, Ralph du Carrois (post@carrois.com www.carrois.com), with Reserved Font Name 'Share'.",
-    "licenseFile": "retroplay/AppHost/Supporting/ShareTechMono-OFL.txt",
+    "copyright": "Copyright 2011, The VT323 Project Authors (peter.hull@oikoi.com)",
+    "licenseFile": "retroplay/AppHost/Supporting/VT323-OFL.txt",
     "requiresNoticeText": true,
-    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches ShareTechMono-SOURCE.md. OFL requires copyright notice + license with the font (bundled OFL.txt satisfies it; also list in in-app licenses)"
+    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches VT323-SOURCE.md. OFL requires copyright notice + license with the font (bundled OFL.txt satisfies it; also list in in-app licenses)"
   },
   {
     "project": "mupen64plus-next",

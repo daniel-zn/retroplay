@@ -70,6 +70,31 @@ final class BoxArtTests: XCTestCase {
         XCTAssertNil(BoxArt.bestMatch(title: "Crush", fileName: "Crush ULUS10238.iso", in: names))
     }
 
+    func testPSPDiscCodesNameTheRelease() {
+        let dat = """
+        clrmamepro (
+        \tname "Sony - PlayStation Portable"
+        )
+
+        game (
+        \tcomment "Crush (USA) (En,Fr,Es)"
+        \trom ( serial "ULUS-10238" )
+        )
+        game (
+        \tcomment "Daxter (Europe) (En,Fr,De,Es,It)"
+        \trom ( serial "UCES-00044" )
+        )
+        """
+        let serials = BoxArt.parseSerials(dat)
+        XCTAssertEqual(serials["ULUS10238"], ["Crush (USA) (En,Fr,Es)"])
+        let covers = ["Daxter (USA) (En,Fr,De,Es,It)", "Daxter (Europe) (En,Fr,De,Es,It)", "Crash Tag Team Racing (USA)"]
+        // The exact release when its cover exists…
+        XCTAssertEqual(BoxArt.match(serial: "UCES00044", serials: serials, in: covers), "Daxter (Europe) (En,Fr,De,Es,It)")
+        // …and nothing when no release of that title has one (Crush isn't on the server).
+        XCTAssertNil(BoxArt.match(serial: "ULUS-10238", serials: serials, in: covers))
+        XCTAssertNil(BoxArt.match(serial: "ULUS99999", serials: serials, in: covers))
+    }
+
     func testEveryServerFolderNameIsSet() {
         for system in SystemID.allCases {
             XCTAssertTrue(BoxArt.indexURL(for: system).absoluteString.hasPrefix("https://thumbnails.libretro.com/"))

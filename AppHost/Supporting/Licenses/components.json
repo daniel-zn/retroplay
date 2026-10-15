@@ -1,12 +1,12 @@
 [
  {
-  "name": "Share Tech Mono font",
+  "name": "VT323 font (VT323-Regular.ttf)",
   "usedBy": "App",
   "license": "OFL-1.1",
-  "copyright": "Copyright (c) 2012, Carrois Type Design, Ralph du Carrois (post@carrois.com www.carrois.com), with Reserved Font Name 'Share'.",
-  "source": "https://github.com/google/fonts/tree/c5a3a1b83fb771759f48d1abdee0127eaec63a97/ofl/sharetechmono",
-  "version": "google/fonts @ c5a3a1b83fb771759f48d1abdee0127eaec63a97; SHA-256 9ceab1f87414829af259c0f537573ae03ef7dd3147c0b27a36a1a0beb6732677",
-  "licenseFile": "Share-Tech-Mono-font-OFL-1-1.txt"
+  "copyright": "Copyright 2011, The VT323 Project Authors (peter.hull@oikoi.com)",
+  "source": "https://github.com/google/fonts/tree/2da41909d08a7bfeab32cfc163edb7be0c34395d/ofl/vt323",
+  "version": "google/fonts @ 2da41909d08a7bfeab32cfc163edb7be0c34395d; SHA-256 cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
+  "licenseFile": "VT323-font-VT323-Regular-ttf-OFL-1-1.txt"
  },
  {
   "name": "mGBA (libmgba, GBA core only)",
