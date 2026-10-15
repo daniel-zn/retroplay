@@ -139,7 +139,7 @@ struct PlayMenuView: View {
         .disabled(leaving)
         .padding(20)
         .frame(maxWidth: 360)
-        // Past AX1 the pixel face no longer fits a phone-width card even stacked.
+        // Past AX1 the menu no longer fits a phone-width card even stacked.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {

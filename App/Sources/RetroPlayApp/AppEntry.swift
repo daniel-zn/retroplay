@@ -46,6 +46,8 @@ public struct RetroPlayRootView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var coverCache = CoverArtImageCache()
+    @State private var boxArt = BoxArtUpdater()
+    @AppStorage(BoxArtUpdater.enabledKey) private var downloadBoxArt = true
     @AppStorage("retroplay.librarySort") private var sortRaw = LibrarySort.recentlyPlayed.rawValue
     /// Newest save state per game (Play auto-saves on exit), refreshed after each session.
     @State private var lastPlayed: [UUID: Date] = [:]
@@ -179,9 +181,19 @@ public struct RetroPlayRootView: View {
         .onChange(of: store.games) { _, _ in
             refreshActivity()
             coverCache.forgetMissing()
+            updateBoxArt()
+        }
+        .onChange(of: downloadBoxArt) { _, on in
+            if on {
+                boxArt.forgetLookups()
+                updateBoxArt()
+            }
         }
         // Pick up ROMs added or removed in Files → RetroPlay → Games.
-        .task { await store.reconcileWithGamesFolder() }
+        .task {
+            await store.reconcileWithGamesFolder()
+            updateBoxArt()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await store.reconcileWithGamesFolder() }
@@ -390,7 +402,7 @@ public struct RetroPlayRootView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("RetroPlay")
                 .font(RetroPlayFont.largeTitle)
-                // One line: at accessibility sizes the pixel face would split the word.
+                // One line: at accessibility sizes the title would otherwise split the word.
                 .lineLimit(1)
                 .minimumScaleFactor(0.4)
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
@@ -594,8 +606,16 @@ public struct RetroPlayRootView: View {
         gamePendingDelete = nil
     }
 
-    private func loadCover(for game: LibraryGame) -> UIImage? {
-        coverCache.image(for: game)
+    /// Box art for games that don't have it yet (Settings → Download Box Art).
+    private func updateBoxArt() {
+        let games = store.games
+        Task {
+            await boxArt.update(games) { coverCache.coverChanged(gameID: $0) }
+        }
+    }
+
+    private func loadCover(for game: LibraryGame) -> CoverArt? {
+        coverCache.cover(for: game)
     }
 
     private func handleImport(_ result: Result<[URL], Error>) {

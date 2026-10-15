@@ -3,10 +3,19 @@ import Combine
 import UIKit
 import RetroPlayCore
 
+/// A library cover: downloaded box art, or art read from the game file (a PSP / DS icon).
+struct CoverArt {
+    let image: UIImage
+    let isBoxArt: Bool
+}
+
 /// In-memory cover cache so grid tiles do not re-read JPEGs on every SwiftUI pass.
 @MainActor
 final class CoverArtImageCache: ObservableObject {
     private let cache = NSCache<NSString, UIImage>()
+    private var boxArt: Set<UUID> = []
+    /// Bumped when a cover changes on disk (box art downloaded), so tiles redraw.
+    @Published private(set) var revision = 0
     /// Games with no cover (all GBA / N64, some DS / PSP): don't re-read the disk every render.
     private var missing: Set<UUID> = []
     private let covers: CoverArtStore
@@ -14,6 +23,10 @@ final class CoverArtImageCache: ObservableObject {
     init(covers: CoverArtStore = CoverArtStore()) {
         self.covers = covers
         cache.countLimit = 256
+    }
+
+    func cover(for game: LibraryGame) -> CoverArt? {
+        image(for: game).map { CoverArt(image: $0, isBoxArt: boxArt.contains(game.id)) }
     }
 
     func image(for game: LibraryGame) -> UIImage? {
@@ -29,8 +42,19 @@ final class CoverArtImageCache: ObservableObject {
             missing.insert(game.id)
             return nil
         }
+        if covers.origin(forGameID: game.id) == .boxArt {
+            boxArt.insert(game.id)
+        } else {
+            boxArt.remove(game.id)
+        }
         cache.setObject(image, forKey: key)
         return image
+    }
+
+    /// A new cover was written for this game: drop the old one and redraw.
+    func coverChanged(gameID: UUID) {
+        remove(gameID: gameID)
+        revision += 1
     }
 
     func remove(gameID: UUID) {

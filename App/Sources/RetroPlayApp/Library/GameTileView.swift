@@ -4,11 +4,13 @@ import SwiftUI
 import RetroPlayCore
 
 /// Cover art, or — for the many games without one — a cartridge-style label:
-/// system-coloured gradient, scanlines, and the game's name in the pixel face.
+/// system-coloured gradient, scanlines, and the game's name in the app font.
 @available(iOS 18.0, *)
 struct GameArtworkView: View {
     let game: LibraryGame
     var artwork: UIImage?
+    /// Box art already has the cover's shape and fills it; icons from the game file are fitted.
+    var isBoxArt = false
     var cornerRadius: CGFloat = 12
     /// Label title size; tiles use the default, wide cards go larger.
     var labelTitleSize: CGFloat = 13
@@ -18,7 +20,12 @@ struct GameArtworkView: View {
     var body: some View {
         Color.clear
             .overlay {
-                if let artwork {
+                if let artwork, isBoxArt {
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .interpolation(.medium)
+                        .scaledToFill()
+                } else if let artwork {
                     artworkImage(artwork)
                 } else {
                     labelArt
@@ -127,28 +134,49 @@ struct SystemBadge: View {
 @available(iOS 18.0, *)
 struct GameTileView: View {
     let game: LibraryGame
-    var artwork: UIImage?
+    var cover: CoverArt?
     /// Most recent save state, used as "last played" (Play auto-saves on exit).
     var lastPlayed: Date?
 
     @Environment(\.colorScheme) private var colorScheme
 
+    /// The cover's shape: box art keeps its own (a European N64 box is portrait), anything
+    /// else takes the system's retail box shape.
+    private var coverAspect: CGFloat {
+        if let cover, cover.isBoxArt, cover.image.size.height > 0 {
+            return min(max(cover.image.size.width / cover.image.size.height, 0.5), 1.6)
+        }
+        return RetroPlayTheme.boxArtAspect(game.systemID)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            GameArtworkView(game: game, artwork: artwork)
-                .aspectRatio(3 / 4, contentMode: .fit)
-                .overlay(alignment: .topLeading) {
-                    if artwork != nil {
-                        SystemBadge(system: game.systemID, style: .onArt)
-                            .padding(6)
+            // Every tile has the same square slot, so rows line up whatever the systems; the
+            // cover stands on its bottom edge in its real shape, like boxes on a shelf.
+            Color.clear
+                .aspectRatio(1, contentMode: .fit)
+                .overlay(alignment: .bottom) {
+                    GameArtworkView(
+                        game: game,
+                        artwork: cover?.image,
+                        isBoxArt: cover?.isBoxArt ?? false,
+                        cornerRadius: 8
+                    )
+                    .aspectRatio(coverAspect, contentMode: .fit)
+                    // Box art carries the system's own branding, and the subtitle names it.
+                    .overlay(alignment: .topLeading) {
+                        if let cover, !cover.isBoxArt {
+                            SystemBadge(system: game.systemID, style: .onArt)
+                                .padding(5)
+                        }
                     }
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    if lastPlayed != nil {
-                        resumeMark
+                    .overlay(alignment: .bottomTrailing) {
+                        if lastPlayed != nil {
+                            resumeMark
+                        }
                     }
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 6, y: 3)
                 }
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 6, y: 3)
 
             Text(game.displayName)
                 .font(RetroPlayFont.caption)

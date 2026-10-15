@@ -161,13 +161,13 @@
   },
   {
     "project": "RetroPlay app resources",
-    "component": "Press Start 2P font (PressStart2P-Regular.ttf)",
-    "version": "google/fonts @ dbd72d6ef9ebea750d33c02c7189633e972d6a40; SHA-256 034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
+    "component": "Share Tech Mono font (ShareTechMono-Regular.ttf)",
+    "version": "google/fonts @ c5a3a1b83fb771759f48d1abdee0127eaec63a97; SHA-256 9ceab1f87414829af259c0f537573ae03ef7dd3147c0b27a36a1a0beb6732677",
     "spdx": "OFL-1.1",
-    "copyright": "Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name \"Press Start 2P\".",
-    "licenseFile": "retroplay/AppHost/Supporting/PressStart2P-OFL.txt",
+    "copyright": "Copyright (c) 2012, Carrois Type Design, Ralph du Carrois (post@carrois.com www.carrois.com), with Reserved Font Name 'Share'.",
+    "licenseFile": "retroplay/AppHost/Supporting/ShareTechMono-OFL.txt",
     "requiresNoticeText": true,
-    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches SOURCE.md. OFL requires copyright notice + license with the font (bundled OFL.txt satisfies it; also list in in-app licenses)"
+    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches ShareTechMono-SOURCE.md. OFL requires copyright notice + license with the font (bundled OFL.txt satisfies it; also list in in-app licenses)"
   },
   {
     "project": "mupen64plus-next",

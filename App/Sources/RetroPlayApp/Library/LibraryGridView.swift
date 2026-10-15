@@ -7,7 +7,7 @@ import RetroPlayCore
 struct LibraryGridView<Header: View>: View {
     let games: [LibraryGame]
     let onSelect: (LibraryGame) -> Void
-    let artworkProvider: (LibraryGame) -> UIImage?
+    let artworkProvider: (LibraryGame) -> CoverArt?
     /// When non-nil, long-press offers Delete (confirmation lives on the caller).
     var onRequestDelete: ((LibraryGame) -> Void)? = nil
     /// When non-nil, drives inline nav collapse once scroll offset exceeds threshold.
@@ -21,8 +21,8 @@ struct LibraryGridView<Header: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    /// Three across on a phone (more in landscape); two at accessibility text sizes, where the
-    /// pixel face (~1 em per letter) would leave only a few letters per line in a narrow tile.
+    /// Three across on a phone (more in landscape); two at accessibility text sizes, where a
+    /// narrow tile would leave only a few letters per line.
     private var columns: [GridItem] {
         let minimum: CGFloat = dynamicTypeSize.isAccessibilitySize ? 150 : 100
         return [GridItem(.adaptive(minimum: minimum, maximum: 240), spacing: 12, alignment: .top)]
@@ -31,7 +31,7 @@ struct LibraryGridView<Header: View>: View {
     init(
         games: [LibraryGame],
         onSelect: @escaping (LibraryGame) -> Void,
-        artworkProvider: @escaping (LibraryGame) -> UIImage?,
+        artworkProvider: @escaping (LibraryGame) -> CoverArt?,
         onRequestDelete: ((LibraryGame) -> Void)? = nil,
         titleCollapsed: Binding<Bool>? = nil,
         lastPlayed: [UUID: Date] = [:],
@@ -59,7 +59,7 @@ struct LibraryGridView<Header: View>: View {
                         } label: {
                             GameTileView(
                                 game: game,
-                                artwork: artworkProvider(game),
+                                cover: artworkProvider(game),
                                 lastPlayed: lastPlayed[game.id]
                             )
                             .opacity(missingGameIDs.contains(game.id) ? 0.45 : 1)
@@ -120,7 +120,7 @@ extension LibraryGridView where Header == EmptyView {
     init(
         games: [LibraryGame],
         onSelect: @escaping (LibraryGame) -> Void,
-        artworkProvider: @escaping (LibraryGame) -> UIImage?,
+        artworkProvider: @escaping (LibraryGame) -> CoverArt?,
         onRequestDelete: ((LibraryGame) -> Void)? = nil,
         titleCollapsed: Binding<Bool>? = nil,
         lastPlayed: [UUID: Date] = [:],

@@ -177,7 +177,7 @@ private struct ComponentLicenseView: View {
 }
 
 /// Full license text, in the system monospaced face: legal text must stay readable,
-/// and the pixel font makes long passages hard to read.
+/// and the app's display font makes long passages hard to read.
 @available(iOS 18.0, *)
 private struct LicenseTextView: View {
     let title: String

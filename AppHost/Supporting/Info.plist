@@ -41,7 +41,7 @@
 	<true/>
 	<key>UIAppFonts</key>
 	<array>
-		<string>PressStart2P-Regular.ttf</string>
+		<string>ShareTechMono-Regular.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

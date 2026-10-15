@@ -16,6 +16,7 @@ struct SettingsView: View {
     @AppStorage(PlaySettingsKey.padOpacity) private var padOpacity = 0.75
     @AppStorage(PlaySettingsKey.smoothScreen) private var smoothScreen = false
     @AppStorage(PlaySettingsKey.touchWithController) private var touchWithController = false
+    @AppStorage(BoxArtUpdater.enabledKey) private var downloadBoxArt = true
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
 
@@ -155,11 +156,16 @@ struct SettingsView: View {
             } label: {
                 SettingsIconLabel("Storage", symbol: "internaldrive.fill", color: .gray)
             }
+            Toggle(isOn: $downloadBoxArt) {
+                SettingsIconLabel("Download Box Art", symbol: "photo.on.rectangle.angled", color: .teal)
+            }
             Button(action: onImport) {
                 SettingsIconLabel("Import Games…", symbol: "plus", color: RetroPlayTheme.accent)
             }
         } header: {
             sectionHeader("Library")
+        } footer: {
+            sectionFooter("Box art comes from the libretro thumbnail server (thumbnails.libretro.com), looked up by each game's title. Games without a match keep their label.")
         }
         .listRowBackground(RetroPlayTheme.card(for: colorScheme))
     }

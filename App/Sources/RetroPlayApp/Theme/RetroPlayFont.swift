@@ -7,11 +7,12 @@ import UIKit
 @available(iOS 18.0, *)
 @MainActor
 enum RetroPlayFont {
-    static let postScriptName = "PressStart2P-Regular"
-    static let resourceName = "PressStart2P-Regular"
-    /// Press Start 2P reads larger than the system face at the same nominal point size.
-    /// Keep the visual correction here so tokens, controls, and UIKit chrome stay aligned.
-    static let pointSizeReduction: CGFloat = 2
+    static let postScriptName = "ShareTechMono-Regular"
+    static let resourceName = "ShareTechMono-Regular"
+    /// Visual size correction against the system face at the same nominal point size, kept
+    /// here so tokens, controls and UIKit chrome stay aligned. Share Tech Mono's capitals are
+    /// as tall as the system font's, so none is needed.
+    static let pointSizeReduction: CGFloat = 0
     private static var didAttemptRegistration = false
 
     static var largeTitle: Font { sized(34, relativeTo: .largeTitle) }

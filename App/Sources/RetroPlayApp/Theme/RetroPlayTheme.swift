@@ -78,7 +78,20 @@ enum RetroPlayTheme {
         }
     }
 
-    /// Deep tone used behind label art so white pixel text stays readable.
+    /// Width / height of the system's retail box (North American release), the shape a
+    /// cover takes in the library when no box art says otherwise.
+    static func boxArtAspect(_ id: SystemID) -> CGFloat {
+        switch id {
+        case .psp: return 0.58
+        case .nes, .genesis, .atari7800: return 0.71
+        case .gba, .ps1: return 1.0
+        case .nds: return 1.1
+        case .n64: return 1.37
+        case .snes: return 1.4
+        }
+    }
+
+    /// Deep tone used behind label art so white text stays readable.
     static func systemShade(_ id: SystemID) -> Color {
         switch id {
         case .gba: return Color(red: 0.17, green: 0.14, blue: 0.36)

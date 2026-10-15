@@ -3,12 +3,14 @@ import CoreGraphics
 import Foundation
 import ImageIO
 
-/// Cover art extracted from imported games, kept in Application Support/Covers so Files does
-/// not show it. Local files only — never fetched.
+/// Cover art for library games, kept in Application Support/Covers so Files does not show it:
+/// art read from the game file itself, or box art downloaded by `BoxArtDownloader`.
 /// Not marked Sendable: holds FileManager and is used from the main-actor UI / LibraryStore.
 public struct CoverArtStore {
     public enum Origin: String, Sendable {
         case rom
+        /// Box art from the libretro thumbnail server; preferred over art from the game file.
+        case boxArt
         /// Marker written by the removed Todo-1 screenshot fallback.
         case frame
     }
@@ -85,12 +87,24 @@ public struct CoverArtStore {
     /// Install cover from the imported game file when it already contains art.
     @discardableResult
     public func installFromGameFile(gameID: UUID, fileURL: URL, system: SystemID) throws -> Bool {
-        guard let payload = CoverArtExtractor.extractImageData(from: fileURL, system: system),
+        // Downloaded box art is the better cover; a re-scan of the file mustn't replace it.
+        guard origin(forGameID: gameID) != .boxArt,
+              let payload = CoverArtExtractor.extractImageData(from: fileURL, system: system),
               let jpeg = CoverArtJPEG.jpegData(fromImageFile: payload)
         else {
             return false
         }
         try write(jpeg, origin: .rom, forGameID: gameID)
+        return true
+    }
+
+    /// Downloaded box art (any image format), stored as a JPEG at most `maxPixels` tall.
+    @discardableResult
+    public func installBoxArt(_ imageData: Data, forGameID id: UUID, maxPixels: Int = 600) throws -> Bool {
+        guard let jpeg = CoverArtJPEG.jpegData(fromImageFile: imageData, maxPixels: maxPixels) else {
+            return false
+        }
+        try write(jpeg, origin: .boxArt, forGameID: id)
         return true
     }
 
@@ -118,12 +132,20 @@ enum CoverArtJPEG {
         return data as Data
     }
 
-    static func jpegData(fromImageFile payload: Data) -> Data? {
-        guard let source = CGImageSourceCreateWithData(payload as CFData, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
-        else {
-            return nil
+    static func jpegData(fromImageFile payload: Data, maxPixels: Int? = nil) -> Data? {
+        guard let source = CGImageSourceCreateWithData(payload as CFData, nil) else { return nil }
+        let image: CGImage?
+        if let maxPixels {
+            // Decodes straight to the smaller size; box art scans can be 2000+ px.
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixels,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+            ]
+            image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        } else {
+            image = CGImageSourceCreateImageAtIndex(source, 0, nil)
         }
-        return jpegData(from: image)
+        return image.flatMap { jpegData(from: $0) }
     }
 }
