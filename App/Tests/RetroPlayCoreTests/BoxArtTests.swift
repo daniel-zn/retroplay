@@ -30,6 +30,18 @@ final class BoxArtTests: XCTestCase {
         )
         XCTAssertEqual(BoxArt.normalizedTitle("Super Mario Bros. 3"), "super mario bros 3")
         XCTAssertEqual(BoxArt.normalizedTitle("Ratchet & Clank"), BoxArt.normalizedTitle("Ratchet and Clank (USA)"))
+        // The server writes "&" (and ":", "/", "?") as "_" in its file names.
+        XCTAssertEqual(
+            BoxArt.normalizedTitle("Ratchet & Clank - Size Matters.iso"),
+            BoxArt.normalizedTitle("Ratchet _ Clank - Size Matters (Europe) (En,Fr,De)")
+        )
+        XCTAssertEqual(
+            BoxArt.bestMatch(
+                title: "Mario & Luigi - Superstar Saga", fileName: "Mario & Luigi - Superstar Saga.gba",
+                in: ["Mario _ Luigi - Superstar Saga (USA)", "Mario _ Luigi - Superstar Saga (Europe)"]
+            ),
+            "Mario _ Luigi - Superstar Saga (USA)"
+        )
     }
 
     private let zelda = [

@@ -111,15 +111,16 @@ public enum BoxArt {
     }
 
     /// Title words only: no bracketed tags, case, punctuation, articles or "&" / "and" differences.
+    /// The server's file names replace `&*/:`<>?\|"` with "_", so "Ratchet & Clank" is listed as
+    /// "Ratchet _ Clank": every symbol becomes a space and "and" is dropped like an article.
     public static func normalizedTitle(_ name: String) -> String {
         var s = stripExtension(name)
         s = s.replacingOccurrences(of: #"\s*[\(\[][^\)\]]*[\)\]]"#, with: "", options: .regularExpression)
         s = s.lowercased()
-            .replacingOccurrences(of: "&", with: " and ")
             .replacingOccurrences(of: "'", with: "")
             .replacingOccurrences(of: "’", with: "")
         s = s.replacingOccurrences(of: #"[^a-z0-9]+"#, with: " ", options: .regularExpression)
-        let words = s.split(separator: " ").filter { $0 != "the" && $0 != "a" && $0 != "an" }
+        let words = s.split(separator: " ").filter { !["the", "a", "an", "and"].contains($0) }
         return words.joined(separator: " ")
     }
 
@@ -192,8 +193,9 @@ public struct BoxArtIndexCache {
         directory.appendingPathComponent("\(system.rawValue)-serials.json")
     }
 
-    /// Versioned: a better matcher (v2 added disc codes) looks every game up again once.
-    private var lookedUpURL: URL { directory.appendingPathComponent("looked-up-2.json") }
+    /// Versioned: a better matcher (v2 added disc codes, v3 "&" written as "_") looks every game
+    /// up again once.
+    private var lookedUpURL: URL { directory.appendingPathComponent("looked-up-3.json") }
 
     /// The cached list when it's younger than `maxAge`.
     public func names(for system: SystemID, now: Date = Date()) -> [String]? {
