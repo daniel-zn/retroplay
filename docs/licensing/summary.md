@@ -13,7 +13,7 @@ Top-level license texts:
 | GPL-2.0 | `ppsspp-GPL-2.0-or-later.txt` (PPSSPP `LICENSE.TXT`, which also carries the PSPSDK BSD-3 notice) and `mupen64plus-next-GPL-2.0-or-later.txt` |
 | MPL-2.0 | `mgba-MPL-2.0.txt` |
 | LGPL-2.1 | `ffmpeg-LGPL-2.1-or-later.txt` and `blip_buf-LGPL-2.1-or-later.txt` |
-| OFL-1.1 | `VT323-OFL-1.1.txt` |
+| OFL-1.1 | `PressStart2P-OFL-1.1.txt` |
 
 ## Per core: what is actually in the binaries
 
@@ -93,7 +93,7 @@ Built by `App/Vendor/build-libretro-cores-ios.sh` from unmodified checkouts (com
 **Compatibility.** Every new license combines with GPL-3.0: the GPL-2.0-or-later and LGPL cores upgrade to v3, bsnes is GPL-3.0 itself, and GPLv3 s.13 explicitly allows linking with AGPLv3 code (clownmdemu). The AGPL's extra s.13 duty (offer source to users who interact over a network) does not apply to an offline emulator, and the app already publishes its complete source. Nothing is non-commercial. See red flags 9-11.
 
 ### App resources
-- **VT323** (OFL-1.1). The SHA-256 matches `VT323-SOURCE.md`. The OFL file is bundled.
+- **Press Start 2P** (OFL-1.1). The SHA-256 matches `SOURCE.md`. The OFL and FONTLOG files are bundled.
 - **PPSSPP assets.** All are byte-identical to ppsspp@98e70c8ca3. Provenance is in `notes-ppsspp.md`.
 
 ## Red flags

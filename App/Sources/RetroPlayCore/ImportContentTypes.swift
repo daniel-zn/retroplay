@@ -17,7 +17,8 @@ public enum ImportContentTypes {
 
     /// Broad types plus per-extension UTTypes so `.fileImporter` surfaces ROMs in Files.
     public static var allowedContentTypes: [UTType] {
-        var types: [UTType] = [.item, .data, .archive, .diskImage]
+        // Images: a picture named like a game becomes its cover (CustomCovers).
+        var types: [UTType] = [.item, .data, .archive, .diskImage, .image]
         for ext in fileExtensions {
             if let type = UTType(filenameExtension: ext) {
                 types.append(type)

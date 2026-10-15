@@ -57,7 +57,7 @@ final class BoxArtUpdater {
         let now = Date()
         let lookedUp = indexCache.lookedUp()
         let pending = games.filter { game in
-            covers.origin(forGameID: game.id) != .boxArt
+            ![.boxArt, .custom].contains(covers.origin(forGameID: game.id))
                 && (lookedUp[game.id].map { now.timeIntervalSince($0) > BoxArtIndexCache.maxAge } ?? true)
         }
         for (system, systemGames) in Dictionary(grouping: pending, by: \.systemID) {

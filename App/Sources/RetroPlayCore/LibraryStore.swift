@@ -24,6 +24,8 @@ public struct LibraryImportSummary: Sendable, Equatable {
     public var unsupported: [String] = []
     /// Picked files that could not be read or copied.
     public var failed: [LibraryImportFailure] = []
+    /// Pictures picked with (or after) their games and set as those games' covers.
+    public var covers: [String] = []
 
     public init() {}
 }
@@ -33,6 +35,8 @@ public struct LibraryImportSummary: Sendable, Equatable {
 @MainActor
 public final class LibraryStore: ObservableObject {
     @Published public private(set) var games: [LibraryGame] = []
+    /// Bumped when the player's own pictures replace covers, so the library redraws them.
+    @Published public private(set) var coversRevision = 0
     /// Set when `library.json` exists but cannot be decoded; cleared on successful load.
     @Published public private(set) var libraryLoadFailureMessage: String?
     /// Files currently being copied in by `importInBackground`.
@@ -194,6 +198,13 @@ public final class LibraryStore: ObservableObject {
     /// Synchronous import with skip details. Prefer `importInBackground` from UI code: this path
     /// does not wait for a background batch that is still copying.
     public func importSummary(from urls: [URL]) throws -> LibraryImportSummary {
+        let pictures = urls.filter(CustomCovers.isImage)
+        var summary = try importGames(from: urls.filter { !CustomCovers.isImage($0) })
+        applyPickedCovers(pictures, to: &summary)
+        return summary
+    }
+
+    private func importGames(from urls: [URL]) throws -> LibraryImportSummary {
         try ensureDirectories()
         let plan = planImport(urls)
         defer { releaseReservations(plan.jobs) }
@@ -207,6 +218,37 @@ public final class LibraryStore: ObservableObject {
     /// only a failed library save rolls the batch back. Batches run one after another, so a pick
     /// made while an earlier import is still copying is checked against that import's files.
     public func importInBackground(from urls: [URL]) async throws -> LibraryImportSummary {
+        let pictures = urls.filter(CustomCovers.isImage)
+        var summary = try await importGamesInBackground(from: urls.filter { !CustomCovers.isImage($0) })
+        applyPickedCovers(pictures, to: &summary)
+        return summary
+    }
+
+    /// Pictures picked in Import become the covers of the games they're named after (picked in
+    /// the same batch or already in the library); a picture matching no game is skipped.
+    private func applyPickedCovers(_ pictures: [URL], to summary: inout LibraryImportSummary) {
+        guard !pictures.isEmpty else { return }
+        let covers = CoverArtStore(fileManager: fileManager, paths: savePaths)
+        for picture in pictures {
+            guard let game = CustomCovers.game(forImageNamed: picture.lastPathComponent, in: games) else {
+                summary.unsupported.append(picture.lastPathComponent)
+                continue
+            }
+            let accessed = picture.startAccessingSecurityScopedResource()
+            defer { if accessed { picture.stopAccessingSecurityScopedResource() } }
+            let data = try? Self.coordinatedRead(of: picture) { try Data(contentsOf: $0) }
+            if let data, (try? covers.installCustom(data, forGameID: game.id)) == true {
+                summary.covers.append(picture.lastPathComponent)
+            } else {
+                summary.failed.append(LibraryImportFailure(
+                    fileName: picture.lastPathComponent, reason: "The picture couldn't be read as an image."
+                ))
+            }
+        }
+        if !summary.covers.isEmpty { coversRevision += 1 }
+    }
+
+    private func importGamesInBackground(from urls: [URL]) async throws -> LibraryImportSummary {
         try ensureDirectories()
         let plan = planImport(urls)
         importsInProgress += plan.jobs.count
@@ -625,7 +667,30 @@ public final class LibraryStore: ObservableObject {
                 try? save()
             }
         }
+        applyFolderCovers()
         refreshMissingGames()
+    }
+
+    /// Pictures dropped into Games/ (Files → RetroPlay → Games) named like a game become its
+    /// cover; a picture is applied again only when it changes after the cover was set.
+    private func applyFolderCovers() {
+        let covers = CoverArtStore(fileManager: fileManager, paths: savePaths)
+        var changed = false
+        for (url, modified) in CustomCovers.imagesInGamesFolder(gamesDirectoryURL, fileManager: fileManager) {
+            guard let game = CustomCovers.game(forImageNamed: url.lastPathComponent, in: games) else { continue }
+            if covers.origin(forGameID: game.id) == .custom,
+               let current = covers.coverModified(forGameID: game.id), current >= modified {
+                continue
+            }
+            if let data = try? Data(contentsOf: url), (try? covers.installCustom(data, forGameID: game.id)) == true {
+                // The cover carries the picture's date, so "changed since" is an exact comparison
+                // (a picture dated in the future isn't applied again on every scan).
+                try? fileManager.setAttributes([.modificationDate: modified],
+                                               ofItemAtPath: covers.coverURL(forGameID: game.id).path)
+                changed = true
+            }
+        }
+        if changed { coversRevision += 1 }
     }
 
     public func refreshMissingGames() {

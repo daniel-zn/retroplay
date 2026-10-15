@@ -161,13 +161,13 @@
   },
   {
     "project": "RetroPlay app resources",
-    "component": "VT323 font (VT323-Regular.ttf)",
-    "version": "google/fonts @ 2da41909d08a7bfeab32cfc163edb7be0c34395d; SHA-256 cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
+    "component": "Press Start 2P font (PressStart2P-Regular.ttf)",
+    "version": "google/fonts @ dbd72d6ef9ebea750d33c02c7189633e972d6a40; SHA-256 034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
     "spdx": "OFL-1.1",
-    "copyright": "Copyright 2011, The VT323 Project Authors (peter.hull@oikoi.com)",
-    "licenseFile": "retroplay/AppHost/Supporting/VT323-OFL.txt",
+    "copyright": "Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name \"Press Start 2P\".",
+    "licenseFile": "retroplay/AppHost/Supporting/PressStart2P-OFL.txt",
     "requiresNoticeText": true,
-    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches VT323-SOURCE.md. OFL requires copyright notice + license with the font (bundled OFL.txt satisfies it; also list in in-app licenses)"
+    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches SOURCE.md. OFL requires copyright notice + license with the font (bundled OFL.txt satisfies it; also list in in-app licenses)"
   },
   {
     "project": "mupen64plus-next",

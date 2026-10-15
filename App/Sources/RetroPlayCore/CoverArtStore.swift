@@ -11,6 +11,8 @@ public struct CoverArtStore {
         case rom
         /// Box art from the libretro thumbnail server; preferred over art from the game file.
         case boxArt
+        /// A picture the player added for the game (`CustomCovers`); nothing replaces it.
+        case custom
         /// Marker written by the removed Todo-1 screenshot fallback.
         case frame
     }
@@ -87,8 +89,9 @@ public struct CoverArtStore {
     /// Install cover from the imported game file when it already contains art.
     @discardableResult
     public func installFromGameFile(gameID: UUID, fileURL: URL, system: SystemID) throws -> Bool {
-        // Downloaded box art is the better cover; a re-scan of the file mustn't replace it.
-        guard origin(forGameID: gameID) != .boxArt,
+        // Downloaded box art and the player's own picture are better covers; a re-scan of the
+        // file mustn't replace them.
+        guard ![.boxArt, .custom].contains(origin(forGameID: gameID)),
               let payload = CoverArtExtractor.extractImageData(from: fileURL, system: system),
               let jpeg = CoverArtJPEG.jpegData(fromImageFile: payload)
         else {
@@ -101,11 +104,27 @@ public struct CoverArtStore {
     /// Downloaded box art (any image format), stored as a JPEG at most `maxPixels` tall.
     @discardableResult
     public func installBoxArt(_ imageData: Data, forGameID id: UUID, maxPixels: Int = 600) throws -> Bool {
-        guard let jpeg = CoverArtJPEG.jpegData(fromImageFile: imageData, maxPixels: maxPixels) else {
+        guard origin(forGameID: id) != .custom,
+              let jpeg = CoverArtJPEG.jpegData(fromImageFile: imageData, maxPixels: maxPixels) else {
             return false
         }
         try write(jpeg, origin: .boxArt, forGameID: id)
         return true
+    }
+
+    /// The player's own picture for a game (any image format), stored as a JPEG.
+    @discardableResult
+    public func installCustom(_ imageData: Data, forGameID id: UUID, maxPixels: Int = 1000) throws -> Bool {
+        guard let jpeg = CoverArtJPEG.jpegData(fromImageFile: imageData, maxPixels: maxPixels) else {
+            return false
+        }
+        try write(jpeg, origin: .custom, forGameID: id)
+        return true
+    }
+
+    /// When the cover file was last written, to tell whether a picture in Games/ is newer.
+    public func coverModified(forGameID id: UUID) -> Date? {
+        (try? fileManager.attributesOfItem(atPath: coverURL(forGameID: id).path))?[.modificationDate] as? Date
     }
 
     private func write(_ jpeg: Data, origin: Origin, forGameID id: UUID) throws {

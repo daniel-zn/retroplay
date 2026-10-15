@@ -183,6 +183,9 @@ public struct RetroPlayRootView: View {
             coverCache.forgetMissing()
             updateBoxArt()
         }
+        .onChange(of: store.coversRevision) { _, _ in
+            coverCache.coversReplaced()
+        }
         .onChange(of: downloadBoxArt) { _, on in
             if on {
                 boxArt.forgetLookups()
@@ -638,9 +641,9 @@ public struct RetroPlayRootView: View {
                     let notices = Self.importNotices(for: summary)
                     if !notices.isEmpty {
                         presentImportResult(.notice(notices.joined(separator: "\n\n")))
-                    } else if summary.added.isEmpty, !urls.isEmpty {
+                    } else if summary.added.isEmpty, summary.covers.isEmpty, !urls.isEmpty {
                         presentImportResult(.error(
-                            "No supported games in the selection. RetroPlay imports .gba, .z64/.n64/.v64, .nds and .iso/.cso/.chd/.pbp files — unzip archives first."
+                            "No supported games in the selection. Unzip archives first; a picture becomes a cover when it's named like a game's file."
                         ))
                     }
                 } catch {
@@ -666,11 +669,16 @@ public struct RetroPlayRootView: View {
                 : "These are already in your library, so they were not copied again: \(names).")
         }
         if !summary.unsupported.isEmpty,
-           !summary.added.isEmpty || !summary.duplicates.isEmpty || !summary.failed.isEmpty {
+           !summary.added.isEmpty || !summary.duplicates.isEmpty || !summary.failed.isEmpty || !summary.covers.isEmpty {
             let names = nameList(summary.unsupported)
             notices.append(summary.unsupported.count == 1
-                ? "\(names) was skipped: RetroPlay plays Game Boy Advance, Nintendo 64, Nintendo DS and PSP games."
-                : "These were skipped because RetroPlay plays Game Boy Advance, Nintendo 64, Nintendo DS and PSP games: \(names).")
+                ? "\(names) was skipped: it isn't a game RetroPlay plays, or a picture named like one."
+                : "These were skipped because they aren't games RetroPlay plays, or pictures named like one: \(names).")
+        }
+        if !summary.covers.isEmpty, summary.added.isEmpty {
+            notices.append(summary.covers.count == 1
+                ? "Cover added from \(nameList(summary.covers))."
+                : "\(summary.covers.count) covers added.")
         }
         return notices
     }

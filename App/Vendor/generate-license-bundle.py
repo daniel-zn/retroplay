@@ -22,7 +22,7 @@ repos={
  'ProSystem':('Atari 7800 core (ProSystem)','https://github.com/libretro/prosystem-libretro/tree/8a88014287c7a01cd568067e5a557d0a2b2a051f'),
  'clownmdemu':('Genesis core (clownmdemu)','https://github.com/Clownacy/clownmdemu-libretro/tree/d43c2708b0a31c285ce16724b6c4a2e92af07346'),
  'PCSX-ReARMed':('PS1 core (PCSX-ReARMed)','https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a'),
- 'RetroPlay app resources':('App','https://github.com/google/fonts/tree/2da41909d08a7bfeab32cfc163edb7be0c34395d/ofl/vt323'),
+ 'RetroPlay app resources':('App','https://github.com/google/fonts/tree/dbd72d6ef9ebea750d33c02c7189633e972d6a40/ofl/pressstart2p'),
 }
 agent_files=[f for f in os.listdir(L) if f.endswith('.txt')]
 manual=json.load(open('docs/licensing/license-map.json'))

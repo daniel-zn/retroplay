@@ -20,7 +20,8 @@ All cores run without JIT, as iOS requires. The NES, SNES, Genesis, PlayStation 
 Atari 7800 cores are libretro cores, each loaded from its own framework. RetroPlay includes on-screen controls modelled on
 each console, game controller and keyboard support, save states with auto-resume, AirPlay, and
 box art from the [libretro thumbnail server](https://thumbnails.libretro.com) (matched by title; it can be
-turned off in Settings), falling back to the art inside PSP and DS games.
+turned off in Settings), falling back to the art inside PSP and DS games. A picture named like a game's
+file (`Game.jpg` next to `Game.iso`), imported or put in Files → RetroPlay → Games, becomes its cover.
 
 ## No games included
 

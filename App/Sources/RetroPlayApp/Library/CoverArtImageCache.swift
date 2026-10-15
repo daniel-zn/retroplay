@@ -3,9 +3,11 @@ import Combine
 import UIKit
 import RetroPlayCore
 
-/// A library cover: downloaded box art, or art read from the game file (a PSP / DS icon).
+/// A library cover: a full box cover (downloaded box art or the player's own picture), or art
+/// read from the game file (a PSP / DS icon).
 struct CoverArt {
     let image: UIImage
+    /// A whole cover with its own shape, drawn edge to edge; icons are fitted instead.
     let isBoxArt: Bool
 }
 
@@ -42,13 +44,19 @@ final class CoverArtImageCache: ObservableObject {
             missing.insert(game.id)
             return nil
         }
-        if covers.origin(forGameID: game.id) == .boxArt {
+        if [.boxArt, .custom].contains(covers.origin(forGameID: game.id)) {
             boxArt.insert(game.id)
         } else {
             boxArt.remove(game.id)
         }
         cache.setObject(image, forKey: key)
         return image
+    }
+
+    /// The player's pictures replaced covers: drop everything cached and redraw.
+    func coversReplaced() {
+        removeAll()
+        revision += 1
     }
 
     /// A new cover was written for this game: drop the old one and redraw.

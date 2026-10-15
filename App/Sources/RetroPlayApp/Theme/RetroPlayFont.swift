@@ -7,15 +7,17 @@ import UIKit
 @available(iOS 18.0, *)
 @MainActor
 enum RetroPlayFont {
-    static let postScriptName = "VT323-Regular"
-    static let resourceName = "VT323-Regular"
-    /// Visual size correction against the system face at the same nominal point size, kept
-    /// here so tokens, controls and UIKit chrome stay aligned. VT323's capitals are 56% of the
-    /// em against the system font's ~70%, so it's set 25% larger.
-    static let pointSizeScale: CGFloat = 1.25
+    static let postScriptName = "PressStart2P-Regular"
+    static let resourceName = "PressStart2P-Regular"
+    /// Press Start 2P reads larger than the system face at the same nominal point size.
+    /// Keep the visual correction here so tokens, controls, and UIKit chrome stay aligned.
+    static let pointSizeReduction: CGFloat = 3
     private static var didAttemptRegistration = false
 
-    static var largeTitle: Font { sized(34, relativeTo: .largeTitle) }
+    /// Large titles ("RetroPlay", "Search", "Settings"): the pixel face at the system's 34 pt
+    /// fills the screen width, so they're set much smaller than other text.
+    static let largeTitleSize: CGFloat = 24
+    static var largeTitle: Font { sized(largeTitleSize, relativeTo: .largeTitle) }
     static var title3: Font { sized(20, relativeTo: .title3) }
     static var body: Font { sized(17, relativeTo: .body) }
     static var subheadline: Font { sized(15, relativeTo: .subheadline) }
@@ -23,7 +25,7 @@ enum RetroPlayFont {
     static var caption2: Font { sized(11, relativeTo: .caption2) }
 
     static func sized(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
-        swiftUIFont(size: adjusted(size), relativeTo: style)
+        swiftUIFont(size: reduced(size), relativeTo: style)
     }
 
     static func registerBundledFont() {
@@ -40,7 +42,7 @@ enum RetroPlayFont {
 
     static func uiFont(size: CGFloat, textStyle: UIFont.TextStyle) -> UIFont {
         registerBundledFont()
-        guard let base = UIFont(name: postScriptName, size: adjusted(size)) else {
+        guard let base = UIFont(name: postScriptName, size: reduced(size)) else {
             // preferredFont is already scaled; scaling it again would magnify
             // the fallback twice at non-default Dynamic Type sizes.
             return UIFont.preferredFont(forTextStyle: textStyle)
@@ -48,8 +50,8 @@ enum RetroPlayFont {
         return UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base)
     }
 
-    private static func adjusted(_ size: CGFloat) -> CGFloat {
-        max(8, (size * pointSizeScale).rounded())
+    private static func reduced(_ size: CGFloat) -> CGFloat {
+        max(8, size - pointSizeReduction)
     }
 
     static func applyUIKitAppearance() {
