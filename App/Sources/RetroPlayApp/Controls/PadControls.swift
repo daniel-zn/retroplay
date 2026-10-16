@@ -18,28 +18,54 @@ extension Color {
     /// This fill, see-through when the pad is drawn over the game.
     func padFill(glass: Bool) -> Color { glass ? opacity(0.65) : self }
 
-    /// This fill as a Liquid Glass tint: lighter over the game so the picture shows through.
+    /// This fill as a Liquid Glass tint (portrait, on the pad's backing).
     func padTint(glass: Bool, held: Bool = false) -> Color {
         opacity(held ? 1 : (glass ? 0.45 : 0.8))
     }
+
+    /// A label over untinted glass (landscape): the button's colour moves to its label so
+    /// A / B / C stay recognisable, and dark ink turns light so it reads over the game.
+    static func padLabel(fill: Color, ink: Color, glass: Bool) -> Color {
+        guard glass, padLiquidGlass else { return ink }
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        UIColor(fill).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        if saturation > 0.35 && brightness > 0.35 { return fill }
+        var inkBrightness: CGFloat = 0
+        UIColor(ink).getHue(nil, saturation: nil, brightness: &inkBrightness, alpha: nil)
+        return inkBrightness < 0.5 ? Color.white.opacity(0.92) : ink
+    }
 }
 
+/// Liquid Glass controls (iOS 26 and later); earlier systems draw the flat fills.
+let padLiquidGlass: Bool = {
+    if #available(iOS 26.0, *) { return true }
+    return false
+}()
+
 extension View {
-    /// A control's surface: Liquid Glass tinted with its colour (iOS 26), else `fallback`
-    /// drawn behind it as before.
+    /// A control's surface on Liquid Glass. Over the game (`clear`, landscape) it's the
+    /// clearest glass with no tint, so the picture shows; on the pad's backing it's tinted
+    /// with the button's colour. Before iOS 26, `fallback` is drawn behind it as before.
     @ViewBuilder
     func padSurface<S: Shape, Fallback: View>(
         _ shape: S,
         tint: Color,
+        clear: Bool = false,
         @ViewBuilder fallback: () -> Fallback
     ) -> some View {
         if #available(iOS 26.0, *) {
-            glassEffect(.regular.tint(tint), in: shape)
+            glassEffect(clear ? .clear : .regular.tint(tint), in: shape)
         } else {
             background { ZStack { fallback() } }
         }
     }
 }
+
+/// Flat-sided buttons (shoulders, SELECT / START, the in-game row) share the backing's
+/// corner language: a shoulder's outer corner follows the controller's corner (a full
+/// half-height round, which is where the concentric radius lands on every iPhone), and
+/// the other corners use this fraction of the button's height.
+let padCornerFraction: CGFloat = 0.3
 
 @available(iOS 18.0, *)
 struct PadFaceButton: View {
@@ -57,16 +83,19 @@ struct PadFaceButton: View {
         let held = input.isHeld(bits)
         Text(title)
             .font(RetroPlayFont.sized(max(11, diameter * 0.34), relativeTo: .body))
-            .foregroundStyle(ink)
+            .foregroundStyle(Color.padLabel(fill: fill, ink: ink, glass: glass))
             .frame(width: diameter, height: diameter)
-            .padSurface(Circle(), tint: fill.padTint(glass: glass, held: held)) {
+            .padSurface(Circle(), tint: fill.padTint(glass: glass, held: held), clear: glass) {
                 Circle()
                     .fill(fill.padFill(glass: glass))
                     .brightness(held ? 0.12 : 0)
                     .shadow(color: .black.opacity(held ? 0.08 : 0.3), radius: held ? 1 : 3, y: held ? 0 : 2)
             }
             .overlay {
-                Circle().strokeBorder(stroke.opacity(held ? 1 : 0.7), lineWidth: held ? 2 : 1)
+                // Glass has its own rim; the outline then only marks a press.
+                if held || !padLiquidGlass {
+                    Circle().strokeBorder(stroke.opacity(held ? 1 : 0.7), lineWidth: held ? 2 : 1)
+                }
             }
             .scaleEffect(held ? 0.92 : 1)
             .animation(pressAnimation, value: held)
@@ -88,24 +117,35 @@ struct PadShoulderButton: View {
     var height: CGFloat = 40
     var fill: Color
     var ink: Color
+    /// The side whose top corner meets the controller's corner.
+    var outer: HorizontalEdge? = nil
+
+    private var shape: UnevenRoundedRectangle {
+        let corner = height * padCornerFraction
+        return UnevenRoundedRectangle(
+            topLeadingRadius: outer == .leading ? height / 2 : corner,
+            bottomLeadingRadius: corner,
+            bottomTrailingRadius: corner,
+            topTrailingRadius: outer == .trailing ? height / 2 : corner,
+            style: .continuous
+        )
+    }
 
     var body: some View {
         let held = input.isHeld(bits)
         Text(title)
             .font(RetroPlayFont.sized(max(11, height * 0.34), relativeTo: .subheadline))
-            .foregroundStyle(ink)
+            .foregroundStyle(Color.padLabel(fill: fill, ink: ink, glass: glass))
             .frame(width: width, height: height)
-            .padSurface(
-                RoundedRectangle(cornerRadius: height * 0.42, style: .continuous),
-                tint: fill.padTint(glass: glass, held: held)
-            ) {
-                RoundedRectangle(cornerRadius: height * 0.42, style: .continuous)
+            .padSurface(shape, tint: fill.padTint(glass: glass, held: held), clear: glass) {
+                shape
                     .fill(fill.padFill(glass: glass))
                     .brightness(held ? 0.12 : 0)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: height * 0.42, style: .continuous)
-                    .strokeBorder(Color.white.opacity(held ? 0.5 : 0.18), lineWidth: held ? 2 : 1)
+                if held || !padLiquidGlass {
+                    shape.strokeBorder(Color.white.opacity(held ? 0.5 : 0.18), lineWidth: held ? 2 : 1)
+                }
             }
             .scaleEffect(held ? 0.95 : 1)
             .animation(pressAnimation, value: held)
@@ -128,6 +168,10 @@ struct PadPillButton: View {
     var fill: Color
     var ink: Color
 
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 26 * scale * padCornerFraction, style: .continuous)
+    }
+
     var body: some View {
         let held = input.isHeld(bits)
         Text(title)
@@ -140,10 +184,14 @@ struct PadPillButton: View {
             .padding(.horizontal, 12 * scale)
             .padding(.vertical, 4 * scale)
             .frame(minWidth: 74 * scale, minHeight: 26 * scale)
-            .padSurface(Capsule(), tint: fill.padTint(glass: glass, held: held)) {
-                Capsule().fill(glass ? fill.opacity(0.3) : fill).brightness(held ? 0.15 : 0)
+            .padSurface(shape, tint: fill.padTint(glass: glass, held: held), clear: glass) {
+                shape.fill(glass ? fill.opacity(0.3) : fill).brightness(held ? 0.15 : 0)
             }
-            .overlay { Capsule().strokeBorder(Color.white.opacity(held ? 0.5 : 0.2), lineWidth: 1) }
+            .overlay {
+                if held || !padLiquidGlass {
+                    shape.strokeBorder(Color.white.opacity(held ? 0.5 : 0.2), lineWidth: 1)
+                }
+            }
             .scaleEffect(held ? 0.94 : 1)
             .animation(pressAnimation, value: held)
             // Pills are small; give them a finger-sized hit area.
@@ -175,7 +223,7 @@ struct PadDPad: View {
         let travel = (size - armWidth) / 2
         ZStack {
             Color.clear
-                .padSurface(PlusShape(armThickness: armWidth), tint: fill.padTint(glass: glass)) {
+                .padSurface(PlusShape(armThickness: armWidth), tint: fill.padTint(glass: glass), clear: glass) {
                     PlusShape(armThickness: armWidth)
                         .fill(fill.padFill(glass: glass))
                         .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
@@ -233,19 +281,19 @@ struct PadStick: View {
         let stick = input.stick
         ZStack {
             if octagonal {
-                Color.clear.padSurface(RegularOctagon(), tint: gateFill.padTint(glass: glass)) {
+                Color.clear.padSurface(RegularOctagon(), tint: gateFill.padTint(glass: glass), clear: glass) {
                     RegularOctagon().fill(gateFill.padFill(glass: glass))
                     RegularOctagon().stroke(Color.white.opacity(0.18), lineWidth: 1.2)
                 }
             } else {
-                Color.clear.padSurface(Circle(), tint: gateFill.padTint(glass: glass)) {
+                Color.clear.padSurface(Circle(), tint: gateFill.padTint(glass: glass), clear: glass) {
                     Circle().fill(gateFill.padFill(glass: glass))
                     Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1.2)
                 }
             }
             Color.clear
                 .frame(width: nub, height: nub)
-                .padSurface(Circle(), tint: nubFill.padTint(glass: false)) {
+                .padSurface(Circle(), tint: nubFill.padTint(glass: false), clear: glass) {
                     Circle().fill(nubFill)
                     Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
                 }

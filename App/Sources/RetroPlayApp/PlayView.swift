@@ -87,7 +87,8 @@ public struct PlayView: View {
         _input = State(initialValue: PadInputModel(system: game.systemID))
         // PSP's 16:9 screen would shrink too far between the columns, so it fills by default.
         _landscapeFill = AppStorage(
-            wrappedValue: game.systemID == .psp,
+            // PSP and GBA: the picture at full size, the controls over it.
+            wrappedValue: [.psp, .gba].contains(game.systemID),
             PlaySettingsKey.landscapeFill(game.systemID)
         )
     }
@@ -325,8 +326,10 @@ public struct PlayView: View {
                 // START, the lowest control on that side.
                 HStack(alignment: .top, spacing: 0) {
                     VStack(alignment: .leading, spacing: 0) {
+                        // Centred over the D-pad / stick below.
                         pad.leftShoulders
                             .opacity(padOpacity)
+                            .frame(width: pad.landscapeColumnWidth)
                         Spacer(minLength: 6)
                         pad.leftMain
                             .opacity(padOpacity)
@@ -342,8 +345,10 @@ public struct PlayView: View {
                     .frame(width: pad.landscapeColumnWidth, alignment: .leading)
                     Spacer(minLength: 0)
                     VStack(alignment: .trailing, spacing: 0) {
+                        // Centred over the face buttons below.
                         pad.rightShoulders
                             .opacity(padOpacity)
+                            .frame(width: pad.landscapeColumnWidth)
                         Spacer(minLength: 6)
                         pad.rightMain
                             .opacity(padOpacity)
@@ -1070,7 +1075,8 @@ private struct PadBacking: View {
     }
 }
 
-/// One in-game chrome button: a glass capsule, or filled when the button is on.
+/// One in-game chrome button: glass, or filled when the button is on. Its corners match the
+/// pad's flat-sided buttons.
 @available(iOS 18.0, *)
 private struct ChromeButtonLabel: View {
     let symbol: String
@@ -1078,20 +1084,25 @@ private struct ChromeButtonLabel: View {
     let width: CGFloat
     let fill: Color?
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.padGlass) private var overGame
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 32 * padCornerFraction, style: .continuous)
+    }
 
     var body: some View {
         Image(systemName: symbol)
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(tint.opacity(isEnabled ? 1 : 0.4))
             .frame(width: width, height: 32)
-            .padSurface(Capsule(), tint: fill ?? .clear) {
+            .padSurface(shape, tint: fill ?? .clear, clear: overGame && fill == nil) {
                 if let fill {
-                    Capsule().fill(fill)
+                    shape.fill(fill)
                 } else {
-                    Capsule().fill(.ultraThinMaterial)
+                    shape.fill(.ultraThinMaterial)
                 }
-                Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                shape.strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
             }
-            .contentShape(Capsule())
+            .contentShape(shape)
     }
 }

@@ -22,22 +22,23 @@ struct ConsolePad {
     @ViewBuilder var leftShoulders: some View {
         switch system {
         case .gba:
-            shoulder("L", GBAInput.l.bits, PadPalette.GBA.shoulder, PadPalette.GBA.ink)
+            shoulder("L", GBAInput.l.bits, PadPalette.GBA.shoulder, PadPalette.GBA.ink, outer: .leading)
         case .psp:
-            shoulder("L", PSPInput.l.rawValue, PadPalette.PSP.nub, PadPalette.PSP.ink)
+            shoulder("L", PSPInput.l.rawValue, PadPalette.PSP.nub, PadPalette.PSP.ink, outer: .leading)
         case .nds:
-            shoulder("L", NDSInput.l.rawValue, PadPalette.NDS.shoulder, PadPalette.NDS.ink)
+            shoulder("L", NDSInput.l.rawValue, PadPalette.NDS.shoulder, PadPalette.NDS.ink, outer: .leading)
         case .n64:
             // Z is the trigger N64 games lean on (Z-targeting, crouch, shoot); L is rarely
             // used, so Z gets the big button and L sits beside it.
             HStack(spacing: 8 * scale) {
-                shoulder("Z", N64Input.z.rawValue, PadPalette.N64.z, PadPalette.N64.inkLight, width: large ? 96 : 84)
+                shoulder("Z", N64Input.z.rawValue, PadPalette.N64.z, PadPalette.N64.inkLight, width: large ? 96 : 84, outer: .leading)
                 shoulder("L", N64Input.l.rawValue, PadPalette.N64.shoulder, PadPalette.N64.inkLight, width: large ? 56 : 48)
             }
         case .snes:
-            shoulder("L", RetroPadInput.l.rawValue, PadPalette.SNES.shoulder, PadPalette.SNES.inkDark)
+            shoulder("L", RetroPadInput.l.rawValue, PadPalette.SNES.shoulder, PadPalette.SNES.inkDark, outer: .leading)
         case .ps1:
             stackedShoulders(
+                outer: .leading,
                 top: ("L2", RetroPadInput.PS1.l2.rawValue),
                 bottom: ("L1", RetroPadInput.PS1.l1.rawValue)
             )
@@ -49,17 +50,18 @@ struct ConsolePad {
     @ViewBuilder var rightShoulders: some View {
         switch system {
         case .gba:
-            shoulder("R", GBAInput.r.bits, PadPalette.GBA.shoulder, PadPalette.GBA.ink)
+            shoulder("R", GBAInput.r.bits, PadPalette.GBA.shoulder, PadPalette.GBA.ink, outer: .trailing)
         case .psp:
-            shoulder("R", PSPInput.r.rawValue, PadPalette.PSP.nub, PadPalette.PSP.ink)
+            shoulder("R", PSPInput.r.rawValue, PadPalette.PSP.nub, PadPalette.PSP.ink, outer: .trailing)
         case .nds:
-            shoulder("R", NDSInput.r.rawValue, PadPalette.NDS.shoulder, PadPalette.NDS.ink)
+            shoulder("R", NDSInput.r.rawValue, PadPalette.NDS.shoulder, PadPalette.NDS.ink, outer: .trailing)
         case .n64:
-            shoulder("R", N64Input.r.rawValue, PadPalette.N64.shoulder, PadPalette.N64.inkLight)
+            shoulder("R", N64Input.r.rawValue, PadPalette.N64.shoulder, PadPalette.N64.inkLight, outer: .trailing)
         case .snes:
-            shoulder("R", RetroPadInput.r.rawValue, PadPalette.SNES.shoulder, PadPalette.SNES.inkDark)
+            shoulder("R", RetroPadInput.r.rawValue, PadPalette.SNES.shoulder, PadPalette.SNES.inkDark, outer: .trailing)
         case .ps1:
             stackedShoulders(
+                outer: .trailing,
                 top: ("R2", RetroPadInput.PS1.r2.rawValue),
                 bottom: ("R1", RetroPadInput.PS1.r1.rawValue)
             )
@@ -412,9 +414,9 @@ struct ConsolePad {
     /// PS1 shoulders are stacked two high, each a little shorter than a single shoulder.
     private static let psShoulderRatio: CGFloat = 0.85
 
-    private func stackedShoulders(top: (String, UInt32), bottom: (String, UInt32)) -> some View {
+    private func stackedShoulders(outer: HorizontalEdge, top: (String, UInt32), bottom: (String, UInt32)) -> some View {
         VStack(spacing: 6 * scale) {
-            shoulder(top.0, top.1, PadPalette.PS1.shoulder, PadPalette.PS1.ink, heightRatio: Self.psShoulderRatio)
+            shoulder(top.0, top.1, PadPalette.PS1.shoulder, PadPalette.PS1.ink, heightRatio: Self.psShoulderRatio, outer: outer)
             shoulder(bottom.0, bottom.1, PadPalette.PS1.shoulder, PadPalette.PS1.ink, heightRatio: Self.psShoulderRatio)
         }
     }
@@ -457,14 +459,14 @@ struct ConsolePad {
 
     private func shoulder(
         _ title: String, _ bits: UInt32, _ fill: Color, _ ink: Color,
-        width: CGFloat = 92, heightRatio: CGFloat = 1
+        width: CGFloat = 92, heightRatio: CGFloat = 1, outer: HorizontalEdge? = nil
     ) -> some View {
         let widen: CGFloat = large && width == 92 ? 112 / 92 : 1
         return PadShoulderButton(
             title: title, bits: bits,
             width: width * widen * scale,
             height: (large ? (landscape ? 42 : 48) : 40) * heightRatio * scale,
-            fill: fill, ink: ink
+            fill: fill, ink: ink, outer: outer
         )
     }
 
