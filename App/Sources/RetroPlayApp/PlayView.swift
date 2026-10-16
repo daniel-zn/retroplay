@@ -113,7 +113,7 @@ public struct PlayView: View {
                 if landscape {
                     landscapeLayout(size: geo.size, safeArea: geo.safeAreaInsets)
                 } else {
-                    portraitLayout(size: geo.size)
+                    portraitLayout(size: geo.size, bottomInset: geo.safeAreaInsets.bottom)
                 }
                 statusOverlay
             }
@@ -240,48 +240,53 @@ public struct PlayView: View {
     }
 
     /// The controls' portrait scale on this phone, worked out from the landscape geometry
-    /// (Face ID iPhones: about 59 pt top and 34 pt bottom safe area in portrait).
+    /// (Face ID iPhones: about 59 pt top safe area in portrait; the pad runs through the
+    /// home-indicator strip to the bottom edge).
     private static func portraitScale(_ system: SystemID, landscape size: CGSize, safeArea: EdgeInsets) -> CGFloat {
         let portrait = CGSize(
             width: size.height + safeArea.top + safeArea.bottom,
-            height: size.width + safeArea.leading + safeArea.trailing - 93
+            height: size.width + safeArea.leading + safeArea.trailing - 59
         )
-        let padHeight = portrait.height - portraitScreenHeight(system, in: portrait) - portraitBarHeight
+        // Less the 6 pt gaps above and below the backing (`portraitLayout`).
+        let padHeight = portrait.height - portraitScreenHeight(system, in: portrait) - portraitBarHeight - 12
         return ConsolePadPortrait.scale(for: system, in: CGSize(width: portrait.width, height: padHeight))
     }
 
-    private func portraitLayout(size: CGSize) -> some View {
+    private func portraitLayout(size: CGSize, bottomInset: CGFloat) -> some View {
         let aspect = CGFloat(system.screenAspect)
         let screenHeight = Self.portraitScreenHeight(system, in: size)
         let screenWidth = screenHeight * aspect
         let barHeight = Self.portraitBarHeight
-        let padHeight = max(0, size.height - screenHeight - barHeight)
+        // The backing runs to the bottom edge (through the home-indicator strip, hidden while
+        // playing); fast-forward / pause / sound sit at its foot, below every game control.
+        let backingHeight = max(0, size.height + bottomInset - screenHeight - 6)
+        let padHeight = max(0, backingHeight - barHeight)
 
-        return VStack(spacing: 0) {
+        return VStack(spacing: 6) {
             screen
                 .frame(width: screenWidth, height: screenHeight)
                 .frame(maxWidth: .infinity)
-            // Own row, so menu / fast-forward never sit inside a pad control's touch area.
-            quickButtons()
-                .frame(height: barHeight)
-            ZStack {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(system.padChassis.opacity(0.55))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .strokeBorder(system.padChassisStroke.opacity(0.35), lineWidth: 1)
-                    }
-                    .padding(.horizontal, 6)
+            VStack(spacing: 0) {
                 if showTouchControls {
                     ConsolePadPortrait(system: system, size: CGSize(width: size.width, height: padHeight))
                         // Button letters mirror the hardware; past xxxLarge they overflow the pad.
                         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                        .frame(height: padHeight)
                 } else {
                     controllerConnectedNote
+                        .frame(maxHeight: .infinity)
                 }
+                // Own row, so the buttons never sit inside a pad control's touch area.
+                quickButtons()
+                    .frame(height: barHeight, alignment: .top)
             }
-            .frame(height: padHeight)
+            .frame(height: backingHeight)
+            .background { PadBacking(fill: system.padChassis, stroke: system.padChassisStroke) }
+            .padding(.horizontal, 6)
+            .padding(.bottom, 6)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .ignoresSafeArea(edges: .bottom)
     }
 
     private func landscapeLayout(size: CGSize, safeArea: EdgeInsets) -> some View {
@@ -313,7 +318,8 @@ public struct PlayView: View {
                 .ignoresSafeArea(edges: fit ? [] : .vertical)
             if showTouchControls {
                 // Every control lives in a side column, off the picture: SELECT under the
-                // left cluster, START under the right one, pause / fast-forward under R.
+                // left cluster, START under the right one, fast-forward / pause / sound under
+                // START, the lowest control on that side.
                 HStack(alignment: .top, spacing: 0) {
                     VStack(alignment: .leading, spacing: 0) {
                         pad.leftShoulders
@@ -335,11 +341,6 @@ public struct PlayView: View {
                     VStack(alignment: .trailing, spacing: 0) {
                         pad.rightShoulders
                             .opacity(padOpacity)
-                        // Beyond R's 14 pt touch slop, so pause / fast-forward taps reach the buttons.
-                        quickButtons(maxWidth: pad.landscapeColumnWidth)
-                            .frame(width: pad.landscapeColumnWidth)
-                            .opacity(chromeOpacity)
-                            .padding(.top, 18)
                         Spacer(minLength: 6)
                         pad.rightMain
                             .opacity(padOpacity)
@@ -347,8 +348,11 @@ public struct PlayView: View {
                             .opacity(padOpacity)
                             .frame(width: pad.landscapeColumnWidth)
                             .padding(.top, pad.landscapePillGap)
-                        Spacer(minLength: 0)
-                            .frame(maxHeight: 8)
+                        // Beyond START's 14 pt touch slop, so taps reach the buttons.
+                        quickButtons(maxWidth: pad.landscapeColumnWidth)
+                            .frame(width: pad.landscapeColumnWidth)
+                            .opacity(chromeOpacity)
+                            .padding(.top, 18)
                     }
                     .frame(width: pad.landscapeColumnWidth, alignment: .trailing)
                 }
@@ -359,13 +363,13 @@ public struct PlayView: View {
                 // Over the game every control is see-through, light ones included.
                 .environment(\.padGlass, true)
             } else {
-                controllerConnectedNote
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 8)
-                quickButtons()
-                    .opacity(chromeOpacity)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 4)
+                VStack(spacing: 8) {
+                    controllerConnectedNote
+                    quickButtons()
+                        .opacity(chromeOpacity)
+                }
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 4)
             }
         }
     }
@@ -1039,6 +1043,27 @@ private final class BackgroundTask {
         guard id != .invalid else { return }
         UIApplication.shared.endBackgroundTask(id)
         id = .invalid
+    }
+}
+
+/// The portrait pad's backing: its bottom corners follow the screen's rounded corners, and
+/// the top corners match them.
+private struct PadBacking: View {
+    let fill: Color
+    let stroke: Color
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            backing(ConcentricRectangle(corners: .concentric(minimum: 28), isUniform: true))
+        } else {
+            backing(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        }
+    }
+
+    private func backing(_ shape: some Shape) -> some View {
+        shape
+            .fill(fill.opacity(0.55))
+            .overlay { shape.stroke(stroke.opacity(0.35), lineWidth: 1).padding(0.5) }
     }
 }
 
