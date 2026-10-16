@@ -280,9 +280,12 @@ public struct PlayView: View {
                 quickButtons()
                     .frame(height: barHeight, alignment: .top)
             }
-            .frame(height: backingHeight)
-            .background { PadBacking(fill: system.padChassis, stroke: system.padChassisStroke) }
-            .padding(.horizontal, 6)
+            // Full width, the backing inset 6 pt inside it: centred on every iPhone width.
+            .frame(width: size.width, height: backingHeight)
+            .background {
+                PadBacking(fill: system.padChassis, stroke: system.padChassisStroke)
+                    .padding(.horizontal, 6)
+            }
             .padding(.bottom, 6)
         }
         .frame(maxHeight: .infinity, alignment: .top)
@@ -1081,14 +1084,14 @@ private struct ChromeButtonLabel: View {
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(tint.opacity(isEnabled ? 1 : 0.4))
             .frame(width: width, height: 32)
-            .background {
+            .padSurface(Capsule(), tint: fill ?? .clear) {
                 if let fill {
                     Capsule().fill(fill)
                 } else {
                     Capsule().fill(.ultraThinMaterial)
                 }
+                Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
             }
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
             .contentShape(Capsule())
     }
 }

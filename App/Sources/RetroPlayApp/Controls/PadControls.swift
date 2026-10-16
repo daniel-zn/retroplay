@@ -17,6 +17,28 @@ extension EnvironmentValues {
 extension Color {
     /// This fill, see-through when the pad is drawn over the game.
     func padFill(glass: Bool) -> Color { glass ? opacity(0.65) : self }
+
+    /// This fill as a Liquid Glass tint: lighter over the game so the picture shows through.
+    func padTint(glass: Bool, held: Bool = false) -> Color {
+        opacity(held ? 1 : (glass ? 0.45 : 0.8))
+    }
+}
+
+extension View {
+    /// A control's surface: Liquid Glass tinted with its colour (iOS 26), else `fallback`
+    /// drawn behind it as before.
+    @ViewBuilder
+    func padSurface<S: Shape, Fallback: View>(
+        _ shape: S,
+        tint: Color,
+        @ViewBuilder fallback: () -> Fallback
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            glassEffect(.regular.tint(tint), in: shape)
+        } else {
+            background { ZStack { fallback() } }
+        }
+    }
 }
 
 @available(iOS 18.0, *)
@@ -37,7 +59,7 @@ struct PadFaceButton: View {
             .font(RetroPlayFont.sized(max(11, diameter * 0.34), relativeTo: .body))
             .foregroundStyle(ink)
             .frame(width: diameter, height: diameter)
-            .background {
+            .padSurface(Circle(), tint: fill.padTint(glass: glass, held: held)) {
                 Circle()
                     .fill(fill.padFill(glass: glass))
                     .brightness(held ? 0.12 : 0)
@@ -73,7 +95,10 @@ struct PadShoulderButton: View {
             .font(RetroPlayFont.sized(max(11, height * 0.34), relativeTo: .subheadline))
             .foregroundStyle(ink)
             .frame(width: width, height: height)
-            .background {
+            .padSurface(
+                RoundedRectangle(cornerRadius: height * 0.42, style: .continuous),
+                tint: fill.padTint(glass: glass, held: held)
+            ) {
                 RoundedRectangle(cornerRadius: height * 0.42, style: .continuous)
                     .fill(fill.padFill(glass: glass))
                     .brightness(held ? 0.12 : 0)
@@ -115,7 +140,9 @@ struct PadPillButton: View {
             .padding(.horizontal, 12 * scale)
             .padding(.vertical, 4 * scale)
             .frame(minWidth: 74 * scale, minHeight: 26 * scale)
-            .background { Capsule().fill(glass ? fill.opacity(0.3) : fill).brightness(held ? 0.15 : 0) }
+            .padSurface(Capsule(), tint: fill.padTint(glass: glass, held: held)) {
+                Capsule().fill(glass ? fill.opacity(0.3) : fill).brightness(held ? 0.15 : 0)
+            }
             .overlay { Capsule().strokeBorder(Color.white.opacity(held ? 0.5 : 0.2), lineWidth: 1) }
             .scaleEffect(held ? 0.94 : 1)
             .animation(pressAnimation, value: held)
@@ -147,11 +174,14 @@ struct PadDPad: View {
         let armWidth = size * 0.36
         let travel = (size - armWidth) / 2
         ZStack {
-            PlusShape(armThickness: armWidth)
-                .fill(fill.padFill(glass: glass))
-                .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
-            PlusShape(armThickness: armWidth)
-                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+            Color.clear
+                .padSurface(PlusShape(armThickness: armWidth), tint: fill.padTint(glass: glass)) {
+                    PlusShape(armThickness: armWidth)
+                        .fill(fill.padFill(glass: glass))
+                        .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
+                    PlusShape(armThickness: armWidth)
+                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                }
             armView(bits: up, arrow: "arrowtriangle.up.fill", offset: CGSize(width: 0, height: -travel), arm: armWidth)
             armView(bits: down, arrow: "arrowtriangle.down.fill", offset: CGSize(width: 0, height: travel), arm: armWidth)
             armView(bits: left, arrow: "arrowtriangle.left.fill", offset: CGSize(width: -travel, height: 0), arm: armWidth)
@@ -203,16 +233,22 @@ struct PadStick: View {
         let stick = input.stick
         ZStack {
             if octagonal {
-                RegularOctagon().fill(gateFill.padFill(glass: glass))
-                RegularOctagon().stroke(Color.white.opacity(0.18), lineWidth: 1.2)
+                Color.clear.padSurface(RegularOctagon(), tint: gateFill.padTint(glass: glass)) {
+                    RegularOctagon().fill(gateFill.padFill(glass: glass))
+                    RegularOctagon().stroke(Color.white.opacity(0.18), lineWidth: 1.2)
+                }
             } else {
-                Circle().fill(gateFill.padFill(glass: glass))
-                Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1.2)
+                Color.clear.padSurface(Circle(), tint: gateFill.padTint(glass: glass)) {
+                    Circle().fill(gateFill.padFill(glass: glass))
+                    Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1.2)
+                }
             }
-            Circle()
-                .fill(nubFill)
+            Color.clear
                 .frame(width: nub, height: nub)
-                .overlay { Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1) }
+                .padSurface(Circle(), tint: nubFill.padTint(glass: false)) {
+                    Circle().fill(nubFill)
+                    Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+                }
                 .shadow(color: .black.opacity(0.45), radius: 3, y: 2)
                 .offset(x: CGFloat(stick.x) * travel, y: CGFloat(-stick.y) * travel)
         }
