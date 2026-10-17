@@ -275,17 +275,12 @@ struct ConsolePad {
         }
     }
 
-    /// Gap above SELECT / START in a landscape column, clear of the D-pad / face buttons'
-    /// 14 pt touch slop at compact size; full-size pills are taller and need less.
-    var landscapePillGap: CGFloat { (large ? 8 : 14) * scale }
-
-    /// Each landscape column's height as `perScale × scale + fixed`: shoulders, thumb
-    /// cluster, gap and SELECT / START grow with the scale; the edge padding and the
-    /// pause row don't. Mirrors `PlayView.landscapeLayout`.
+    /// Each landscape column's height as `perScale × scale + fixed`: shoulders and thumb
+    /// cluster grow with the scale; the edge padding and the pause row don't (SELECT / START
+    /// sit at the bottom centre, outside the columns). Mirrors `PlayView.landscapeLayout`.
     private static func landscapeColumns(_ system: SystemID, large: Bool) -> [(perScale: CGFloat, fixed: CGFloat)] {
-        // Shoulder, gap above SELECT / START, the pill itself (26 + 2 × 8 touch padding).
+        // Shoulder height.
         let top: CGFloat = large ? 42 : 40
-        let bottom: CGFloat = large ? 8 + 42 * 1.25 : 14 + 42
         // Left: 2 × 6 edge padding + 6 spacer. Right adds the 18 + 32 pause row.
         let left: CGFloat = 18, right: CGFloat = 18 + 50
         let leftCluster: CGFloat, rightCluster: CGFloat
@@ -314,16 +309,9 @@ struct ConsolePad {
         case .ps1: shoulders = 2 * top * psShoulderRatio + 6
         default: shoulders = top
         }
-        // N64 and Genesis have no SELECT; the 7800 stacks SELECT over RESET on the left.
-        let leftBottom: CGFloat
-        switch system {
-        case .n64, .genesis: leftBottom = large ? 8 : 14
-        case .atari7800: leftBottom = bottom * 2
-        default: leftBottom = bottom
-        }
         return [
-            (shoulders + leftCluster + leftBottom, left),
-            (shoulders + rightCluster + bottom, right),
+            (shoulders + leftCluster, left),
+            (shoulders + rightCluster, right),
         ]
     }
 
@@ -344,55 +332,6 @@ struct ConsolePad {
         let compactScale = min(max(size.height / 390, 0.66), 1.15, fit(false))
         // Full-size controls are about 7% bigger at the same scale.
         return largeScale * 1.07 >= compactScale ? (largeScale, true) : (compactScale, false)
-    }
-
-    /// SELECT alone, for the bottom of the left landscape column (N64 has none).
-    @ViewBuilder var selectButton: some View {
-        switch system {
-        case .gba:
-            PadPillButton(title: "SELECT", bits: GBAInput.select.bits, scale: pillScale, fill: PadPalette.GBA.startSelect, ink: PadPalette.GBA.ink)
-        case .psp:
-            PadPillButton(title: "SELECT", bits: PSPInput.select.rawValue, scale: pillScale, fill: PadPalette.PSP.silver, ink: PadPalette.PSP.chassis)
-        case .nds:
-            PadPillButton(title: "SELECT", bits: NDSInput.select.rawValue, scale: pillScale, fill: PadPalette.NDS.shoulder, ink: PadPalette.NDS.ink)
-        case .nes:
-            PadPillButton(title: "SELECT", bits: RetroPadInput.select.rawValue, scale: pillScale, fill: PadPalette.NES.pill, ink: PadPalette.NES.ink)
-        case .snes:
-            PadPillButton(title: "SELECT", bits: RetroPadInput.select.rawValue, scale: pillScale, fill: PadPalette.SNES.pill, ink: PadPalette.SNES.ink)
-        case .ps1:
-            PadPillButton(title: "SELECT", bits: RetroPadInput.select.rawValue, scale: pillScale, fill: PadPalette.PS1.pill, ink: PadPalette.PS1.ink)
-        case .atari7800:
-            VStack(spacing: 4 * scale) {
-                atariSwitch("SELECT", RetroPadInput.Atari7800.select)
-                atariSwitch("RESET", RetroPadInput.Atari7800.reset)
-            }
-        case .n64, .genesis:
-            EmptyView()
-        }
-    }
-
-    /// START alone, for the bottom of the right landscape column.
-    @ViewBuilder var startButton: some View {
-        switch system {
-        case .gba:
-            PadPillButton(title: "START", bits: GBAInput.start.bits, scale: pillScale, fill: PadPalette.GBA.startSelect, ink: PadPalette.GBA.ink)
-        case .psp:
-            PadPillButton(title: "START", bits: PSPInput.start.rawValue, scale: pillScale, fill: PadPalette.PSP.silver, ink: PadPalette.PSP.chassis)
-        case .nds:
-            PadPillButton(title: "START", bits: NDSInput.start.rawValue, scale: pillScale, fill: PadPalette.NDS.shoulder, ink: PadPalette.NDS.ink)
-        case .n64:
-            PadPillButton(title: "START", bits: N64Input.start.rawValue, scale: pillScale, fill: PadPalette.N64.start, ink: PadPalette.N64.inkLight)
-        case .nes:
-            PadPillButton(title: "START", bits: RetroPadInput.start.rawValue, scale: pillScale, fill: PadPalette.NES.pill, ink: PadPalette.NES.ink)
-        case .snes:
-            PadPillButton(title: "START", bits: RetroPadInput.start.rawValue, scale: pillScale, fill: PadPalette.SNES.pill, ink: PadPalette.SNES.ink)
-        case .ps1:
-            PadPillButton(title: "START", bits: RetroPadInput.start.rawValue, scale: pillScale, fill: PadPalette.PS1.pill, ink: PadPalette.PS1.ink)
-        case .genesis:
-            PadPillButton(title: "START", bits: RetroPadInput.start.rawValue, scale: pillScale, fill: PadPalette.Genesis.start, ink: PadPalette.Genesis.ink)
-        case .atari7800:
-            atariSwitch("PAUSE", RetroPadInput.Atari7800.pause)
-        }
     }
 
     // MARK: Helpers

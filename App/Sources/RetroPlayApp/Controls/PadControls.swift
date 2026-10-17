@@ -175,22 +175,27 @@ struct PadPillButton: View {
     var fill: Color
     var ink: Color
 
+    /// SELECT / START are drawn at half the area (each side × √½); the touch area keeps its
+    /// full height, so they're as easy to hit.
+    static let sizeFactor: CGFloat = 0.71
+    private var drawn: CGFloat { scale * Self.sizeFactor }
+
     private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 26 * scale * padCornerFraction, style: .continuous)
+        RoundedRectangle(cornerRadius: 26 * drawn * padCornerFraction, style: .continuous)
     }
 
     var body: some View {
         let held = input.isHeld(bits)
         Text(title)
-            .font(RetroPlayFont.sized(max(8, 10 * scale), relativeTo: .caption2))
+            .font(RetroPlayFont.sized(max(8, 10 * drawn), relativeTo: .caption2))
             // Over the game the capsule is mostly see-through, so a dark label would vanish.
             .foregroundStyle(glass ? Color.white.opacity(0.9) : ink)
             .lineLimit(1)
             // The label grows with Dynamic Type, so the capsule sizes to it instead of a fixed width.
             .fixedSize()
-            .padding(.horizontal, 12 * scale)
-            .padding(.vertical, 4 * scale)
-            .frame(minWidth: 74 * scale, minHeight: 26 * scale)
+            .padding(.horizontal, 12 * drawn)
+            .padding(.vertical, 4 * drawn)
+            .frame(minWidth: 74 * drawn, minHeight: 26 * drawn)
             .padSurface(shape, tint: fill.padTint(glass: glass, held: held), clear: glass) {
                 shape.fill(glass ? fill.opacity(0.3) : fill).brightness(held ? 0.15 : 0)
             }
@@ -201,8 +206,9 @@ struct PadPillButton: View {
             }
             .scaleEffect(held ? 0.94 : 1)
             .animation(pressAnimation, value: held)
-            // Pills are small; give them a finger-sized hit area.
-            .padding(.vertical, 8 * scale)
+            // Pills are small; give them a finger-sized hit area (the full-size pill's height).
+            .padding(.vertical, 8 * scale + 13 * (scale - drawn))
+            .padding(.horizontal, 6 * scale)
             .contentShape(Rectangle())
             .padRegion("pill.\(bits)", .button(bits))
             .accessibilityElement()

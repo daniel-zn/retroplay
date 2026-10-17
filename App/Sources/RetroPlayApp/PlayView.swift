@@ -338,9 +338,9 @@ public struct PlayView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea(edges: fit ? [] : .vertical)
             if showTouchControls {
-                // Every control lives in a side column, off the picture: SELECT under the
-                // left cluster, START under the right one, fast-forward / pause / sound under
-                // START, the lowest control on that side.
+                // The thumb controls live in the side columns; fast-forward / pause / sound
+                // are the lowest control on the right; SELECT / START sit side by side at the
+                // bottom centre.
                 HStack(alignment: .top, spacing: 0) {
                     VStack(alignment: .leading, spacing: 0) {
                         // Centred over the D-pad / stick below.
@@ -350,12 +350,6 @@ public struct PlayView: View {
                         Spacer(minLength: 6)
                         pad.leftMain
                             .opacity(padOpacity)
-                        // A gap as in portrait, so a low press on the D-pad or face
-                        // buttons can't land on SELECT / START (the pad's touch slop is 14 pt).
-                        pad.selectButton
-                            .opacity(padOpacity)
-                            .frame(width: pad.landscapeColumnWidth)
-                            .padding(.top, pad.landscapePillGap)
                         Spacer(minLength: 0)
                             .frame(maxHeight: 8)
                     }
@@ -369,11 +363,7 @@ public struct PlayView: View {
                         Spacer(minLength: 6)
                         pad.rightMain
                             .opacity(padOpacity)
-                        pad.startButton
-                            .opacity(padOpacity)
-                            .frame(width: pad.landscapeColumnWidth)
-                            .padding(.top, pad.landscapePillGap)
-                        // Beyond START's 14 pt touch slop, so taps reach the buttons.
+                        // Beyond the face buttons' 14 pt touch slop, so taps reach the buttons.
                         quickButtons(maxWidth: pad.landscapeColumnWidth)
                             .frame(width: pad.landscapeColumnWidth)
                             .opacity(chromeOpacity)
@@ -387,6 +377,12 @@ public struct PlayView: View {
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 // Over the game every control is see-through, light ones included.
                 .environment(\.padGlass, true)
+                pad.center
+                    .opacity(padOpacity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea(edges: .bottom)
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    .environment(\.padGlass, true)
             } else {
                 VStack(spacing: 8) {
                     controllerConnectedNote
