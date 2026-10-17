@@ -333,6 +333,11 @@ public struct PlayView: View {
         let chromeOpacity = max(padOpacity, 0.6)
 
         return ZStack {
+            // Full-height picture: the bars beside it carry its colours (see AmbientScreenView).
+            if !fit, let core, !casting.isExternalDisplayConnected {
+                AmbientScreenView(store: core.video)
+                    .ignoresSafeArea()
+            }
             screen
                 .frame(width: screenWidth, height: screenHeight)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -97,3 +97,93 @@ private final class DisplayLinkProxy: NSObject {
         }
     }
 }
+
+/// Fills the screen around a full-height landscape picture with the game's own colours:
+/// each frame shrunk to 16 × 9 and stretched back up (the stretch is the blur), dimmed.
+/// Glass controls that hang past the picture's edge then sit over matching colour rather
+/// than black. 15 updates a second and a tiny image, so it costs next to nothing.
+@available(iOS 18.0, *)
+struct AmbientScreenView: UIViewRepresentable {
+    let store: VideoFrameStore
+
+    func makeUIView(context: Context) -> AmbientScreenUIView {
+        let view = AmbientScreenUIView()
+        view.store = store
+        return view
+    }
+
+    func updateUIView(_ view: AmbientScreenUIView, context: Context) {
+        view.store = store
+    }
+}
+
+@available(iOS 18.0, *)
+final class AmbientScreenUIView: UIView {
+    var store: VideoFrameStore? {
+        didSet {
+            if store !== oldValue {
+                seen = 0
+                layer.contents = nil
+            }
+        }
+    }
+
+    private var link: CADisplayLink?
+    private var seen: UInt64 = 0
+    private let context = CGContext(
+        data: nil, width: 16, height: 9, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+    )
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .black
+        isUserInteractionEnabled = false
+        alpha = 0.5
+        layer.contentsGravity = .resizeAspectFill
+        layer.magnificationFilter = .linear
+        context?.interpolationQuality = .medium
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        link?.invalidate()
+        link = nil
+        guard window != nil else { return }
+        let link = CADisplayLink(target: AmbientLinkProxy(self), selector: #selector(AmbientLinkProxy.tick))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 10, maximum: 15, preferred: 15)
+        link.add(to: .main, forMode: .common)
+        self.link = link
+    }
+
+    fileprivate func refresh() {
+        guard let store, let context, let frame = store.latest(newerThan: seen) else { return }
+        seen = frame.sequence
+        context.draw(frame.image, in: CGRect(x: 0, y: 0, width: 16, height: 9))
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.contents = context.makeImage()
+        CATransaction.commit()
+    }
+}
+
+@available(iOS 18.0, *)
+private final class AmbientLinkProxy: NSObject {
+    weak var target: AmbientScreenUIView?
+
+    init(_ target: AmbientScreenUIView) {
+        self.target = target
+    }
+
+    @objc func tick() {
+        let target = self.target
+        MainActor.assumeIsolated {
+            target?.refresh()
+        }
+    }
+}
