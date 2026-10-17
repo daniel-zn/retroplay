@@ -240,7 +240,7 @@ public struct PlayView: View {
     private static let portraitBarHeight: CGFloat = 52
     /// The backing's inset from the screen's sides, and from its bottom edge.
     private static let backingSideInset: CGFloat = 6
-    private static let backingBottomInset: CGFloat = 12
+    private static let backingBottomInset: CGFloat = 6
 
     /// Portrait game screen height: full width, but DS screens are tall, so they're capped
     /// to leave the pad room for full-size controls.
@@ -1095,7 +1095,7 @@ private struct PadBacking: View {
     private func backing(_ shape: some Shape) -> some View {
         shape
             .fill(fill.opacity(0.55))
-            .overlay { shape.stroke(stroke.opacity(0.35), lineWidth: 1).padding(0.5) }
+            .overlay { shape.stroke(stroke.opacity(0.15), lineWidth: 1).padding(0.5) }
     }
 }
 
