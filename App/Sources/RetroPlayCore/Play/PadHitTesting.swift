@@ -91,8 +91,8 @@ public enum PadHitTesting {
 /// travel radius, the origin is dragged along behind it, so reversing direction takes
 /// one radius of movement instead of crossing the whole well.
 public struct TouchStick: Sendable, Equatable {
-    public private(set) var originX: Double
-    public private(set) var originY: Double
+    public let originX: Double
+    public let originY: Double
     /// Thumb travel for full deflection, in points.
     public let radius: Double
     /// Fraction of `radius` that reads as zero (thumb wobble).
@@ -106,19 +106,10 @@ public struct TouchStick: Sendable, Equatable {
     }
 
     /// Feed the current touch point (view space, Y down). Returns −1…1, Y up-positive.
+    /// The centre stays where the thumb landed: past the rim the stick holds full tilt toward
+    /// the thumb, and it only eases back once the thumb is back over the stick's travel.
     public mutating func update(x: Double, y: Double) -> (x: Double, y: Double) {
-        var dx = x - originX
-        var dy = y - originY
-        let mag = (dx * dx + dy * dy).squareRoot()
-        if mag > radius {
-            // Drag the origin so the thumb sits exactly on the rim.
-            let excess = mag - radius
-            originX += dx / mag * excess
-            originY += dy / mag * excess
-            dx = x - originX
-            dy = y - originY
-        }
-        return PadHitTesting.analogUnit(dx: dx, dy: dy, radius: radius, deadzone: deadzone)
+        PadHitTesting.analogUnit(dx: x - originX, dy: y - originY, radius: radius, deadzone: deadzone)
     }
 }
 

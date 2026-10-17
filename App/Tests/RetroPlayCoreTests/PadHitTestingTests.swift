@@ -120,16 +120,24 @@ final class PadHitTestingTests: XCTestCase {
         XCTAssertEqual(v.y, 0, accuracy: 1e-9)
     }
 
-    func testTouchStickOriginFollowsOvershoot() {
+    func testTouchStickHoldsTheRimUntilTheThumbComesBackOverIt() {
         var stick = TouchStick(originX: 0, originY: 0, radius: 50, deadzone: 0)
         let far = stick.update(x: 200, y: 0)
         XCTAssertEqual(far.x, 1, accuracy: 1e-9)
-        XCTAssertEqual(stick.originX, 150, accuracy: 1e-9)
-        // Coming back 50 pt from the rim reaches centre, not still-full-right.
-        let back = stick.update(x: 150, y: 0)
-        XCTAssertEqual(back.x, 0, accuracy: 1e-9)
-        let left = stick.update(x: 125, y: 0)
+        // Coming back but still past the rim: the stick stays fully over.
+        let back = stick.update(x: 120, y: 0)
+        XCTAssertEqual(back.x, 1, accuracy: 1e-9)
+        let atRim = stick.update(x: 50, y: 0)
+        XCTAssertEqual(atRim.x, 1, accuracy: 1e-9)
+        // Back over the stick's zone it follows the thumb again, from the same centre.
+        let inside = stick.update(x: 25, y: 0)
+        XCTAssertEqual(inside.x, 0.5, accuracy: 1e-9)
+        let left = stick.update(x: -25, y: 0)
         XCTAssertEqual(left.x, -0.5, accuracy: 1e-9)
+        // Past the rim in another direction it points that way, fully over.
+        let up = stick.update(x: 0, y: -300)
+        XCTAssertEqual(up.x, 0, accuracy: 1e-9)
+        XCTAssertEqual(up.y, 1, accuracy: 1e-9)
     }
 }
 
