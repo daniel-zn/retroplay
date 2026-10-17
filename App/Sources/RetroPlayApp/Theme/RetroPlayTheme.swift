@@ -135,7 +135,9 @@ struct RetroPlayPrimaryButtonStyle: ButtonStyle {
             .foregroundStyle(.white)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
-            .background(tint.opacity(configuration.isPressed ? 0.75 : 1), in: Capsule())
+            .retroPlayGlass(Capsule(), tint: tint) {
+                Capsule().fill(tint.opacity(configuration.isPressed ? 0.75 : 1))
+            }
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }

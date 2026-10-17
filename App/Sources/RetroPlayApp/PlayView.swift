@@ -35,6 +35,8 @@ public struct PlayView: View {
     @AppStorage(PlaySettingsKey.smoothScreen) private var smoothScreen = false
     @AppStorage(PlaySettingsKey.touchWithController) private var touchWithController = false
     @AppStorage private var landscapeFill: Bool
+    /// The display's corner radius (0 until read, or before iOS 26).
+    @State private var displayCorner: CGFloat = 0
 
     @State private var core: (any EmulatorCore)?
     @State private var input: PadInputModel
@@ -151,6 +153,10 @@ public struct PlayView: View {
             }
         }
         .environment(input)
+        .background {
+            DisplayCornerReader { displayCorner = $0 }
+                .ignoresSafeArea()
+        }
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
@@ -231,7 +237,10 @@ public struct PlayView: View {
 
     // MARK: - Layouts
 
-    private static let portraitBarHeight: CGFloat = 44
+    private static let portraitBarHeight: CGFloat = 52
+    /// The backing's inset from the screen's sides, and from its bottom edge.
+    private static let backingSideInset: CGFloat = 6
+    private static let backingBottomInset: CGFloat = 12
 
     /// Portrait game screen height: full width, but DS screens are tall, so they're capped
     /// to leave the pad room for full-size controls.
@@ -248,8 +257,9 @@ public struct PlayView: View {
             width: size.height + safeArea.top + safeArea.bottom,
             height: size.width + safeArea.leading + safeArea.trailing - 59
         )
-        // Less the 6 pt gaps above and below the backing (`portraitLayout`).
-        let padHeight = portrait.height - portraitScreenHeight(system, in: portrait) - portraitBarHeight - 12
+        // Less the gaps above and below the backing (`portraitLayout`).
+        let padHeight = portrait.height - portraitScreenHeight(system, in: portrait) - portraitBarHeight
+            - 6 - backingBottomInset
         return ConsolePadPortrait.scale(for: system, in: CGSize(width: portrait.width, height: padHeight))
     }
 
@@ -260,8 +270,10 @@ public struct PlayView: View {
         let barHeight = Self.portraitBarHeight
         // The backing runs to the bottom edge (through the home-indicator strip, hidden while
         // playing); fast-forward / pause / sound sit at its foot, below every game control.
-        let backingHeight = max(0, size.height + bottomInset - screenHeight - 6)
+        let backingHeight = max(0, size.height + bottomInset - screenHeight - 6 - Self.backingBottomInset)
         let padHeight = max(0, backingHeight - barHeight)
+        // Concentric with the screen's corners; 0 when the display's radius isn't known.
+        let backingRadius = displayCorner > 0 ? displayCorner - Self.backingSideInset : 0
 
         return VStack(spacing: 6) {
             screen
@@ -273,21 +285,26 @@ public struct PlayView: View {
                         // Button letters mirror the hardware; past xxxLarge they overflow the pad.
                         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                         .frame(height: padHeight)
+                        // Shoulders sit `ConsolePadPortrait.edgeInset` in from the backing's top
+                        // and side, so their outer corner is that much tighter than the backing's.
+                        .environment(\.padOuterCornerRadius,
+                                     backingRadius > 0 ? backingRadius - ConsolePadPortrait.edgeInset : nil)
                 } else {
                     controllerConnectedNote
                         .frame(maxHeight: .infinity)
                 }
-                // Own row, so the buttons never sit inside a pad control's touch area.
+                // Own row, so the buttons never sit inside a pad control's touch area; well
+                // clear of the backing's rounded bottom.
                 quickButtons()
                     .frame(height: barHeight, alignment: .top)
             }
             // Full width, the backing inset 6 pt inside it: centred on every iPhone width.
             .frame(width: size.width, height: backingHeight)
             .background {
-                PadBacking(fill: system.padChassis, stroke: system.padChassisStroke)
-                    .padding(.horizontal, 6)
+                PadBacking(fill: system.padChassis, stroke: system.padChassisStroke, radius: backingRadius)
+                    .padding(.horizontal, Self.backingSideInset)
             }
-            .padding(.bottom, 6)
+            .padding(.bottom, Self.backingBottomInset)
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea(edges: .bottom)
@@ -490,7 +507,7 @@ public struct PlayView: View {
                         .font(RetroPlayFont.subheadline)
                         .padding(.horizontal, 6)
                 }
-                .buttonStyle(.bordered)
+                .glassButton()
                 .tint(.white)
                 .disabled(didLeave)
                 .padding(.top, 4)
@@ -517,7 +534,7 @@ public struct PlayView: View {
                     .foregroundStyle(.white.opacity(0.75))
                     .multilineTextAlignment(.center)
                 Button("Back to Library") { dismiss() }
-                    .buttonStyle(.borderedProminent)
+                    .prominentGlassButton()
             }
             .padding(24)
             .frame(maxWidth: 420)
@@ -540,7 +557,7 @@ public struct PlayView: View {
 
     private var menuOverlay: some View {
         ZStack {
-            Color.black.opacity(0.55)
+            Color.black.opacity(0.35)
                 .ignoresSafeArea()
                 .onTapGesture { if !leaving { menuOpen = false } }
             PlayMenuView(
@@ -1017,6 +1034,13 @@ public struct PlayView: View {
             }
             NSLog("RP_SMOKE %@ pulsed Start+A", system.rawValue)
         }
+        // `-RetroPlaySmokeMenu YES`: open the pause menu after the presses, for screenshots.
+        if UserDefaults.standard.bool(forKey: "RetroPlaySmokeMenu") {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(5))
+                menuOpen = true
+            }
+        }
         // `-RetroPlaySmokeRestartAfter <seconds>`: run Restart from Scratch's reboot once,
         // so the fresh-boot path can be checked without driving the menu.
         if let index = args.firstIndex(of: "-RetroPlaySmokeRestartAfter"),
@@ -1059,9 +1083,13 @@ private final class BackgroundTask {
 private struct PadBacking: View {
     let fill: Color
     let stroke: Color
+    /// Concentric with the display's corners when known (all four corners alike).
+    let radius: CGFloat
 
     var body: some View {
-        if #available(iOS 26.0, *) {
+        if radius > 0 {
+            backing(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        } else if #available(iOS 26.0, *) {
             backing(ConcentricRectangle(corners: .concentric(minimum: 28), isUniform: true))
         } else {
             backing(RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -1072,6 +1100,47 @@ private struct PadBacking: View {
         shape
             .fill(fill.opacity(0.55))
             .overlay { shape.stroke(stroke.opacity(0.35), lineWidth: 1).padding(0.5) }
+    }
+}
+
+/// Reads the display's corner radius: a full-window view whose corners are concentric with
+/// the screen's (UIKit, iOS 26) reports its effective radius. Nothing on earlier systems.
+private struct DisplayCornerReader: UIViewRepresentable {
+    let onChange: (CGFloat) -> Void
+
+    func makeUIView(context: Context) -> Probe {
+        let view = Probe()
+        view.isUserInteractionEnabled = false
+        view.onChange = onChange
+        return view
+    }
+
+    func updateUIView(_ view: Probe, context: Context) {
+        view.onChange = onChange
+    }
+
+    final class Probe: UIView {
+        var onChange: ((CGFloat) -> Void)?
+        private var reported: CGFloat = -1
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            if #available(iOS 26.0, *) {
+                cornerConfiguration = .uniformCorners(radius: .containerConcentric())
+            }
+        }
+
+        required init?(coder: NSCoder) { nil }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            guard #available(iOS 26.0, *), window != nil else { return }
+            let radius = effectiveRadius(corner: .bottomLeft)
+            guard radius != reported else { return }
+            reported = radius
+            let onChange = onChange
+            DispatchQueue.main.async { onChange?(radius) }
+        }
     }
 }
 

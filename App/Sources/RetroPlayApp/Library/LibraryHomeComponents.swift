@@ -110,6 +110,7 @@ struct LibraryFilterBar: View {
                         chip(tab)
                     }
                 }
+                .retroPlayGlassGroup()
                 .padding(.horizontal, 16)
                 .padding(.vertical, 2)
             }
@@ -140,10 +141,8 @@ struct LibraryFilterBar: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
-            .background {
+            .retroPlayGlass(Capsule(), tint: selected ? tint.opacity(0.45) : nil) {
                 Capsule().fill(selected ? tint.opacity(0.28) : RetroPlayTheme.card(for: colorScheme))
-            }
-            .overlay {
                 Capsule().strokeBorder(
                     selected ? tint : RetroPlayTheme.cardStroke(for: colorScheme),
                     lineWidth: 1
@@ -168,8 +167,10 @@ struct LibraryFilterBar: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                 .frame(width: 36, height: 36)
-                .background(RetroPlayTheme.card(for: colorScheme), in: Circle())
-                .overlay(Circle().strokeBorder(RetroPlayTheme.cardStroke(for: colorScheme), lineWidth: 1))
+                .retroPlayGlass(Circle()) {
+                    Circle().fill(RetroPlayTheme.card(for: colorScheme))
+                    Circle().strokeBorder(RetroPlayTheme.cardStroke(for: colorScheme), lineWidth: 1)
+                }
         }
         .accessibilityLabel("Sort: \(sort.title)")
     }
@@ -275,7 +276,7 @@ struct EmptyFilterView: View {
             }
             HStack(spacing: 10) {
                 Button("Show All", action: onShowAll)
-                    .buttonStyle(.bordered)
+                    .glassButton()
                     .font(RetroPlayFont.caption)
                 Button(action: onImport) {
                     Label("Import", systemImage: "plus")

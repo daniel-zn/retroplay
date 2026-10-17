@@ -544,7 +544,10 @@ struct ConsolePadPortrait: View {
 
     /// Clear of the rounded corners and the gripping hand.
     static let horizontalInset: CGFloat = 16
-    static let verticalInset: CGFloat = 12
+    /// The controls' distance from the backing (inset 6 pt from the screen's sides) on every
+    /// side, so the shoulders sit as far from its top as from its sides.
+    static let edgeInset: CGFloat = 10
+    static let verticalInset: CGFloat = edgeInset
     /// Fewest points between the left and right thumb clusters.
     private static let clusterGap: CGFloat = 28
     private static let shoulderGap: CGFloat = 12

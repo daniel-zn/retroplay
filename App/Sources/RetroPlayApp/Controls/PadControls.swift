@@ -12,6 +12,8 @@ private let pressAnimation = Animation.easeOut(duration: 0.06)
 extension EnvironmentValues {
     /// Controls drawn over the game (landscape): fills are see-through so the picture shows.
     @Entry var padGlass = false
+    /// A shoulder's outer corner, concentric with the backing's corner; nil: a half-height round.
+    @Entry var padOuterCornerRadius: CGFloat? = nil
 }
 
 extension Color {
@@ -120,13 +122,18 @@ struct PadShoulderButton: View {
     /// The side whose top corner meets the controller's corner.
     var outer: HorizontalEdge? = nil
 
+    @Environment(\.padOuterCornerRadius) private var outerRadius
+
     private var shape: UnevenRoundedRectangle {
         let corner = height * padCornerFraction
+        // The outer corner can take most of the button's height; the corner under it gives way.
+        let outerCorner = min(outerRadius ?? height / 2, height - 4, width / 2)
+        let underOuter = min(corner, max(4, height - outerCorner))
         return UnevenRoundedRectangle(
-            topLeadingRadius: outer == .leading ? height / 2 : corner,
-            bottomLeadingRadius: corner,
-            bottomTrailingRadius: corner,
-            topTrailingRadius: outer == .trailing ? height / 2 : corner,
+            topLeadingRadius: outer == .leading ? outerCorner : corner,
+            bottomLeadingRadius: outer == .leading ? underOuter : corner,
+            bottomTrailingRadius: outer == .trailing ? underOuter : corner,
+            topTrailingRadius: outer == .trailing ? outerCorner : corner,
             style: .continuous
         )
     }

@@ -73,7 +73,7 @@ struct PlayMenuView: View {
                     .minimumScaleFactor(0.5)
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .prominentGlassButton()
             .controlSize(.large)
 
             // Quick actions: icon only.
@@ -86,7 +86,7 @@ struct PlayMenuView: View {
                 .disabled(!supportsSaveState || busy)
                 AirPlayRoutePicker()
                     .frame(width: MenuIconButton.size, height: MenuIconButton.size)
-                    .background(Color.white.opacity(0.12), in: Circle())
+                    .menuGlass(Circle(), fallback: Color.white.opacity(0.12))
                     .accessibilityLabel("AirPlay display")
             }
             .padding(.vertical, 4)
@@ -141,12 +141,55 @@ struct PlayMenuView: View {
         .frame(maxWidth: 360)
         // Past AX1 the menu no longer fits a phone-width card even stacked.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+        .menuCardGlass()
+    }
+}
+
+extension View {
+    /// The pause menu card: Liquid Glass (iOS 26), else the material card.
+    @ViewBuilder
+    func menuCardGlass() -> some View {
+        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer {
+                glassEffect(.regular, in: shape)
+            }
+        } else {
+            background(.regularMaterial, in: shape)
+                .overlay { shape.strokeBorder(Color.white.opacity(0.12), lineWidth: 1) }
+                .shadow(color: .black.opacity(0.4), radius: 24, y: 8)
         }
-        .shadow(color: .black.opacity(0.4), radius: 24, y: 8)
+    }
+
+    /// A pause-menu button's surface: interactive Liquid Glass (iOS 26), optionally tinted,
+    /// else `fallback` filling `shape`.
+    @ViewBuilder
+    func menuGlass<S: Shape>(_ shape: S, tint: Color? = nil, fallback: Color) -> some View {
+        if #available(iOS 26.0, *) {
+            glassEffect(.regular.tint(tint).interactive(), in: shape)
+        } else {
+            background(fallback, in: shape)
+        }
+    }
+
+    /// A secondary button: glass (iOS 26), else bordered.
+    @ViewBuilder
+    func glassButton() -> some View {
+        if #available(iOS 26.0, *) {
+            buttonStyle(.glass)
+        } else {
+            buttonStyle(.bordered)
+        }
+    }
+
+    /// Resume: prominent glass (iOS 26), else bordered prominent.
+    @ViewBuilder
+    func prominentGlassButton() -> some View {
+        if #available(iOS 26.0, *) {
+            buttonStyle(.glassProminent)
+        } else {
+            buttonStyle(.borderedProminent)
+        }
     }
 }
 
@@ -249,9 +292,9 @@ private struct SaveRowButtonStyle: ButtonStyle {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(
-                Color.white.opacity(configuration.isPressed ? 0.22 : 0.08),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .menuGlass(
+                RoundedRectangle(cornerRadius: 12, style: .continuous),
+                fallback: Color.white.opacity(configuration.isPressed ? 0.22 : 0.08)
             )
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
@@ -271,9 +314,9 @@ struct MenuTileButtonStyle: ButtonStyle {
             .multilineTextAlignment(.center)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, minHeight: Self.height)
-            .background(
-                Color.white.opacity(configuration.isPressed ? 0.22 : 0.12),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .menuGlass(
+                RoundedRectangle(cornerRadius: 14, style: .continuous),
+                fallback: Color.white.opacity(configuration.isPressed ? 0.22 : 0.12)
             )
     }
 }
@@ -296,7 +339,8 @@ struct MenuIconButton: View {
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(active ? .black : tint)
                 .frame(width: Self.size, height: Self.size)
-                .background(active ? activeColor : Color.white.opacity(0.12), in: Circle())
+                .menuGlass(Circle(), tint: active ? activeColor : nil,
+                           fallback: active ? activeColor : Color.white.opacity(0.12))
                 .contentShape(Circle())
                 .opacity(isEnabled ? 1 : 0.4)
         }

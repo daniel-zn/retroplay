@@ -75,17 +75,16 @@ private struct RetroPlayAlertModifier: ViewModifier {
                                             .font(RetroPlayFont.subheadline)
                                             .frame(maxWidth: .infinity)
                                     }
-                                    .buttonStyle(.borderedProminent)
+                                    .prominentGlassButton()
                                     .tint(tint(for: action.role))
                                 }
                             }
                         }
                         .padding(20)
                         .frame(maxWidth: 360)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 18)
-                                .strokeBorder(.white.opacity(0.16))
+                        .retroPlayGlass(RoundedRectangle(cornerRadius: 18), interactive: false) {
+                            RoundedRectangle(cornerRadius: 18).fill(.regularMaterial)
+                            RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.16))
                         }
                         .padding(24)
                         .accessibilityElement(children: .contain)
