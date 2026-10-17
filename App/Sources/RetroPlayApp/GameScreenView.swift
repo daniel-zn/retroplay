@@ -98,10 +98,11 @@ private final class DisplayLinkProxy: NSObject {
     }
 }
 
-/// Fills the screen around a full-height landscape picture with the game's own colours:
-/// each frame shrunk to 16 × 9 and stretched back up (the stretch is the blur), dimmed.
-/// Glass controls that hang past the picture's edge then sit over matching colour rather
-/// than black. 15 updates a second and a tiny image, so it costs next to nothing.
+/// A live layer behind a full-height landscape picture, so the bars beside it look black but
+/// keep changing: Liquid Glass that hangs past the picture's edge is only refreshed when
+/// what's under it changes, and over static black it trails the game. Each frame is shrunk
+/// to 16 × 9 and drawn at 3% opacity (reads as black). 15 updates a second and a tiny
+/// image, so it costs next to nothing.
 @available(iOS 18.0, *)
 struct AmbientScreenView: UIViewRepresentable {
     let store: VideoFrameStore
@@ -140,7 +141,8 @@ final class AmbientScreenUIView: UIView {
         super.init(frame: frame)
         backgroundColor = .black
         isUserInteractionEnabled = false
-        alpha = 0.5
+        // Not 0: a fully transparent layer isn't drawn, and then nothing under the glass changes.
+        alpha = 0.03
         layer.contentsGravity = .resizeAspectFill
         layer.magnificationFilter = .linear
         context?.interpolationQuality = .medium
