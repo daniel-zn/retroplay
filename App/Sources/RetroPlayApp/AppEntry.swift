@@ -14,6 +14,7 @@ public struct RetroPlayRootView: View {
     @State private var showImporter = false
     @State private var showSettings = false
     @State private var playGame: LibraryGame?
+    @State private var navigator = ControllerNavigator()
     @State private var searchPlayGame: LibraryGame?
     @State private var searchQuery = ""
     @State private var isSearchPresented = false
@@ -117,6 +118,22 @@ public struct RetroPlayRootView: View {
                 .tag(RootTab.search)
         }
         .environment(\.font, RetroPlayFont.body)
+        .environment(navigator)
+        .task { navigator.start() }
+        .onChange(of: selectedTab == .library && !showSettings && !showImporter, initial: true) { _, front in
+            navigator.libraryVisible = front
+        }
+        .onChange(of: navigator.event) { _, event in
+            // L1 / R1 step through the system filters that have games.
+            guard let event, event.context == .library,
+                  event.command == .previousPage || event.command == .nextPage else { return }
+            let tabs = SystemTab.allCases.filter { $0 == .all || (tabCounts[$0] ?? 0) > 0 }
+            guard let current = tabs.firstIndex(of: systemTab) ?? tabs.firstIndex(of: .all) else { return }
+            let step = event.command == .nextPage ? 1 : -1
+            withAnimation(.easeOut(duration: 0.15)) {
+                systemTab = tabs[(current + step + tabs.count) % tabs.count]
+            }
+        }
         .tint(RetroPlayTheme.accent)
         .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
@@ -327,7 +344,8 @@ public struct RetroPlayRootView: View {
                         onRequestDelete: { requestDelete($0) },
                         titleCollapsed: $libraryTitleCollapsed,
                         lastPlayed: lastPlayed,
-                        missingGameIDs: store.missingGameIDs
+                        missingGameIDs: store.missingGameIDs,
+                        controllerNavigation: true
                     ) {
                         libraryTitle
                         LibraryFilterBar(selection: $systemTab, sort: sortBinding, counts: tabCounts)

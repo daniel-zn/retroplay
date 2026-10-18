@@ -14,6 +14,8 @@ struct PlayMenuView: View {
     /// Quit was chosen and the exit save is running: the menu is locked and says so.
     let leaving: Bool
     let hasController: Bool
+    /// The connected controller, named under Options (not over the game).
+    var controllerName: String? = nil
 
     @Binding var haptics: Bool
     @Binding var padOpacity: Double
@@ -31,6 +33,33 @@ struct PlayMenuView: View {
     @State private var confirmRestart = false
     @State private var showSaves = false
     @State private var showOptions = false
+    /// The controller cursor.
+    @State private var focus: MenuItem?
+    @Environment(ControllerNavigator.self) private var navigator
+
+    /// Everything the controller cursor can land on, top to bottom.
+    private enum MenuItem: Hashable {
+        case resume, save, saves, saveEntry(Int), reset, importSave
+        case options, haptics, smooth, touchWithController, fill, quit
+    }
+
+    private var menuItems: [MenuItem] {
+        var items: [MenuItem] = [.resume]
+        if supportsSaveState { items.append(.save) }
+        items.append(.saves)
+        if showSaves {
+            items += saveEntries.indices.map(MenuItem.saveEntry)
+            items += [.reset, .importSave]
+        }
+        items.append(.options)
+        if showOptions {
+            items += [.haptics, .smooth]
+            if hasController { items.append(.touchWithController) }
+            items.append(.fill)
+        }
+        if !leaving { items.append(.quit) }
+        return items
+    }
 
     var body: some View {
         // Landscape phones are short: scroll only when the card does not fit.
@@ -43,6 +72,11 @@ struct PlayMenuView: View {
             .frame(maxWidth: 380)
         }
         .environment(\.colorScheme, .dark)
+        .onAppear { if navigator.isConnected { focus = .resume } }
+        .onChange(of: navigator.event) { _, event in
+            guard let event, event.context == .pauseMenu, !confirmRestart else { return }
+            handle(event.command)
+        }
         .retroPlayAlert(
             "Reset Game?",
             message: "Every save state for this game is deleted and it starts over. In-game saves are kept.",
@@ -75,6 +109,7 @@ struct PlayMenuView: View {
             }
             .prominentGlassButton()
             .controlSize(.large)
+            .controllerFocusRing(focus == .resume, cornerRadius: 22)
 
             // Quick actions: icon only.
             HStack(spacing: 14) {
@@ -84,6 +119,7 @@ struct PlayMenuView: View {
                     action: onSave
                 )
                 .disabled(!supportsSaveState || busy)
+                .controllerFocusRing(focus == .save, cornerRadius: MenuIconButton.size / 2)
                 AirPlayRoutePicker()
                     .frame(width: MenuIconButton.size, height: MenuIconButton.size)
                     .menuGlass(Circle(), fallback: Color.white.opacity(0.12))
@@ -95,12 +131,22 @@ struct PlayMenuView: View {
 
             DisclosureGroup(isExpanded: $showOptions) {
                 VStack(spacing: 10) {
+                    if hasController {
+                        Label(controllerName ?? "Controller connected", systemImage: "gamecontroller.fill")
+                            .font(RetroPlayFont.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     Toggle("Haptics", isOn: $haptics)
+                        .controllerFocusRing(focus == .haptics, cornerRadius: 6)
                     Toggle("Smooth Screen", isOn: $smoothScreen)
+                        .controllerFocusRing(focus == .smooth, cornerRadius: 6)
                     if hasController {
                         Toggle("Touch Controls with Controller", isOn: $touchWithController)
+                            .controllerFocusRing(focus == .touchWithController, cornerRadius: 6)
                     }
                     Toggle("Fill Screen in Landscape", isOn: $landscapeFill)
+                        .controllerFocusRing(focus == .fill, cornerRadius: 6)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Landscape Controls Opacity")
                             .font(RetroPlayFont.caption)
@@ -113,6 +159,7 @@ struct PlayMenuView: View {
             } label: {
                 Label("Options", systemImage: "slider.horizontal.3")
                     .foregroundStyle(.white)
+                    .controllerFocusRing(focus == .options, cornerRadius: 6)
             }
             .font(RetroPlayFont.subheadline)
             .padding(.horizontal, 4)
@@ -134,6 +181,7 @@ struct PlayMenuView: View {
                 }
                 .buttonStyle(MenuTileButtonStyle(foreground: .red))
                 .frame(minHeight: MenuTileButtonStyle.height)
+                .controllerFocusRing(focus == .quit)
             }
         }
         .disabled(leaving)
@@ -194,6 +242,45 @@ extension View {
 }
 
 extension PlayMenuView {
+    /// Up / down move the cursor, A does what a tap would, B resumes the game.
+    private func handle(_ command: ControllerNavCommand) {
+        let items = menuItems
+        guard let current = focus, let index = items.firstIndex(of: current) else {
+            if command == .back { onResume() } else { focus = items.first }
+            return
+        }
+        switch command {
+        case .up: focus = items[max(0, index - 1)]
+        case .down: focus = items[min(items.count - 1, index + 1)]
+        case .confirm: activate(current)
+        case .back: onResume()
+        case .left, .right, .previousPage, .nextPage: break
+        }
+    }
+
+    private func activate(_ item: MenuItem) {
+        guard !leaving else { return }
+        withAnimation(.easeOut(duration: 0.15)) {
+            switch item {
+            case .resume: onResume()
+            case .save: if supportsSaveState && !busy { onSave() }
+            case .saves: showSaves.toggle()
+            case .saveEntry(let index):
+                if supportsSaveState, !busy, saveEntries.indices.contains(index) {
+                    onLoadCommand(.loadEntry(saveEntries[index]))
+                }
+            case .reset: if !busy { confirmRestart = true }
+            case .importSave: onImportSave()
+            case .options: showOptions.toggle()
+            case .haptics: haptics.toggle()
+            case .smooth: smoothScreen.toggle()
+            case .touchWithController: touchWithController.toggle()
+            case .fill: landscapeFill.toggle()
+            case .quit: onQuit()
+            }
+        }
+    }
+
     /// Saves dropdown: every save state (newest first), Reset, battery-save import.
     private var savesGroup: some View {
         DisclosureGroup(isExpanded: $showSaves) {
@@ -204,7 +291,7 @@ extension PlayMenuView {
                         .foregroundStyle(.white.opacity(0.6))
                         .frame(maxWidth: .infinity, minHeight: 36)
                 } else {
-                    ForEach(saveEntries) { entry in
+                    ForEach(Array(saveEntries.enumerated()), id: \.element.id) { index, entry in
                         Button {
                             onLoadCommand(.loadEntry(entry))
                         } label: {
@@ -212,6 +299,7 @@ extension PlayMenuView {
                         }
                         .buttonStyle(SaveRowButtonStyle())
                         .disabled(!supportsSaveState || busy)
+                        .controllerFocusRing(focus == .saveEntry(index), cornerRadius: 12)
                     }
                 }
 
@@ -226,6 +314,7 @@ extension PlayMenuView {
                     }
                     .buttonStyle(MenuTileButtonStyle(foreground: .red))
                     .disabled(busy)
+                    .controllerFocusRing(focus == .reset)
                     Button(action: onImportSave) {
                         Label("Import", systemImage: "square.and.arrow.down.on.square")
                             .lineLimit(1)
@@ -234,12 +323,14 @@ extension PlayMenuView {
                     }
                     .buttonStyle(MenuTileButtonStyle())
                     .accessibilityLabel(PlaySavesMenuContent.importTitle)
+                    .controllerFocusRing(focus == .importSave)
                 }
             }
             .padding(.top, 8)
         } label: {
             Label(PlaySavesMenuContent.title, systemImage: "tray.full")
                 .foregroundStyle(.white)
+                .controllerFocusRing(focus == .saves, cornerRadius: 6)
         }
         .font(RetroPlayFont.subheadline)
         .padding(.horizontal, 4)

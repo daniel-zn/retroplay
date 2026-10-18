@@ -25,6 +25,7 @@
 #include "Core/HLE/sceCtrl.h"
 #include "Core/SaveState.h"
 #include "Core/HLE/sceDisplay.h"
+#include "Core/HW/Display.h"
 #include <algorithm>
 #include <fstream>
 #include <mutex>
@@ -79,6 +80,20 @@ void applyRetroPlayHostConfig(BridgeState *bridge) {
     // PPGeDrawCurrentText uses 512 texture windows only when this flag is set. Without it the
     // software sampler clamps the 2048-wide atlas and SAVEDATA dialog text draws as garbage.
     g_Config.bSoftwareRendering = rp_ppsspp_enables_software_renderer();
+    // Heavy scenes (LEGO Batman's busy levels): when a frame runs late, skip drawing the next
+    // one (at most 3 in a row) so the game keeps full speed instead of slowing down. The
+    // software renderer is most of a frame's cost, and a skipped frame skips it. Auto
+    // frameskip needs buffer effects on.
+    g_Config.bSkipBufferEffects = false;
+    g_Config.iFrameSkip = 3;
+    g_Config.bAutoFrameSkip = true;
+#if DEBUG
+    // Measuring: `-RetroPlayPSPNoFrameskip YES` turns it off for a before/after comparison.
+    if ([NSUserDefaults.standardUserDefaults boolForKey:@"RetroPlayPSPNoFrameskip"]) {
+        g_Config.iFrameSkip = 0;
+        g_Config.bAutoFrameSkip = false;
+    }
+#endif
     g_Config.SetSearchPath(GetSysDirectory(DIRECTORY_SYSTEM));
     CreateSysDirectories();
     MemoryStick_Init();
@@ -277,6 +292,16 @@ void rp_ppsspp_run_frame(void *bridgePtr) {
         return;
     }
     PSP_RunLoopWhileState();
+#if DEBUG
+    // Speed log for measuring: vps is emulated vblanks per second (60 = full speed), fps the
+    // frames the game drew per second.
+    static int perfTicks = 0;
+    if (++perfTicks % 120 == 0) {
+        float vps = 0, fps = 0, actual = 0;
+        __DisplayGetFPS(&vps, &fps, &actual);
+        std::fprintf(stderr, "RP_PERF vps=%.1f fps=%.1f actual=%.1f\n", vps, fps, actual);
+    }
+#endif
     // Match libretro: after a full host frame, put the CPU back to running for the next tick.
     if (!resumeCPUIfNeeded()) {
         bridge->hadRuntimeError = true;

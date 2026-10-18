@@ -261,19 +261,21 @@ final class PadTouchView: UIView {
 
     /// Region under the point, else the closest one within `slop`.
     private func nearestRegion(to p: CGPoint) -> PadRegion? {
+        // Controls first (within their touch slop): over the DS Touch Screen (portrait DS draws
+        // them on top of it) a press near a button is the button, not a tap on the screen.
         var best: PadRegion?
         var bestDistance = CGFloat.greatestFiniteMagnitude
-        for region in regions {
-            // Screen touch must be exact: a near-miss should not poke the game.
-            let reach: CGFloat = region.kind == .touchscreen ? 0 : slop
+        for region in regions where region.kind != .touchscreen {
             let d = distance(from: p, to: region)
-            if d <= reach && d < bestDistance {
+            if d <= slop && d < bestDistance {
                 best = region
                 bestDistance = d
-                if d == 0 && region.kind != .touchscreen { break }
+                if d == 0 { break }
             }
         }
-        return best
+        if let best { return best }
+        // Screen touch must be exact: a near-miss should not poke the game.
+        return regions.first { $0.kind == .touchscreen && distance(from: p, to: $0) == 0 }
     }
 
     private func isNearAnyButton(_ p: CGPoint) -> Bool {

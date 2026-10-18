@@ -35,12 +35,19 @@ public struct PlayView: View {
     @AppStorage(PlaySettingsKey.smoothScreen) private var smoothScreen = false
     @AppStorage(PlaySettingsKey.touchWithController) private var touchWithController = false
     @AppStorage private var landscapeFill: Bool
+    /// With a controller playing, fast-forward / pause / sound stay hidden until a tap shows them.
+    @State private var chromeRevealed = false
+    @State private var isLandscape = false
+    @State private var chromeHideTask: Task<Void, Never>?
     /// The display's corner radius (0 until read, or before iOS 26).
     @State private var displayCorner: CGFloat = 0
+    @Environment(ControllerNavigator.self) private var navigator
 
     @State private var core: (any EmulatorCore)?
     @State private var input: PadInputModel
     @State private var controllers = GameControllerInput()
+    /// Keeps controller presses made in the pause menu out of the game.
+    @State private var menuGate = MenuInputGateBox()
     @State private var phase: Phase = .loading
     @State private var menuOpen = false
     @State private var fastForward = false
@@ -123,6 +130,9 @@ public struct PlayView: View {
             // A finger held through a rotation keeps its old-layout origin (stick, D-pad);
             // drop it so nothing stays pinned until the finger lifts.
             .onChange(of: landscape) { input.releaseAll() }
+            .onChange(of: landscape, initial: true) { _, now in isLandscape = now }
+            // With a controller, a tap anywhere shows fast-forward / pause / sound for a moment.
+            .simultaneousGesture(TapGesture().onEnded { revealChrome() })
             .coordinateSpace(.named(PadSurface.space))
             .overlayPreferenceValue(PadRegionKey.self) { regions in
                 // Not over the loading / failed card, where the pad is not live yet.
@@ -133,6 +143,8 @@ public struct PlayView: View {
                         releaseCount: input.releaseCount
                     ) { output in
                         input.applyTouch(output)
+                        // DS Touch Screen with a controller: a touch there also shows the buttons.
+                        if !chromeRevealed { revealChrome() }
                     }
                 }
             }
@@ -176,7 +188,10 @@ public struct PlayView: View {
             refreshSaveEntries()
             await boot()
         }
+        .onAppear { navigator.playing = true }
         .onDisappear {
+            navigator.playing = false
+            navigator.pauseMenuOpen = false
             loadCoordinator.cancel()
             casting.endGame()
             GameModeSession.end()
@@ -222,6 +237,8 @@ public struct PlayView: View {
             handleScenePhase(newPhase)
         }
         .onChange(of: menuOpen) { _, open in
+            navigator.pauseMenuOpen = open
+            input.applyPhysical(menuGate.setMenuOpen(open))
             if open {
                 input.releaseAll()
                 core?.pause()
@@ -263,7 +280,62 @@ public struct PlayView: View {
         return ConsolePadPortrait.scale(for: system, in: CGSize(width: portrait.width, height: padHeight))
     }
 
+    @ViewBuilder
     private func portraitLayout(size: CGSize, bottomInset: CGFloat) -> some View {
+        if !showTouchControls {
+            portraitControllerLayout(size: size, bottomInset: bottomInset)
+        } else if system == .nds {
+            portraitDSLayout(size: size, bottomInset: bottomInset)
+        } else {
+            portraitPadLayout(size: size, bottomInset: bottomInset)
+        }
+    }
+
+    /// A controller is playing: just the game, centred; the in-game buttons show on a tap.
+    private func portraitControllerLayout(size: CGSize, bottomInset: CGFloat) -> some View {
+        let aspect = CGFloat(system.screenAspect)
+        let screenHeight = min(size.height, size.width / aspect)
+        return ZStack {
+            screen
+                .frame(width: screenHeight * aspect, height: screenHeight)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            quickButtons()
+                .frame(height: Self.portraitBarHeight, alignment: .top)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, Self.backingBottomInset)
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    /// DS: both screens at full width, the controls over the lower part in clear glass, as
+    /// in landscape (no backing). Where a control overlaps the Touch Screen, the control wins.
+    private func portraitDSLayout(size: CGSize, bottomInset: CGFloat) -> some View {
+        let aspect = CGFloat(system.screenAspect)
+        let screenHeight = min(size.width / aspect, size.height * 0.8)
+        let barHeight = Self.portraitBarHeight
+        // The controls' own height; when the screens leave less room they overlap them.
+        let room = size.height + bottomInset - screenHeight - barHeight - Self.backingBottomInset
+        let padHeight = max(room, 300)
+        return ZStack(alignment: .top) {
+            screen
+                .frame(width: screenHeight * aspect, height: screenHeight)
+                .frame(maxWidth: .infinity)
+            VStack(spacing: 0) {
+                ConsolePadPortrait(system: system, size: CGSize(width: size.width, height: padHeight))
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    .frame(height: padHeight)
+                    .opacity(padOpacity)
+                quickButtons()
+                    .frame(height: barHeight, alignment: .top)
+            }
+            .environment(\.padGlass, true)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, Self.backingBottomInset)
+            .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private func portraitPadLayout(size: CGSize, bottomInset: CGFloat) -> some View {
         let aspect = CGFloat(system.screenAspect)
         let screenHeight = Self.portraitScreenHeight(system, in: size)
         let screenWidth = screenHeight * aspect
@@ -280,19 +352,14 @@ public struct PlayView: View {
                 .frame(width: screenWidth, height: screenHeight)
                 .frame(maxWidth: .infinity)
             VStack(spacing: 0) {
-                if showTouchControls {
-                    ConsolePadPortrait(system: system, size: CGSize(width: size.width, height: padHeight))
-                        // Button letters mirror the hardware; past xxxLarge they overflow the pad.
-                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                        .frame(height: padHeight)
-                        // Shoulders sit `ConsolePadPortrait.edgeInset` in from the backing's top
-                        // and side, so their outer corner is that much tighter than the backing's.
-                        .environment(\.padOuterCornerRadius,
-                                     backingRadius > 0 ? backingRadius - ConsolePadPortrait.edgeInset : nil)
-                } else {
-                    controllerConnectedNote
-                        .frame(maxHeight: .infinity)
-                }
+                ConsolePadPortrait(system: system, size: CGSize(width: size.width, height: padHeight))
+                    // Button letters mirror the hardware; past xxxLarge they overflow the pad.
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    .frame(height: padHeight)
+                    // Shoulders sit `ConsolePadPortrait.edgeInset` in from the backing's top
+                    // and side, so their outer corner is that much tighter than the backing's.
+                    .environment(\.padOuterCornerRadius,
+                                 backingRadius > 0 ? backingRadius - ConsolePadPortrait.edgeInset : nil)
                 // Own row, so the buttons never sit inside a pad control's touch area; well
                 // clear of the backing's rounded bottom.
                 quickButtons()
@@ -310,8 +377,16 @@ public struct PlayView: View {
         .ignoresSafeArea(edges: .bottom)
     }
 
+    /// DS in landscape shows its two screens side by side.
+    private var dsSideBySide: Bool { system == .nds && isLandscape }
+
+    /// The picture's shape on screen: DS side by side is twice as wide and half as tall.
+    private var landscapeScreenAspect: CGFloat {
+        CGFloat(system.screenAspect) * (dsSideBySide ? 4 : 1)
+    }
+
     private func landscapeLayout(size: CGSize, safeArea: EdgeInsets) -> some View {
-        let aspect = CGFloat(system.screenAspect)
+        let aspect = landscapeScreenAspect
         // The controls also use the home-indicator strip (it's hidden while playing).
         let sizing = ConsolePad.landscapeLayout(
             for: system,
@@ -389,13 +464,10 @@ public struct PlayView: View {
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .environment(\.padGlass, true)
             } else {
-                VStack(spacing: 8) {
-                    controllerConnectedNote
-                    quickButtons()
-                        .opacity(chromeOpacity)
-                }
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .padding(.bottom, 4)
+                quickButtons()
+                    .opacity(chromeOpacity)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 4)
             }
         }
     }
@@ -409,17 +481,26 @@ public struct PlayView: View {
                 ) == .castingRemote {
                     castingRemoteNote
                 } else {
-                    GameScreenView(store: core.video, smoothing: smoothScreen)
+                    GameScreenView(store: core.video, smoothing: smoothScreen, sideBySide: dsSideBySide)
                 }
             } else {
                 Color.black
             }
             if system == .nds {
-                // Bottom half of the stacked frame is the DS Touch Screen: touch it directly.
-                VStack(spacing: 0) {
-                    Color.clear
-                    Color.clear
-                        .padRegion("nds.touchscreen", .touchscreen)
+                // The DS Touch Screen, touched directly: the bottom half of the stacked frame,
+                // or the right half side by side.
+                if dsSideBySide {
+                    HStack(spacing: 0) {
+                        Color.clear
+                        Color.clear
+                            .padRegion("nds.touchscreen", .touchscreen)
+                    }
+                } else {
+                    VStack(spacing: 0) {
+                        Color.clear
+                        Color.clear
+                            .padRegion("nds.touchscreen", .touchscreen)
+                    }
                 }
             }
         }
@@ -450,6 +531,24 @@ public struct PlayView: View {
         }
         .frame(maxWidth: .infinity)
         .disabled(core == nil || phase != .running)
+        .opacity(chromeShown ? 1 : 0)
+        .allowsHitTesting(chromeShown)
+        .animation(.easeOut(duration: 0.25), value: chromeShown)
+    }
+
+    /// The in-game buttons: always with touch controls; with a controller, for a few seconds
+    /// after a tap.
+    private var chromeShown: Bool { showTouchControls || chromeRevealed }
+
+    private func revealChrome() {
+        guard !showTouchControls else { return }
+        chromeRevealed = true
+        chromeHideTask?.cancel()
+        chromeHideTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            chromeRevealed = false
+        }
     }
 
     private func chromeButton(
@@ -459,7 +558,10 @@ public struct PlayView: View {
         fill: Color? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        Button {
+            action()
+            revealChrome()
+        } label: {
             ChromeButtonLabel(symbol: symbol, tint: tint, width: width, fill: fill)
         }
         .buttonStyle(.plain)
@@ -479,15 +581,6 @@ public struct PlayView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white.opacity(0.06))
-    }
-
-    private var controllerConnectedNote: some View {
-        Label(controllers.controllerName ?? "Controller connected", systemImage: "gamecontroller.fill")
-            .font(RetroPlayFont.caption)
-            .foregroundStyle(.white.opacity(0.7))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial, in: Capsule())
     }
 
     @ViewBuilder
@@ -569,6 +662,7 @@ public struct PlayView: View {
                 busy: busy || leaving,
                 leaving: leaving,
                 hasController: controllers.hasController,
+                controllerName: controllers.controllerName,
                 haptics: $haptics,
                 padOpacity: $padOpacity,
                 smoothScreen: $smoothScreen,
@@ -858,8 +952,8 @@ public struct PlayView: View {
     // MARK: - Boot
 
     private func startControllers() {
-        controllers.onState = { [input] pad in
-            input.applyPhysical(pad)
+        controllers.onState = { [input, menuGate] pad in
+            input.applyPhysical(menuGate.filter(pad))
         }
         controllers.onMenu = {
             // Nothing to pause while loading, failed, or quitting.
@@ -1175,4 +1269,13 @@ private struct ChromeButtonLabel: View {
             }
             .contentShape(shape)
     }
+}
+
+/// `MenuInputGate` shared between the controller callback and the menu state.
+@MainActor
+final class MenuInputGateBox {
+    private var gate = MenuInputGate()
+
+    func filter(_ pad: PhysicalPadState) -> PhysicalPadState { gate.filter(pad) }
+    func setMenuOpen(_ open: Bool) -> PhysicalPadState { gate.setMenuOpen(open) }
 }

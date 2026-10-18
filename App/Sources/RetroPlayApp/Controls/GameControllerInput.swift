@@ -48,6 +48,12 @@ final class GameControllerInput {
         GCController.shouldMonitorBackgroundEvents = false
         refreshControllers()
         refreshKeyboard()
+        #if DEBUG
+        // Simulator screenshots of the controller layouts: `-RetroPlaySmokeController YES`.
+        if UserDefaults.standard.bool(forKey: "RetroPlaySmokeController") {
+            controllerName = "Test Controller"
+        }
+        #endif
     }
 
     func stop() {

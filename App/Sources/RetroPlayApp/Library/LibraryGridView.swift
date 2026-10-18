@@ -16,16 +16,28 @@ struct LibraryGridView<Header: View>: View {
     var lastPlayed: [UUID: Date] = [:]
     /// Rows whose ROM was removed in Files; drawn dimmed with a warning mark.
     var missingGameIDs: Set<UUID> = []
+    /// Takes controller moves (the main library, not search results).
+    var controllerNavigation = false
     let header: () -> Header
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(ControllerNavigator.self) private var navigator
+    /// The controller cursor (nil until the first controller move).
+    @State private var focusedIndex: Int?
+    @State private var gridWidth: CGFloat = 0
 
     /// Three across on a phone (more in landscape); two at accessibility text sizes, where a
     /// narrow tile would leave only a few letters per line.
     private var columns: [GridItem] {
-        let minimum: CGFloat = dynamicTypeSize.isAccessibilitySize ? 150 : 100
-        return [GridItem(.adaptive(minimum: minimum, maximum: 240), spacing: 12, alignment: .top)]
+        [GridItem(.adaptive(minimum: tileMinimum, maximum: 240), spacing: 12, alignment: .top)]
+    }
+
+    private var tileMinimum: CGFloat { dynamicTypeSize.isAccessibilitySize ? 150 : 100 }
+
+    /// Tiles per row, as the adaptive grid lays them out.
+    private var columnCount: Int {
+        max(1, Int((gridWidth + 12) / (tileMinimum + 12)))
     }
 
     init(
@@ -36,8 +48,10 @@ struct LibraryGridView<Header: View>: View {
         titleCollapsed: Binding<Bool>? = nil,
         lastPlayed: [UUID: Date] = [:],
         missingGameIDs: Set<UUID> = [],
+        controllerNavigation: Bool = false,
         @ViewBuilder header: @escaping () -> Header
     ) {
+        self.controllerNavigation = controllerNavigation
         self.lastPlayed = lastPlayed
         self.missingGameIDs = missingGameIDs
         self.games = games
@@ -49,11 +63,12 @@ struct LibraryGridView<Header: View>: View {
     }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header()
                 LazyVGrid(columns: columns, spacing: 18) {
-                    ForEach(games) { game in
+                    ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
                         Button {
                             onSelect(game)
                         } label: {
@@ -63,6 +78,7 @@ struct LibraryGridView<Header: View>: View {
                                 lastPlayed: lastPlayed[game.id]
                             )
                             .opacity(missingGameIDs.contains(game.id) ? 0.45 : 1)
+                            .controllerFocusRing(focusedIndex == index, cornerRadius: 8)
                             .overlay(alignment: .topTrailing) {
                                 if missingGameIDs.contains(game.id) {
                                     Image(systemName: "exclamationmark.triangle.fill")
@@ -97,6 +113,7 @@ struct LibraryGridView<Header: View>: View {
                         }
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
                 .padding(.top, 4)
@@ -111,6 +128,44 @@ struct LibraryGridView<Header: View>: View {
             if titleCollapsed.wrappedValue != collapsed {
                 titleCollapsed.wrappedValue = collapsed
             }
+        }
+        .onChange(of: navigator.event) { _, event in
+            guard controllerNavigation, let event, event.context == .library else { return }
+            handle(event.command)
+        }
+        .onChange(of: focusedIndex) { _, index in
+            guard let index, games.indices.contains(index) else { return }
+            withAnimation(.easeOut(duration: 0.15)) {
+                proxy.scrollTo(games[index].id, anchor: .center)
+            }
+        }
+        .onChange(of: games.map(\.id)) { _, ids in
+            if let index = focusedIndex { focusedIndex = ids.isEmpty ? nil : min(index, ids.count - 1) }
+        }
+        .onChange(of: navigator.isConnected) { _, connected in
+            if !connected { focusedIndex = nil }
+        }
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+extension LibraryGridView {
+    /// D-pad / stick move the cursor a tile (a row up or down); A plays the game under it.
+    /// The first move only shows the cursor.
+    private func handle(_ command: ControllerNavCommand) {
+        guard !games.isEmpty else { return }
+        guard let index = focusedIndex else {
+            if command != .back { focusedIndex = 0 }
+            return
+        }
+        switch command {
+        case .left: focusedIndex = max(0, index - 1)
+        case .right: focusedIndex = min(games.count - 1, index + 1)
+        case .up: focusedIndex = index - columnCount >= 0 ? index - columnCount : index
+        case .down: focusedIndex = min(games.count - 1, index + columnCount)
+        case .confirm: onSelect(games[index])
+        case .back, .previousPage, .nextPage: break
         }
     }
 }

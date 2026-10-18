@@ -11,17 +11,21 @@ import RetroPlayCore
 struct GameScreenView: UIViewRepresentable {
     let store: VideoFrameStore
     var smoothing: Bool
+    /// DS in landscape: the frame's top and bottom halves (its two screens) side by side.
+    var sideBySide = false
 
     func makeUIView(context: Context) -> GameScreenUIView {
         let view = GameScreenUIView()
         view.store = store
         view.smoothing = smoothing
+        view.sideBySide = sideBySide
         return view
     }
 
     func updateUIView(_ view: GameScreenUIView, context: Context) {
         view.store = store
         view.smoothing = smoothing
+        view.sideBySide = sideBySide
     }
 }
 
@@ -39,10 +43,29 @@ final class GameScreenUIView: UIView {
     var smoothing = false {
         didSet {
             let filter: CALayerContentsFilter = smoothing ? .linear : .nearest
-            layer.magnificationFilter = filter
-            layer.minificationFilter = .linear
+            for target in [layer, topHalf, bottomHalf] {
+                target.magnificationFilter = filter
+                target.minificationFilter = .linear
+            }
         }
     }
+
+    /// The frame split in two halves drawn left and right (DS screens in landscape).
+    var sideBySide = false {
+        didSet {
+            guard sideBySide != oldValue else { return }
+            topHalf.isHidden = !sideBySide
+            bottomHalf.isHidden = !sideBySide
+            let image = sideBySide ? layer.contents : topHalf.contents
+            layer.contents = sideBySide ? nil : image
+            topHalf.contents = sideBySide ? image : nil
+            bottomHalf.contents = sideBySide ? image : nil
+            setNeedsLayout()
+        }
+    }
+
+    private let topHalf = CALayer()
+    private let bottomHalf = CALayer()
 
     private var link: CADisplayLink?
     private var seen: UInt64 = 0
@@ -54,6 +77,22 @@ final class GameScreenUIView: UIView {
         layer.contentsGravity = .resize
         layer.magnificationFilter = .nearest
         layer.isOpaque = true
+        for (half, rect) in [(topHalf, CGRect(x: 0, y: 0, width: 1, height: 0.5)),
+                             (bottomHalf, CGRect(x: 0, y: 0.5, width: 1, height: 0.5))] {
+            half.contentsRect = rect
+            half.contentsGravity = .resize
+            half.magnificationFilter = .nearest
+            half.isHidden = true
+            half.actions = ["contents": NSNull(), "bounds": NSNull(), "position": NSNull()]
+            layer.addSublayer(half)
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let half = bounds.width / 2
+        topHalf.frame = CGRect(x: 0, y: 0, width: half, height: bounds.height)
+        bottomHalf.frame = CGRect(x: half, y: 0, width: bounds.width - half, height: bounds.height)
     }
 
     required init?(coder: NSCoder) {
@@ -77,7 +116,12 @@ final class GameScreenUIView: UIView {
         seen = frame.sequence
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        layer.contents = frame.image
+        if sideBySide {
+            topHalf.contents = frame.image
+            bottomHalf.contents = frame.image
+        } else {
+            layer.contents = frame.image
+        }
         CATransaction.commit()
     }
 }
