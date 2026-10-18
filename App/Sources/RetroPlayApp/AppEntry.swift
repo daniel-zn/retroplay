@@ -15,6 +15,8 @@ public struct RetroPlayRootView: View {
     @State private var showSettings = false
     @State private var playGame: LibraryGame?
     @State private var navigator = ControllerNavigator()
+    /// The tab bar steps aside while a game plays and fades back in when it's left.
+    @State private var tabBarHidden = false
     @State private var searchPlayGame: LibraryGame?
     @State private var searchQuery = ""
     @State private var isSearchPresented = false
@@ -120,6 +122,9 @@ public struct RetroPlayRootView: View {
         .environment(\.font, RetroPlayFont.body)
         .environment(navigator)
         .task { navigator.start() }
+        .onChange(of: playGame != nil || searchPlayGame != nil) { _, playing in
+            withAnimation(.easeInOut(duration: 0.3)) { tabBarHidden = playing }
+        }
         .onChange(of: selectedTab == .library && !showSettings && !showImporter, initial: true) { _, front in
             navigator.libraryVisible = front
         }
@@ -368,6 +373,7 @@ public struct RetroPlayRootView: View {
                 }
             }
             .background(RetroPlayTheme.canvas(for: colorScheme))
+            .toolbarVisibility(tabBarHidden ? .hidden : .visible, for: .tabBar)
             .navigationTitle(libraryTitleCollapsed ? "RetroPlay" : "")
             .navigationBarTitleDisplayMode(.inline)
             .retroPlayLibraryInlineNav()
@@ -508,6 +514,7 @@ public struct RetroPlayRootView: View {
             .navigationBarTitleDisplayMode(.large)
             // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
             .toolbarColorScheme(colorScheme, for: .navigationBar)
+            .toolbarVisibility(tabBarHidden ? .hidden : .visible, for: .tabBar)
             .retroPlayNavigationTitleChrome(for: colorScheme)
             .searchable(
                 text: $searchQuery,

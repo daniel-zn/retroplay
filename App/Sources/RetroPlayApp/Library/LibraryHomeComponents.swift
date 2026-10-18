@@ -103,19 +103,17 @@ struct LibraryFilterBar: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(SystemTab.allCases) { tab in
-                        chip(tab)
-                    }
+        // Sort first, then the system filters, all in one scrolling row.
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                sortMenu
+                ForEach(SystemTab.allCases) { tab in
+                    chip(tab)
                 }
-                .retroPlayGlassGroup()
-                .padding(.horizontal, 16)
-                .padding(.vertical, 2)
             }
-            sortMenu
-                .padding(.trailing, 16)
+            .retroPlayGlassGroup()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 2)
         }
     }
 

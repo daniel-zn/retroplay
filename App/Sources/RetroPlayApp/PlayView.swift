@@ -96,8 +96,8 @@ public struct PlayView: View {
         _input = State(initialValue: PadInputModel(system: game.systemID))
         // PSP's 16:9 screen would shrink too far between the columns, so it fills by default.
         _landscapeFill = AppStorage(
-            // PSP and GBA: the picture at full size, the controls over it.
-            wrappedValue: [.psp, .gba].contains(game.systemID),
+            // PSP, GBA and DS: the picture at full size, the controls over it.
+            wrappedValue: [.psp, .gba, .nds].contains(game.systemID),
             PlaySettingsKey.landscapeFill(game.systemID)
         )
     }
@@ -397,11 +397,12 @@ public struct PlayView: View {
         let pad = ConsolePad(system: system, scale: scale, large: sizing.large, landscape: true)
         let edgeInset: CGFloat = 8
         // Fit: the screen sits between the two control columns so no control covers the
-        // game. Fill: it runs the full height (through the home-indicator strip) under the pad.
+        // game. Fill: it runs the full height (through the home-indicator strip) under the pad,
+        // or the full width, edge to edge, when it's wider than the phone (DS side by side).
         let fit = showTouchControls && !landscapeFill
         let availableWidth = fit
             ? size.width - 2 * (pad.landscapeColumnWidth + edgeInset + 4)
-            : size.width
+            : size.width + safeArea.leading + safeArea.trailing
         let fullHeight = size.height + safeArea.top + safeArea.bottom
         let screenHeight = min(fit ? size.height : fullHeight, max(0, availableWidth) / aspect)
         let screenWidth = screenHeight * aspect
@@ -413,9 +414,16 @@ public struct PlayView: View {
                 AmbientScreenView(store: core.video)
                     .ignoresSafeArea()
             }
-            screen
-                .frame(width: screenWidth, height: screenHeight)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // An overlay, so a picture wider than the safe area (DS side by side, edge to edge)
+            // can't widen the layout and push the controls aside.
+            Color.clear
+                .overlay {
+                    screen
+                        .frame(width: screenWidth, height: screenHeight)
+                        // Filled, the picture is centred on the whole screen, not the safe
+                        // area (landscape insets differ side to side).
+                        .offset(x: fit ? 0 : (safeArea.trailing - safeArea.leading) / 2)
+                }
                 .ignoresSafeArea(edges: fit ? [] : .vertical)
             if showTouchControls {
                 // The thumb controls live in the side columns; fast-forward / pause / sound
@@ -1134,6 +1142,16 @@ public struct PlayView: View {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(5))
                 menuOpen = true
+            }
+        }
+        // `-RetroPlaySmokeQuitAfter <seconds>`: leave the game, for checking the way back.
+        if let index = args.firstIndex(of: "-RetroPlaySmokeQuitAfter"),
+           args.index(after: index) < args.endIndex,
+           let seconds = Double(args[args.index(after: index)]) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(seconds))
+                NSLog("RP_SMOKE quit")
+                await leave(autoSave: false)
             }
         }
         // `-RetroPlaySmokeRestartAfter <seconds>`: run Restart from Scratch's reboot once,

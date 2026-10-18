@@ -26,6 +26,7 @@
 #include "Core/SaveState.h"
 #include "Core/HLE/sceDisplay.h"
 #include "Core/HW/Display.h"
+#include "Core/FrameTiming.h"
 #include <algorithm>
 #include <fstream>
 #include <mutex>
@@ -292,6 +293,11 @@ void rp_ppsspp_run_frame(void *bridgePtr) {
         return;
     }
     PSP_RunLoopWhileState();
+    // PPSSPP keeps the game at real-time speed itself: it defers the wait for a frame's
+    // time slot to the frontend, after the frame is shown. Without this the host's own
+    // ticking set the pace, one display flip per tick, which runs games that flip less than
+    // every vblank (30 fps titles) or skip frames (auto frameskip) too fast.
+    g_frameTiming.PostSubmit();
 #if DEBUG
     // Speed log for measuring: vps is emulated vblanks per second (60 = full speed), fps the
     // frames the game drew per second.
