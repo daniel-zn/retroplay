@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #import "RetroPlayPPSSPPBridge.h"
+#import "RetroPlayPPSSPPVulkan.h"
 #import <Foundation/Foundation.h>
 
 #include <cstdio>
@@ -34,6 +35,13 @@
 #include "GPU/Common/GPUDebugInterface.h"
 #include "GPU/GPUCommon.h"
 #include "GPU/ge_constants.h"
+#include "Common/GPU/thin3d.h"
+#include "Common/System/Display.h"
+#include "Common/File/FileUtil.h"
+#include "Core/ELF/ParamSFO.h"
+#include "GPU/Vulkan/GPU_Vulkan.h"
+#include <atomic>
+#include <memory>
 
 namespace {
 struct BridgeState {
@@ -45,6 +53,15 @@ struct BridgeState {
     bool hadRuntimeError = false;
     std::string saveDir;
     std::string cacheDir;
+
+    /// Hardware rendering (Vulkan on MoltenVK). Null when the software renderer is used.
+    std::unique_ptr<RetroPlayVulkan::GraphicsContext> graphics;
+    rp_ppsspp_frame_callback frameCallback = nullptr;
+    void *frameCallbackContext = nullptr;
+    /// Internal resolution the host asked for (multiple of 480×272); applied between frames.
+    std::atomic<int> requestedScale{2};
+    int appliedScale = 0;
+    int framesSinceCacheSave = 0;
 };
 
 // PPSSPP pushes mixed audio through the host hook System_AudioPushSamples (on the
@@ -63,6 +80,29 @@ void setError(char *errorOut, size_t errorOutLen, const std::string &msg) {
 
 extern "C" bool rp_ppsspp_enables_software_renderer(void);
 
+/// Present the PSP picture 1:1 into an image exactly the internal render size; Core Animation
+/// scales that on screen (the app's Smooth Screen picks nearest or linear), so PPSSPP's own
+/// output pass is a straight copy with no filtering, cropping or letterboxing.
+void applyHardwareRenderingConfig() {
+    for (DisplayLayoutConfig *layout : { &g_Config.displayLayoutLandscape, &g_Config.displayLayoutPortrait }) {
+        layout->iDisplayFilter = SCALE_NEAREST;
+        layout->bDisplayStretch = true;
+        layout->fDisplayOffsetX = 0.5f;
+        layout->fDisplayOffsetY = 0.5f;
+        layout->fDisplayScale = 1.0f;
+        layout->bDisplayIntegerScale = false;
+        layout->fDisplayAspectRatio = 1.0f;
+        layout->iInternalScreenRotation = ROTATION_LOCKED_HORIZONTAL;
+        layout->bEnableCardboardVR = false;
+    }
+    g_Config.bDisplayCropTo16x9 = false;
+    g_Config.vPostShaderNames.clear();
+    // Texture upscaling runs on the CPU (no JIT on iOS): far too slow to be worth it.
+    g_Config.iTexScalingLevel = 1;
+    g_Config.bTexHardwareScaling = false;
+    g_Config.bShaderCache = true;
+}
+
 /// RetroPlay's memstick lives under Documents/Saves/psp-memstick. NativeInit on iOS resets
 /// g_Config.memStickDirectory to Documents/ and loads ppsspp.ini from there, so host
 /// defaults are applied before PSP_Init and again after (a game ini can change them).
@@ -78,9 +118,15 @@ void applyRetroPlayHostConfig(BridgeState *bridge) {
     g_Config.iGameVolume = VOLUMEHI_FULL;
     // Games that query BUTTON_PREFERENCE copy this into common.buttonSwap.
     g_Config.iButtonPreference = PSP_SYSTEMPARAM_BUTTON_CROSS;
-    // PPGeDrawCurrentText uses 512 texture windows only when this flag is set. Without it the
-    // software sampler clamps the 2048-wide atlas and SAVEDATA dialog text draws as garbage.
-    g_Config.bSoftwareRendering = rp_ppsspp_enables_software_renderer();
+    // Software rendering only when the GPU path is unavailable. PPGeDrawCurrentText uses 512
+    // texture windows only when this flag is set; without it the software sampler clamps the
+    // 2048-wide atlas and SAVEDATA dialog text draws as garbage (the GPU samples it fine).
+    g_Config.bSoftwareRendering = !bridge->graphics && rp_ppsspp_enables_software_renderer();
+    if (bridge->graphics) {
+        applyHardwareRenderingConfig();
+        // The host picks the resolution (Options, or Auto from the screen), not a game ini.
+        g_Config.iInternalResolution = bridge->appliedScale;
+    }
     // Heavy scenes (LEGO Batman's busy levels): when a frame runs late, skip drawing the next
     // one (at most 3 in a row) so the game keeps full speed instead of slowing down. The
     // software renderer is most of a frame's cost, and a skipped frame skips it. Auto
@@ -179,6 +225,124 @@ bool blackFrame(uint8_t **outBytes, int *outWidth, int *outHeight, int *outStrid
 }
 }  // namespace
 
+namespace {
+/// PSP first (it saves the shader cache and frees GPU objects), then the Vulkan device.
+void shutDownGame(BridgeState *bridge) {
+    if (bridge->inited) {
+        PSP_Shutdown(true);
+        NativeShutdown();
+        bridge->inited = false;
+    }
+    if (bridge->graphics) {
+        bridge->graphics->ShutdownAPI();
+        bridge->graphics.reset();
+    }
+}
+
+int clampScale(int scale) { return std::clamp(scale, 1, 8); }
+
+// GPU_Vulkan saves its shader/pipeline cache only from its destructor, at a clean shutdown,
+// which an iOS app rarely gets (it's suspended, then killed). Its SaveCache is private; an
+// explicit template instantiation may name a private member, which lets the bridge call it
+// without patching PPSSPP.
+void saveVulkanCacheTo(GPU_Vulkan *gpu, const Path &path);
+template <void (GPU_Vulkan::*Save)(const Path &)>
+struct VulkanCacheSaver {
+    friend void saveVulkanCacheTo(GPU_Vulkan *gpu, const Path &path) { (gpu->*Save)(path); }
+};
+template struct VulkanCacheSaver<&GPU_Vulkan::SaveCache>;
+
+/// Writes the game's `.vkshadercache` (shader and pipeline keys, a few hundred KB at most) so
+/// the next launch compiles them up front instead of stuttering through first use. Between
+/// frames on the emulation thread only. Written aside and renamed, so a kill never leaves a
+/// torn file.
+void saveShaderCache(BridgeState *bridge) {
+    if (!bridge->graphics || !bridge->inited || !gpu || PSP_CoreParameter().gpuCore != GPUCORE_VULKAN) return;
+    const std::string discID = g_paramSFO.GetDiscID();
+    if (discID.empty()) return;
+    const Path path = GetSysDirectory(DIRECTORY_APP_CACHE) / (discID + ".vkshadercache");
+    const Path temp = GetSysDirectory(DIRECTORY_APP_CACHE) / (discID + ".vkshadercache.tmp");
+    saveVulkanCacheTo(static_cast<GPU_Vulkan *>(gpu), temp);
+    if (File::Exists(temp)) File::Rename(temp, path);
+}
+
+/// Host frames between shader cache saves while playing (about 30 s).
+constexpr int kShaderCacheSaveFrames = 1800;
+
+/// Hardware rendering unless the device can't (or, in Debug, `-RetroPlayPSPSoftwareGPU YES`).
+void startGraphics(BridgeState *bridge) {
+#if DEBUG
+    if ([NSUserDefaults.standardUserDefaults boolForKey:@"RetroPlayPSPSoftwareGPU"]) return;
+#endif
+    const int scale = clampScale(bridge->requestedScale.load());
+    auto sink = [bridge](void *surface) {
+        if (bridge->frameCallback) bridge->frameCallback(bridge->frameCallbackContext, surface);
+    };
+    auto graphics = std::make_unique<RetroPlayVulkan::GraphicsContext>(sink, 480 * scale, 272 * scale);
+    std::string deviceName, error;
+    if (!graphics->InitAPI(nullptr, &deviceName, &error)) {
+        std::fprintf(stderr, "RetroPlay: PSP GPU rendering unavailable (%s); using the software renderer\n", error.c_str());
+        return;
+    }
+    std::fprintf(stderr, "RetroPlay: PSP renders on %s (Vulkan), %dx internal\n", graphics->DeviceName().c_str(), scale);
+    bridge->graphics = std::move(graphics);
+    bridge->appliedScale = scale;
+    g_Config.iInternalResolution = scale;
+}
+
+/// The render size follows the requested scale: PPSSPP renders at 480×272 × scale, and the
+/// presented image is that size too.
+void setRenderSize(int scale) {
+    const int width = 480 * scale, height = 272 * scale;
+    g_Config.iInternalResolution = scale;
+    PSP_CoreParameter().pixelWidth = width;
+    PSP_CoreParameter().pixelHeight = height;
+    g_display.pixel_xres = width;
+    g_display.pixel_yres = height;
+    g_display.dp_xres = width;
+    g_display.dp_yres = height;
+}
+
+void applyRequestedScale(BridgeState *bridge) {
+    const int scale = clampScale(bridge->requestedScale.load());
+    if (!bridge->graphics || scale == bridge->appliedScale) return;
+    bridge->appliedScale = scale;
+    setRenderSize(scale);
+    std::fprintf(stderr, "RetroPlay: PSP internal resolution %dx (%dx%d)\n", scale, 480 * scale, 272 * scale);
+    bridge->graphics->SetOutputSize(480 * scale, 272 * scale);
+    if (gpu) {
+        gpu->NotifyDisplayResized();
+        gpu->NotifyRenderResized(g_Config.displayLayoutLandscape);
+    }
+}
+
+/// One host frame on the GPU, shaped like PPSSPP's own EmuScreen: savestate work, emulation,
+/// then the display framebuffer copied into the presented image.
+template <typename Work>
+void hardwareFrame(BridgeState *bridge, Work &&work, bool runEmulation) {
+    Draw::DrawContext *draw = bridge->graphics->GetDrawContext();
+    const DisplayLayoutConfig &layout = g_Config.displayLayoutLandscape;
+    __DisplaySetDisplayLayoutConfig(layout);
+    draw->BeginFrame(Draw::DebugFlags::NONE);
+    work();
+    if (gpu) gpu->BeginHostFrame(layout);
+    if (runEmulation) PSP_RunLoopWhileState();
+    if (gpu) {
+        gpu->PrepareCopyDisplayToOutput(layout);
+        gpu->EndHostFrame();
+    }
+    draw->BindFramebufferAsRenderTarget(nullptr, { Draw::RPAction::CLEAR, Draw::RPAction::CLEAR, Draw::RPAction::CLEAR }, "BackBuffer");
+    if (gpu) gpu->CopyDisplayToOutput(layout);
+    draw->EndFrame();
+    // PPSSPP keeps the game at real-time speed itself: it defers the wait for a frame's time
+    // slot to the frontend, after the frame is submitted. Without this the host's own ticking
+    // set the pace, one display flip per tick, which runs games that flip less than every
+    // vblank (30 fps titles) or skip frames (auto frameskip) too fast.
+    g_frameTiming.PostSubmit();
+    draw->Present(g_frameTiming.PresentMode());
+}
+}  // namespace
+
 void *rp_ppsspp_create(const char *saveDir, const char *cacheDir) {
     auto *b = new BridgeState();
     b->saveDir = saveDir ? saveDir : "";
@@ -189,11 +353,7 @@ void *rp_ppsspp_create(const char *saveDir, const char *cacheDir) {
 void rp_ppsspp_destroy(void *bridgePtr) {
     auto *bridge = asBridge(bridgePtr);
     if (!bridge) return;
-    if (bridge->inited) {
-        PSP_Shutdown(true);
-        NativeShutdown();
-        bridge->inited = false;
-    }
+    shutDownGame(bridge);
     delete bridge;
 }
 
@@ -204,17 +364,14 @@ bool rp_ppsspp_load(void *bridgePtr, const char *gamePath, char *errorOut, size_
         return false;
     }
 
-    if (bridge->inited) {
-        PSP_Shutdown(true);
-        NativeShutdown();
-        bridge->inited = false;
-    }
+    shutDownGame(bridge);
 
     const char *argv[] = { "RetroPlay", gamePath };
     CommandLineOptions cmd{};
     const std::string ppgeAssets = retroPlayBundledPPSSPPAssetsDirectory();
     const char *externalDir = ppgeAssets.empty() ? bridge->saveDir.c_str() : ppgeAssets.c_str();
     NativeInit(2, argv, cmd, bridge->saveDir.c_str(), externalDir, bridge->cacheDir.c_str());
+    startGraphics(bridge);
     applyRetroPlayHostConfig(bridge);
 
     g_Config.iCpuCore = (int)CPUCore::IR_INTERPRETER;
@@ -226,7 +383,13 @@ bool rp_ppsspp_load(void *bridgePtr, const char *gamePath, char *errorOut, size_
 
     CoreParameter param{};
     param.cpuCore = CPUCore::IR_INTERPRETER;
-    param.gpuCore = GPUCORE_SOFTWARE;
+    param.gpuCore = bridge->graphics ? GPUCORE_VULKAN : GPUCORE_SOFTWARE;
+    if (bridge->graphics) {
+        param.graphicsContext = bridge->graphics.get();
+        setRenderSize(bridge->appliedScale);
+        param.pixelWidth = param.renderWidth = 480 * bridge->appliedScale;
+        param.pixelHeight = param.renderHeight = 272 * bridge->appliedScale;
+    }
     param.enableSound = true;
     param.headLess = true;
     param.fileToStart = Path(std::string(gamePath));
@@ -236,6 +399,10 @@ bool rp_ppsspp_load(void *bridgePtr, const char *gamePath, char *errorOut, size_
     BootState state = PSP_Init(param, &error);
     if (state != BootState::Complete) {
         NativeShutdown();
+        if (bridge->graphics) {
+            bridge->graphics->ShutdownAPI();
+            bridge->graphics.reset();
+        }
         setError(errorOut, errorOutLen, error.empty() ? "PSP_Init failed" : error);
         return false;
     }
@@ -292,12 +459,18 @@ void rp_ppsspp_run_frame(void *bridgePtr) {
         bridge->hadRuntimeError = true;
         return;
     }
-    PSP_RunLoopWhileState();
-    // PPSSPP keeps the game at real-time speed itself: it defers the wait for a frame's
-    // time slot to the frontend, after the frame is shown. Without this the host's own
-    // ticking set the pace, one display flip per tick, which runs games that flip less than
-    // every vblank (30 fps titles) or skip frames (auto frameskip) too fast.
-    g_frameTiming.PostSubmit();
+    if (bridge->graphics) {
+        applyRequestedScale(bridge);
+        hardwareFrame(bridge, [] {}, true);
+        if (++bridge->framesSinceCacheSave >= kShaderCacheSaveFrames) {
+            bridge->framesSinceCacheSave = 0;
+            saveShaderCache(bridge);
+        }
+    } else {
+        PSP_RunLoopWhileState();
+        // PPSSPP's deferred real-time wait; see hardwareFrame.
+        g_frameTiming.PostSubmit();
+    }
 #if DEBUG
     // Speed log for measuring: vps is emulated vblanks per second (60 = full speed), fps the
     // frames the game drew per second.
@@ -325,9 +498,26 @@ bool rp_ppsspp_had_runtime_error(void *bridgePtr) {
     return bridge ? bridge->hadRuntimeError : false;
 }
 
+void rp_ppsspp_set_frame_callback(void *bridgePtr, rp_ppsspp_frame_callback callback, void *context) {
+    auto *bridge = asBridge(bridgePtr);
+    if (!bridge) return;
+    bridge->frameCallback = callback;
+    bridge->frameCallbackContext = context;
+}
+
+void rp_ppsspp_set_render_scale(void *bridgePtr, int scale) {
+    if (auto *bridge = asBridge(bridgePtr)) bridge->requestedScale = clampScale(scale);
+}
+
+bool rp_ppsspp_uses_gpu(void *bridgePtr) {
+    auto *bridge = asBridge(bridgePtr);
+    return bridge && bridge->graphics != nullptr;
+}
+
 bool rp_ppsspp_copy_rgba(void *bridgePtr, uint8_t **outBytes, int *outWidth, int *outHeight, int *outStrideBytes) {
     auto *bridge = asBridge(bridgePtr);
-    if (!bridge || !bridge->inited || !outBytes || !outWidth || !outHeight || !outStrideBytes) {
+    // On the GPU, frames reach the app as IOSurfaces through the frame callback instead.
+    if (!bridge || !bridge->inited || bridge->graphics || !outBytes || !outWidth || !outHeight || !outStrideBytes) {
         return false;
     }
     *outBytes = nullptr;
@@ -355,8 +545,31 @@ bool rp_ppsspp_copy_rgba(void *bridgePtr, uint8_t **outBytes, int *outWidth, int
 }
 
 
+namespace {
+bool saveState(BridgeState *bridge, const char *path, char *errorOut, size_t errorOutLen);
+bool loadState(BridgeState *bridge, const char *path, char *errorOut, size_t errorOutLen);
+}  // namespace
+
+// On the GPU, savestate work runs inside a host frame, as PPSSPP's own EmuScreen does it, so
+// framebuffer readbacks and resets have a frame to record into. The emulated CPU doesn't run.
 bool rp_ppsspp_save_state(void *bridgePtr, const char *path, char *errorOut, size_t errorOutLen) {
     auto *bridge = asBridge(bridgePtr);
+    if (!bridge || !bridge->graphics || !bridge->inited) return saveState(bridge, path, errorOut, errorOutLen);
+    bool ok = false;
+    hardwareFrame(bridge, [&] { ok = saveState(bridge, path, errorOut, errorOutLen); }, false);
+    return ok;
+}
+
+bool rp_ppsspp_load_state(void *bridgePtr, const char *path, char *errorOut, size_t errorOutLen) {
+    auto *bridge = asBridge(bridgePtr);
+    if (!bridge || !bridge->graphics || !bridge->inited) return loadState(bridge, path, errorOut, errorOutLen);
+    bool ok = false;
+    hardwareFrame(bridge, [&] { ok = loadState(bridge, path, errorOut, errorOutLen); }, false);
+    return ok;
+}
+
+namespace {
+bool saveState(BridgeState *bridge, const char *path, char *errorOut, size_t errorOutLen) {
     if (!bridge || !bridge->inited || !path) {
         setError(errorOut, errorOutLen, "null bridge/path or not inited");
         return false;
@@ -408,8 +621,7 @@ bool rp_ppsspp_save_state(void *bridgePtr, const char *path, char *errorOut, siz
     return true;
 }
 
-bool rp_ppsspp_load_state(void *bridgePtr, const char *path, char *errorOut, size_t errorOutLen) {
-    auto *bridge = asBridge(bridgePtr);
+bool loadState(BridgeState *bridge, const char *path, char *errorOut, size_t errorOutLen) {
     if (!bridge || !bridge->inited || !path) {
         setError(errorOut, errorOutLen, "null bridge/path or not inited");
         return false;
@@ -490,6 +702,7 @@ bool rp_ppsspp_load_state(void *bridgePtr, const char *path, char *errorOut, siz
     __DisplaySetWasPaused();
     return true;
 }
+}  // namespace
 
 void System_AudioPushSamples(const int32_t *audio, int numSamples, float volume) {
     if (!audio || numSamples <= 0) return;
@@ -503,6 +716,13 @@ void System_AudioPushSamples(const int32_t *audio, int numSamples, float volume)
     }
     if (gAudio.size() > kMaxAudioSamples) {
         gAudio.erase(gAudio.begin(), gAudio.end() - (std::ptrdiff_t)kMaxAudioSamples);
+    }
+}
+
+void rp_ppsspp_save_caches(void *bridgePtr) {
+    if (auto *bridge = asBridge(bridgePtr)) {
+        bridge->framesSinceCacheSave = 0;
+        saveShaderCache(bridge);
     }
 }
 
@@ -537,6 +757,9 @@ void rp_ppsspp_run_frame(void *) {}
 bool rp_ppsspp_had_runtime_error(void *) { return false; }
 void rp_ppsspp_set_fast_forward(void *, bool) {}
 bool rp_ppsspp_copy_rgba(void *, uint8_t **, int *, int *, int *) { return false; }
+void rp_ppsspp_set_frame_callback(void *, rp_ppsspp_frame_callback, void *) {}
+void rp_ppsspp_set_render_scale(void *, int) {}
+bool rp_ppsspp_uses_gpu(void *) { return false; }
 bool rp_ppsspp_save_state(void *, const char *, char *errorOut, size_t errorOutLen) {
     if (errorOut && errorOutLen) std::snprintf(errorOut, errorOutLen, "RETROPLAY_HAS_PPSSPP not set");
     return false;
@@ -545,6 +768,7 @@ bool rp_ppsspp_load_state(void *, const char *, char *errorOut, size_t errorOutL
     if (errorOut && errorOutLen) std::snprintf(errorOut, errorOutLen, "RETROPLAY_HAS_PPSSPP not set");
     return false;
 }
+void rp_ppsspp_save_caches(void *) {}
 void rp_ppsspp_pause(void *) {}
 void rp_ppsspp_resume(void *) {}
 

@@ -61,6 +61,7 @@ final class EmulationSession: @unchecked Sendable {
         lastSampleRate = driver.audioSampleRate
         audio = lastSampleRate > 0 ? AudioOutput(sourceRate: lastSampleRate) : nil
         audioScratch = .allocate(capacity: audioScratchFrames * 2)
+        driver.attachVideo(video)
     }
 
     deinit {
@@ -82,6 +83,7 @@ final class EmulationSession: @unchecked Sendable {
         if paused {
             audio?.pause()
             driver.flushSaveData()
+            driver.willSuspend()
         } else {
             resetClock()
             applyAudioState()
@@ -149,6 +151,7 @@ final class EmulationSession: @unchecked Sendable {
         isTornDown = true
         audio?.stop()
         driver.flushSaveData()
+        driver.willSuspend()
         driver.tearDown()
         isStarted = false
     }

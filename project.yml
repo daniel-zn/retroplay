@@ -76,6 +76,9 @@ targets:
         embed: false
       - framework: App/Vendor/Output/PPSSPP.xcframework
         embed: false
+      # Vulkan on Metal for PPSSPP's GPU renderer, linked statically (as PPSSPP's App Store build does).
+      - framework: App/Vendor/Output/MoltenVK.xcframework
+        embed: false
       - framework: App/Vendor/Output/mupen64plus.xcframework
         embed: true
       - framework: App/Vendor/Output/melonDS.xcframework
@@ -100,6 +103,7 @@ targets:
       - sdk: UIKit.framework
       - sdk: Foundation.framework
       - sdk: Metal.framework
+      - sdk: IOSurface.framework
       - sdk: MetalKit.framework
       - sdk: QuartzCore.framework
       - sdk: AudioToolbox.framework

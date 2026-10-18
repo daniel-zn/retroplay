@@ -22,6 +22,8 @@ struct PlayMenuView: View {
     @Binding var smoothScreen: Bool
     @Binding var touchWithController: Bool
     @Binding var landscapeFill: Bool
+    /// PSP only: internal resolution (`PSPRenderResolution` raw value).
+    var pspResolution: Binding<Int>? = nil
 
     let onResume: () -> Void
     let onSave: () -> Void
@@ -40,7 +42,7 @@ struct PlayMenuView: View {
     /// Everything the controller cursor can land on, top to bottom.
     private enum MenuItem: Hashable {
         case resume, save, saves, saveEntry(Int), reset, importSave
-        case options, haptics, smooth, touchWithController, fill, quit
+        case options, haptics, smooth, resolution, touchWithController, fill, quit
     }
 
     private var menuItems: [MenuItem] {
@@ -54,6 +56,7 @@ struct PlayMenuView: View {
         items.append(.options)
         if showOptions {
             items += [.haptics, .smooth]
+            if pspResolution != nil { items.append(.resolution) }
             if hasController { items.append(.touchWithController) }
             items.append(.fill)
         }
@@ -141,6 +144,10 @@ struct PlayMenuView: View {
                         .controllerFocusRing(focus == .haptics, cornerRadius: 6)
                     Toggle("Smooth Screen", isOn: $smoothScreen)
                         .controllerFocusRing(focus == .smooth, cornerRadius: 6)
+                    if let pspResolution {
+                        resolutionPicker(pspResolution)
+                            .controllerFocusRing(focus == .resolution, cornerRadius: 6)
+                    }
                     if hasController {
                         Toggle("Touch Controls with Controller", isOn: $touchWithController)
                             .controllerFocusRing(focus == .touchWithController, cornerRadius: 6)
@@ -274,10 +281,34 @@ extension PlayMenuView {
             case .options: showOptions.toggle()
             case .haptics: haptics.toggle()
             case .smooth: smoothScreen.toggle()
+            case .resolution:
+                if let pspResolution {
+                    let all = PSPRenderResolution.allCases
+                    let index = all.firstIndex { $0.rawValue == pspResolution.wrappedValue } ?? 0
+                    pspResolution.wrappedValue = all[(index + 1) % all.count].rawValue
+                }
             case .touchWithController: touchWithController.toggle()
             case .fill: landscapeFill.toggle()
             case .quit: onQuit()
             }
+        }
+    }
+
+    /// PSP internal resolution: Auto matches the screen; the others are fixed multiples.
+    private func resolutionPicker(_ selection: Binding<Int>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Resolution")
+                .font(RetroPlayFont.caption)
+                .foregroundStyle(.white.opacity(0.6))
+            Picker("Resolution", selection: selection) {
+                ForEach(PSPRenderResolution.allCases) { option in
+                    Text(option.title)
+                        .accessibilityLabel(option.accessibilityTitle)
+                        .tag(option.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
         }
     }
 

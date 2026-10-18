@@ -2,6 +2,7 @@
 import SwiftUI
 import UIKit
 import QuartzCore
+import IOSurface
 import RetroPlayCore
 
 /// Shows emulator frames. A display link pulls the newest frame from the core's
@@ -36,6 +37,8 @@ final class GameScreenUIView: UIView {
             if store !== oldValue {
                 seen = 0
                 layer.contents = nil
+                oldValue?.removeDisplay(self)
+                reportDisplaySize()
             }
         }
     }
@@ -93,6 +96,18 @@ final class GameScreenUIView: UIView {
         let half = bounds.width / 2
         topHalf.frame = CGRect(x: 0, y: 0, width: half, height: bounds.height)
         bottomHalf.frame = CGRect(x: half, y: 0, width: bounds.width - half, height: bounds.height)
+        reportDisplaySize()
+    }
+
+    /// The picture's size in pixels on this screen, for cores that render at any resolution.
+    private func reportDisplaySize() {
+        guard let store else { return }
+        guard window != nil else {
+            store.removeDisplay(self)
+            return
+        }
+        let scale = traitCollection.displayScale
+        store.setDisplaySize(CGSize(width: bounds.width * scale, height: bounds.height * scale), for: self)
     }
 
     required init?(coder: NSCoder) {
@@ -103,6 +118,7 @@ final class GameScreenUIView: UIView {
         super.didMoveToWindow()
         link?.invalidate()
         link = nil
+        reportDisplaySize()
         guard window != nil else { return }
         // Weak proxy: CADisplayLink retains its target.
         let link = CADisplayLink(target: DisplayLinkProxy(self), selector: #selector(DisplayLinkProxy.tick))
@@ -117,10 +133,10 @@ final class GameScreenUIView: UIView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         if sideBySide {
-            topHalf.contents = frame.image
-            bottomHalf.contents = frame.image
+            topHalf.contents = frame.contents
+            bottomHalf.contents = frame.contents
         } else {
-            layer.contents = frame.image
+            layer.contents = frame.contents
         }
         CATransaction.commit()
     }
@@ -210,11 +226,40 @@ final class AmbientScreenUIView: UIView {
     fileprivate func refresh() {
         guard let store, let context, let frame = store.latest(newerThan: seen) else { return }
         seen = frame.sequence
-        context.draw(frame.image, in: CGRect(x: 0, y: 0, width: 16, height: 9))
+        if CFGetTypeID(frame.contents) == CGImage.typeID {
+            context.draw(frame.contents as! CGImage, in: CGRect(x: 0, y: 0, width: 16, height: 9))
+        } else if let surface = frame.contents as? IOSurface {
+            // A GPU frame: the core reuses it soon, so sample it instead of keeping it.
+            Self.sample(surface, into: context)
+        }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         layer.contents = context.makeImage()
         CATransaction.commit()
+    }
+}
+
+@available(iOS 18.0, *)
+extension AmbientScreenUIView {
+    /// Nearest-neighbour 16 × 9 sample of a BGRA surface (144 reads; the picture is shown at 3%).
+    fileprivate static func sample(_ surface: IOSurface, into context: CGContext) {
+        guard let out = context.data else { return }
+        surface.lock(options: .readOnly, seed: nil)
+        defer { surface.unlock(options: .readOnly, seed: nil) }
+        let width = surface.width, height = surface.height, rowBytes = surface.bytesPerRow
+        guard width > 0, height > 0 else { return }
+        let src = surface.baseAddress.assumingMemoryBound(to: UInt8.self)
+        let dst = out.assumingMemoryBound(to: UInt8.self)
+        let outRow = context.bytesPerRow
+        for y in 0..<9 {
+            let sy = (y * 2 + 1) * height / 18
+            for x in 0..<16 {
+                let sx = (x * 2 + 1) * width / 32
+                let p = src + sy * rowBytes + sx * 4
+                let q = dst + y * outRow + x * 4
+                q[0] = p[2]; q[1] = p[1]; q[2] = p[0]; q[3] = 255  // BGRA → RGBX
+            }
+        }
     }
 }
 

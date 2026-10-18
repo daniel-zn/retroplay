@@ -26,6 +26,9 @@ public protocol NativeEmulatorDriver: AnyObject {
     func readAudio(into buffer: UnsafeMutablePointer<Int16>, maxFrames: Int) -> Int
     /// Copy the most recent video frame as RGBX8888 (alpha ignored). False if none yet.
     func copyVideo(into buffer: VideoFrameBuffer) -> Bool
+    /// The frames' destination, given once before the first frame. A core that renders on
+    /// the GPU publishes its frames there itself (and returns false from `copyVideo`).
+    func attachVideo(_ store: VideoFrameStore)
 
     var supportsSaveStates: Bool { get }
     func saveState(to url: URL) throws
@@ -37,6 +40,9 @@ public protocol NativeEmulatorDriver: AnyObject {
 
     /// Write battery/SRAM to disk if it changed. Called periodically and before teardown.
     func flushSaveData()
+    /// The game is pausing (pause menu, backgrounding) or ending: persist caches worth
+    /// keeping across launches (PSP shader cache). The app may be killed after this.
+    func willSuspend()
     /// True once the core stopped on an unrecoverable error (frames no longer advance).
     var hadRuntimeError: Bool { get }
 
@@ -51,8 +57,10 @@ public extension NativeEmulatorDriver {
     var supportsReset: Bool { false }
     func reset() {}
     func flushSaveData() {}
+    func willSuspend() {}
     var hadRuntimeError: Bool { false }
     func setFastForward(_ enabled: Bool) {}
+    func attachVideo(_ store: VideoFrameStore) {}
 }
 
 /// Factories registered by the app target once the native XCFrameworks are linked.

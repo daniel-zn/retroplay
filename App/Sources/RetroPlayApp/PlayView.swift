@@ -34,6 +34,8 @@ public struct PlayView: View {
     @AppStorage(PlaySettingsKey.padOpacity) private var padOpacity = 0.75
     @AppStorage(PlaySettingsKey.smoothScreen) private var smoothScreen = false
     @AppStorage(PlaySettingsKey.touchWithController) private var touchWithController = false
+    /// PSP internal resolution (`PSPRenderResolution` raw value); the PSP driver reads it.
+    @AppStorage(PSPRenderResolution.defaultsKey) private var pspResolution = PSPRenderResolution.auto.rawValue
     @AppStorage private var landscapeFill: Bool
     /// With a controller playing, fast-forward / pause / sound stay hidden until a tap shows them.
     @State private var chromeRevealed = false
@@ -676,6 +678,7 @@ public struct PlayView: View {
                 smoothScreen: $smoothScreen,
                 touchWithController: $touchWithController,
                 landscapeFill: $landscapeFill,
+                pspResolution: system == .psp ? $pspResolution : nil,
                 onResume: { menuOpen = false },
                 onSave: { Task { await quickSave() } },
                 onLoadCommand: { submitLoadCommand($0) },
@@ -1048,6 +1051,9 @@ public struct PlayView: View {
             instance.pause()
         }
         phase = .running
+        #if DEBUG
+        NSLog("RP_SMOKE resume %@", String(describing: resumeStatus))
+        #endif
         switch resumeStatus {
         case .loaded, .failed:
             showToast(AutoResumeLoader.statusLine(for: resumeStatus))
@@ -1137,6 +1143,14 @@ public struct PlayView: View {
             }
             NSLog("RP_SMOKE %@ pulsed Start+A", system.rawValue)
         }
+        // `-RetroPlaySmokeFastForward YES`: hold fast-forward after the presses, for measuring.
+        if UserDefaults.standard.bool(forKey: "RetroPlaySmokeFastForward") {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(5))
+                NSLog("RP_SMOKE fast forward on")
+                setFastForward(true)
+            }
+        }
         // `-RetroPlaySmokeMenu YES`: open the pause menu after the presses, for screenshots.
         if UserDefaults.standard.bool(forKey: "RetroPlaySmokeMenu") {
             Task { @MainActor in
@@ -1145,13 +1159,16 @@ public struct PlayView: View {
             }
         }
         // `-RetroPlaySmokeQuitAfter <seconds>`: leave the game, for checking the way back.
+        // With `-RetroPlaySmokeQuitSaving YES` it leaves like Quit Game does, writing the
+        // resume save (a save state round trip with the next launch's auto-resume).
         if let index = args.firstIndex(of: "-RetroPlaySmokeQuitAfter"),
            args.index(after: index) < args.endIndex,
            let seconds = Double(args[args.index(after: index)]) {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(seconds))
-                NSLog("RP_SMOKE quit")
-                await leave(autoSave: false)
+                let saving = UserDefaults.standard.bool(forKey: "RetroPlaySmokeQuitSaving")
+                NSLog("RP_SMOKE quit saving=%d", saving ? 1 : 0)
+                await leave(autoSave: saving)
             }
         }
         // `-RetroPlaySmokeRestartAfter <seconds>`: run Restart from Scratch's reboot once,

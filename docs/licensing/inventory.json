@@ -870,14 +870,44 @@
     "evidence": "not used; ext/zstd v1.5.7 linked instead"
   },
   {
-    "project": "PPSSPP",
-    "component": "MoltenVK / Vulkan loader",
-    "version": "n/a",
-    "spdx": "n/a",
-    "copyright": "n/a",
-    "licenseFile": "ppsspp/ios/MoltenVK",
-    "requiresNoticeText": false,
-    "evidence": "not in libPPSSPP.a; RetroPlay project.yml does not link MoltenVK"
+    "project": "MoltenVK",
+    "component": "MoltenVK",
+    "version": "1.4.2 (db66022459ffb663aa2b50f6b018bc2e124f5edf)",
+    "spdx": "Apache-2.0",
+    "copyright": "Copyright (c) 2015-2026 The Brenwill Workshop Ltd.",
+    "licenseFile": "docs/licensing/sources/moltenvk-Apache-2.0.txt",
+    "requiresNoticeText": true,
+    "evidence": "Linked statically into the app (project.yml: App/Vendor/Output/MoltenVK.xcframework, official v1.4.2 release static libs, ios-arm64 + ios-arm64_x86_64-simulator) for PPSSPP's Vulkan GPU renderer; nm libMoltenVK.a: MVKDevice, spirv_cross::, spvtools::, cereal::. Bundled dependency revisions from MoltenVK ExternalRevisions at v1.4.2."
+  },
+  {
+    "project": "MoltenVK",
+    "component": "SPIRV-Cross (in MoltenVK)",
+    "version": "6c09849fe88c48eaed08413aa022aaa136a3a057",
+    "spdx": "Apache-2.0",
+    "copyright": "Copyright 2015-2021 Arm Limited; others",
+    "licenseFile": "docs/licensing/sources/moltenvk-spirv-cross-Apache-2.0.txt",
+    "requiresNoticeText": true,
+    "evidence": "Linked statically into the app (project.yml: App/Vendor/Output/MoltenVK.xcframework, official v1.4.2 release static libs, ios-arm64 + ios-arm64_x86_64-simulator) for PPSSPP's Vulkan GPU renderer; nm libMoltenVK.a: MVKDevice, spirv_cross::, spvtools::, cereal::. Bundled dependency revisions from MoltenVK ExternalRevisions at v1.4.2."
+  },
+  {
+    "project": "MoltenVK",
+    "component": "SPIRV-Tools (in MoltenVK)",
+    "version": "0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55",
+    "spdx": "Apache-2.0",
+    "copyright": "Copyright (c) 2015-2025 The Khronos Group Inc.; Google LLC; others",
+    "licenseFile": "docs/licensing/sources/moltenvk-spirv-tools-Apache-2.0.txt",
+    "requiresNoticeText": true,
+    "evidence": "Linked statically into the app (project.yml: App/Vendor/Output/MoltenVK.xcframework, official v1.4.2 release static libs, ios-arm64 + ios-arm64_x86_64-simulator) for PPSSPP's Vulkan GPU renderer; nm libMoltenVK.a: MVKDevice, spirv_cross::, spvtools::, cereal::. Bundled dependency revisions from MoltenVK ExternalRevisions at v1.4.2."
+  },
+  {
+    "project": "MoltenVK",
+    "component": "cereal (in MoltenVK)",
+    "version": "a56bad8bbb770ee266e930c95d37fff2a5be7fea",
+    "spdx": "BSD-3-Clause",
+    "copyright": "Copyright (c) 2013-2022, Randolph Voorhies, Shane Grant",
+    "licenseFile": "docs/licensing/sources/moltenvk-cereal-BSD-3-Clause.txt",
+    "requiresNoticeText": true,
+    "evidence": "Linked statically into the app (project.yml: App/Vendor/Output/MoltenVK.xcframework, official v1.4.2 release static libs, ios-arm64 + ios-arm64_x86_64-simulator) for PPSSPP's Vulkan GPU renderer; nm libMoltenVK.a: MVKDevice, spirv_cross::, spvtools::, cereal::. Bundled dependency revisions from MoltenVK ExternalRevisions at v1.4.2."
   },
   {
     "project": "Nestopia UE",

@@ -34,13 +34,29 @@ int rp_ppsspp_read_audio(void *bridge, int16_t *out, int maxFrames);
 /// Advance emulation roughly one frame (best-effort).
 void rp_ppsspp_run_frame(void *bridge);
 
-/// Copy current display as tightly packed RGBA8888 into malloc'd buffer.
+/// Hardware rendering: each finished frame is an IOSurface (BGRA8, the internal render size),
+/// passed as `surface` (an IOSurfaceRef) on a background thread once the GPU is done with it.
+/// Retain it to keep it. Set before `rp_ppsspp_load`.
+typedef void (*rp_ppsspp_frame_callback)(void *context, void *surface);
+void rp_ppsspp_set_frame_callback(void *bridge, rp_ppsspp_frame_callback callback, void *context);
+
+/// Internal resolution as a multiple of the PSP's 480×272 (1…8). Takes effect between frames.
+void rp_ppsspp_set_render_scale(void *bridge, int scale);
+
+/// True when the loaded game renders on the GPU (frames come through the frame callback and
+/// `rp_ppsspp_copy_rgba` returns false); false for the software renderer.
+bool rp_ppsspp_uses_gpu(void *bridge);
+
+/// Software renderer: copy current display as tightly packed RGBA8888 into malloc'd buffer.
 /// Caller frees with free(). Returns false if no frame yet.
 bool rp_ppsspp_copy_rgba(void *bridge, uint8_t **outBytes, int *outWidth, int *outHeight, int *outStrideBytes);
 
 /// Synchronous save/load (Save+Process, with SaveToRam/LoadFromRam fallback) into `path`.
 bool rp_ppsspp_save_state(void *bridge, const char *path, char *errorOut, size_t errorOutLen);
 bool rp_ppsspp_load_state(void *bridge, const char *path, char *errorOut, size_t errorOutLen);
+
+/// Persist the GPU shader cache now (pausing, backgrounding, quitting).
+void rp_ppsspp_save_caches(void *bridge);
 
 void rp_ppsspp_pause(void *bridge);
 void rp_ppsspp_resume(void *bridge);

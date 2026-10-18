@@ -4,7 +4,9 @@ RetroPlay's PSP core is [PPSSPP](https://www.ppsspp.org) ([hrydgard/ppsspp](http
 GPL-2.0-or-later). The exact revision and submodule states are in [`SOURCES.md`](SOURCES.md).
 
 - CPU: IR interpreter (`CPUCore = 2`), no JIT, as iOS requires. See `PPSSPPDefaults`.
-- Software GPU, captured to RGBA for the app's renderer.
+- GPU: PPSSPP's Vulkan backend on [MoltenVK](https://github.com/KhronosGroup/MoltenVK) (linked
+  statically, like PPSSPP's own App Store build), rendering into IOSurfaces that the app shows
+  directly. The software renderer remains as a fallback (see "GPU rendering" below).
 
 ## Build
 
@@ -18,6 +20,45 @@ GPL-2.0-or-later). The exact revision and submodule states are in [`SOURCES.md`]
 
 PPSSPP's prebuilt FFmpeg libraries are device-only; a Simulator build needs FFmpeg rebuilt for
 the Simulator.
+
+## GPU rendering
+
+`AppHost/Sources/RetroPlayPPSSPPVulkan.mm` creates the Vulkan instance and device on MoltenVK
+and plugs a `VulkanPresentation` (PPSSPP's hook for hosts without a swapchain, the same one its
+libretro core uses) into `VulkanContext`. Instead of swapchain images it hands PPSSPP a ring of
+five BGRA IOSurfaces, imported as `VkImage`s with `VK_EXT_metal_objects`. When PPSSPP presents
+a frame, a fence on the queue marks it done; a waiter thread then passes the surface to the
+app's `VideoFrameStore`, and `GameScreenView` puts it straight into `CALayer.contents` on the
+phone and on an external display. No frame is ever read back to the CPU. A surface is drawn
+into again only after two newer frames were shown and `IOSurfaceIsInUse` is false.
+
+- **Resolution.** PPSSPP renders at 480×272 × N and the presented image is that size; Core
+  Animation scales it on screen (Smooth Screen picks linear or nearest). N is the pause menu's
+  Resolution option, or for Auto the picture's on-screen size in pixels (largest screen showing
+  it) divided by 480×272, rounded, at most 5 (`PSPRenderResolution`). Changes apply between
+  frames (`rp_ppsspp_set_render_scale`).
+- **Host frame** (`hardwareFrame` in the bridge), as PPSSPP's EmuScreen does it: `BeginFrame`,
+  savestate work, `BeginHostFrame`, `PSP_RunLoopWhileState`, copy the display framebuffer to the
+  presented image, `EndFrame`, `g_frameTiming.PostSubmit()` (PPSSPP's real-time wait), `Present`.
+  Save and load states run inside such a frame without running the CPU.
+- **Shader cache.** PPSSPP writes `<disc ID>.vkshadercache` only from `GPU_Vulkan`'s destructor,
+  which an iOS app rarely reaches. The bridge also saves it when the game pauses (menu,
+  backgrounding), when it quits, and every 30 s of play, so the next launch builds its pipelines
+  up front instead of stuttering through them.
+- **Config.** Texture upscaling off (CPU work without a JIT), no post-processing shaders, 16:9
+  crop off, stretch to the presented image, nearest output filter (the image is 1:1).
+- **Fallback.** If MoltenVK can't start (or lacks `VK_EXT_metal_objects`), the game runs on the
+  software renderer as before. Debug builds can force it with `-RetroPlayPSPSoftwareGPU YES`
+  for comparisons.
+- **Why Vulkan, not OpenGL ES.** PPSSPP's official iOS build defaults to Vulkan on MoltenVK;
+  Apple deprecated OpenGL ES (iOS 12) and implements it on Metal anyway; PPSSPP's GL backend
+  needs its own render thread with an EAGL context and a CVOpenGLESTextureCache round trip to
+  reach an IOSurface, while Vulkan's pluggable presentation renders into IOSurfaces directly.
+  The GLES path was not built for a side-by-side measurement (the Simulator emulates GLES on
+  Metal, so its numbers wouldn't carry over to a phone).
+
+`App/Vendor/fetch-moltenvk.sh` downloads MoltenVK (pinned release, checksums checked) and
+writes `Output/MoltenVK.xcframework`.
 
 ## Integration
 
