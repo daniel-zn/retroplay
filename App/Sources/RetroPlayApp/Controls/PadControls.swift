@@ -292,6 +292,11 @@ struct PadStick: View {
 
     /// How far the knob moves from the centre at full tilt, as a fraction of the stick's size.
     static let travelFraction: CGFloat = 0.30
+    /// How far the thumb moves for full tilt: three quarters of the knob's travel. A thumb's
+    /// touch point sits a little inside where it feels it's pressing, and the landscape stick
+    /// is close to the screen's bottom edge, so at a 1:1 distance a full push down often read
+    /// as 70–80% (a walk instead of a run). Past this it holds full tilt.
+    static let touchTravelFraction: CGFloat = travelFraction * 0.75
 
     var body: some View {
         let nub = size * 0.46

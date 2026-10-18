@@ -328,10 +328,10 @@ final class PadTouchView: UIView {
         return bits
     }
 
-    /// Thumb travel for full tilt: the distance the knob itself moves on screen
-    /// (`PadStick`'s travel), so the knob sits under the thumb.
+    /// Thumb travel for full tilt: a little less than the knob's own travel
+    /// (`PadStick.touchTravelFraction`), so a natural full push always reaches 100%.
     private func stickTravel(_ region: PadRegion) -> Double {
-        Double(min(region.frame.width, region.frame.height)) * PadStick.travelFraction
+        Double(min(region.frame.width, region.frame.height)) * PadStick.touchTravelFraction
     }
 
     private func touchscreenPoint(_ region: PadRegion, _ p: CGPoint) -> (x: UInt16, y: UInt16) {
