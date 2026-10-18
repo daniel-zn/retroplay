@@ -381,10 +381,18 @@ public struct RetroPlayRootView: View {
             .navigationTitle(libraryTitleCollapsed ? "RetroPlay" : "")
             .navigationBarTitleDisplayMode(.inline)
             .retroPlayLibraryInlineNav()
-            .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .toolbar {
+                // The collapsed title, drawn here so it keeps the pixel font: the bar's own
+                // title text falls back to the system font under SwiftUI's toolbar styling.
+                ToolbarItem(placement: .principal) {
+                    Text("RetroPlay")
+                        .font(RetroPlayFont.sized(17, relativeTo: .headline))
+                        .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                        .opacity(libraryTitleCollapsed ? 1 : 0)
+                        .animation(.easeOut(duration: 0.15), value: libraryTitleCollapsed)
+                        .accessibilityAddTraits(.isHeader)
+                }
                 ToolbarItemGroup(placement: .primaryAction) {
                     if store.importsInProgress > 0 {
                         HStack(spacing: 6) {

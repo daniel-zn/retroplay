@@ -2,9 +2,8 @@
 import SwiftUI
 import UIKit
 
-/// Music-style black chrome: opaque SwiftUI `toolbarBackground` paints over the
-/// *large* title. Use a clear scroll-edge appearance (title visible at top) and
-/// an opaque standard appearance (inline title after scroll). Also set
+/// Navigation bar chrome: clear at the top (the large / custom title shows on the canvas) and
+/// iOS's own blurred background once content scrolls under it. Also set
 /// `UINavigationBar.appearance()` so it sticks even when the local VC has no nav yet.
 @available(iOS 18.0, *)
 @MainActor
@@ -14,14 +13,12 @@ enum RetroPlayNavigationBarChrome {
     static func apply(colorScheme: ColorScheme, force: Bool = false) {
         if !force, lastAppliedColorScheme == colorScheme { return }
         lastAppliedColorScheme = colorScheme
-        let background: UIColor =
-            colorScheme == .dark ? .black : .systemGroupedBackground
         let foreground: UIColor =
             colorScheme == .dark ? .white : .label
 
+        // Scrolled: iOS's own bar background, so content blurs under it as everywhere else.
         let standard = UINavigationBarAppearance()
-        standard.configureWithOpaqueBackground()
-        standard.backgroundColor = background
+        standard.configureWithDefaultBackground()
         standard.shadowColor = .clear
         standard.titleTextAttributes = [
             .foregroundColor: foreground,

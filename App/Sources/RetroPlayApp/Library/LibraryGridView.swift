@@ -145,6 +145,15 @@ struct LibraryGridView<Header: View>: View {
         .onChange(of: navigator.isConnected) { _, connected in
             if !connected { focusedIndex = nil }
         }
+        #if DEBUG
+        // Screenshots of the collapsed title bar: `-RetroPlaySmokeScrolled YES`.
+        .task {
+            guard controllerNavigation, UserDefaults.standard.bool(forKey: "RetroPlaySmokeScrolled"),
+                  let last = games.last else { return }
+            try? await Task.sleep(for: .seconds(2))
+            proxy.scrollTo(last.id, anchor: .bottom)
+        }
+        #endif
         }
     }
 }
