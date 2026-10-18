@@ -38,16 +38,18 @@ extension Color {
     }
 }
 
-/// Liquid Glass controls (iOS 26 and later); earlier systems draw the flat fills.
-let padLiquidGlass: Bool = {
-    if #available(iOS 26.0, *) { return true }
-    return false
-}()
+/// Liquid Glass controls: iOS 26 and later, unless Settings → Flat Controls is on. Otherwise
+/// every control draws its flat fill (`padSurface`'s fallback). Read when a control draws, so
+/// the setting applies to the next game without anything else to keep in sync.
+var padLiquidGlass: Bool {
+    guard #available(iOS 26.0, *) else { return false }
+    return !UserDefaults.standard.bool(forKey: PlaySettingsKey.flatControls)
+}
 
 extension View {
     /// A control's surface on Liquid Glass. Over the game (`clear`, landscape) it's the
     /// clearest glass with no tint, so the picture shows; on the pad's backing it's tinted
-    /// with the button's colour. Before iOS 26, `fallback` is drawn behind it as before.
+    /// with the button's colour. Flat controls (or before iOS 26): `fallback` drawn behind it.
     @ViewBuilder
     func padSurface<S: Shape, Fallback: View>(
         _ shape: S,
@@ -55,7 +57,7 @@ extension View {
         clear: Bool = false,
         @ViewBuilder fallback: () -> Fallback
     ) -> some View {
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, *), padLiquidGlass {
             glassEffect(clear ? .clear : .regular.tint(tint), in: shape)
         } else {
             background { ZStack { fallback() } }
@@ -288,9 +290,12 @@ struct PadStick: View {
     var octagonal = true
     var accessibilityName = "Analog stick"
 
+    /// How far the knob moves from the centre at full tilt, as a fraction of the stick's size.
+    static let travelFraction: CGFloat = 0.30
+
     var body: some View {
         let nub = size * 0.46
-        let travel = size * 0.30
+        let travel = size * Self.travelFraction
         let stick = input.stick
         ZStack {
             if octagonal {

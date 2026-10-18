@@ -91,7 +91,7 @@ struct ConsolePad {
                     fill: PadPalette.PSP.dpad, heldFill: PadPalette.PSP.nub
                 )
                 PadStick(
-                    size: (large ? 108 : 96) * scale,
+                    size: (large ? 122 : 108) * scale,
                     gateFill: Color(red: 0.16, green: 0.16, blue: 0.17),
                     nubFill: PadPalette.PSP.nub,
                     octagonal: false,
@@ -116,7 +116,7 @@ struct ConsolePad {
                     fill: PadPalette.N64.dpad, heldFill: PadPalette.N64.chassisDark
                 )
                 PadStick(
-                    size: (large ? 136 : 128) * scale,
+                    size: (large ? 152 : 144) * scale,
                     gateFill: PadPalette.N64.stickWell,
                     nubFill: PadPalette.N64.stickNub,
                     accessibilityName: "Control Stick"
@@ -251,11 +251,22 @@ struct ConsolePad {
     var landscapeFaceLift: CGFloat {
         guard system == .psp else { return 0 }
         let dpad: CGFloat = large ? 144 : 136
-        let stick: CGFloat = large ? 108 : 96
+        let stick: CGFloat = large ? 122 : 108
         let diameter: CGFloat = large ? 60 : 54
         let dpadCentre = 8 + (stick + 6 + dpad / 2) * scale
         let faceCentre = 50 + diameter * 1.4 * scale
         return max(0, dpadCentre - faceCentre)
+    }
+
+    /// DS in landscape: room under each thumb cluster that puts both at the middle of the
+    /// columns' height, level with each other. The left column ends in an 8 pt foot, the
+    /// right one in the 18 + 32 pt fast-forward / pause / sound row.
+    func landscapeCentreLifts(columnHeight: CGFloat) -> (left: CGFloat, right: CGFloat) {
+        guard system == .nds else { return (0, 0) }
+        let dpad = (large ? 152 : 146) * scale
+        let diamond = (large ? 60 : 54) * 2.8 * scale
+        let middle = columnHeight / 2
+        return (max(0, middle - 8 - dpad / 2), max(0, middle - 50 - diamond / 2))
     }
 
     /// SELECT / START are easy to miss small; full-size controls get bigger ones.
@@ -281,7 +292,7 @@ struct ConsolePad {
         switch system {
         case .gba: return 150 * scale
         case .psp, .nds: return 151 * scale
-        case .n64: return 140 * scale
+        case .n64: return 146 * scale
         case .nes: return 154 * scale
         case .snes, .ps1: return 151 * scale
         case .genesis: return Self.genesisWidth(48) * scale
@@ -305,10 +316,10 @@ struct ConsolePad {
         case (.nds, true): (leftCluster, rightCluster) = (152, 60 * 2.8)
         // PSP's face buttons are lifted level with the D-pad (`landscapeFaceLift`): from their
         // top, half the diamond, then the D-pad's lower half, the gap and the stick.
-        case (.psp, false): (leftCluster, rightCluster) = (136 + 6 + 96, 54 * 1.4 + 68 + 6 + 96)
-        case (.psp, true): (leftCluster, rightCluster) = (144 + 6 + 108, 60 * 1.4 + 72 + 6 + 108)
-        case (.n64, false): (leftCluster, rightCluster) = (100 + 6 + 128, 40 * 2.8 + 6 + 104)
-        case (.n64, true): (leftCluster, rightCluster) = (108 + 6 + 136, 44 * 2.8 + 6 + 108 * 1.08)
+        case (.psp, false): (leftCluster, rightCluster) = (136 + 6 + 108, 54 * 1.4 + 68 + 6 + 108)
+        case (.psp, true): (leftCluster, rightCluster) = (144 + 6 + 122, 60 * 1.4 + 72 + 6 + 122)
+        case (.n64, false): (leftCluster, rightCluster) = (100 + 6 + 144, 40 * 2.8 + 6 + 104)
+        case (.n64, true): (leftCluster, rightCluster) = (108 + 6 + 152, 44 * 2.8 + 6 + 108 * 1.08)
         case (.nes, false): (leftCluster, rightCluster) = (150, 70)
         case (.nes, true): (leftCluster, rightCluster) = (156, 76)
         case (.snes, false), (.ps1, false): (leftCluster, rightCluster) = (150, 54 * 2.8)
@@ -520,8 +531,8 @@ struct ConsolePadPortrait: View {
         switch system {
         case .gba: return CGSize(width: 156 + 78 * 1.8 + clusterGap, height: fixed + 156)
         case .nds: return CGSize(width: 152 + 60 * 2.8 + clusterGap, height: fixed + 60 * 2.8)
-        case .psp: return CGSize(width: 144 + 60 * 2.8 + clusterGap, height: fixed + 144 + 18 + 108)
-        case .n64: return CGSize(width: 136 + 136 * 1.08 + clusterGap, height: fixed + 108 + 16 + 136)
+        case .psp: return CGSize(width: 144 + 60 * 2.8 + clusterGap, height: fixed + 144 + 18 + 122)
+        case .n64: return CGSize(width: 152 + 136 * 1.08 + clusterGap, height: fixed + 108 + 16 + 152)
         case .nes: return CGSize(width: 156 + 76 * 2.2 + clusterGap, height: noShoulders + 156)
         case .snes: return CGSize(width: 156 + 60 * 2.8 + clusterGap, height: fixed + 60 * 2.8)
         case .genesis:

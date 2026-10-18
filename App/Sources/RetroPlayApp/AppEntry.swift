@@ -154,6 +154,10 @@ public struct RetroPlayRootView: View {
             // Debug builds only — Mac/sim smoke: -RetroPlaySmokeSystem <SystemID raw value>,
             // optionally -RetroPlaySmokeGame <part of the title> to pick one of that system's games.
             // simctl launch maps "-Key value" into UserDefaults as well as argv.
+            // `-RetroPlaySmokeSettings YES`: open Settings, for screenshots.
+            if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSettings") {
+                showSettings = true
+            }
             if playGame == nil {
                 let args = ProcessInfo.processInfo.arguments
                 var raw: String?

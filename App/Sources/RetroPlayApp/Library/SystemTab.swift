@@ -2,18 +2,19 @@
 import Foundation
 import RetroPlayCore
 
-/// Library filter tabs: All + each system, grouped by maker and in release order.
+/// Library filter tabs: All, then each system alphabetically by its chip title
+/// (7800, GBA, Genesis, N64, NDS, NES, PS1, PSP, SNES). `allCases` is the chip order.
 public enum SystemTab: String, CaseIterable, Identifiable, Sendable {
     case all
-    case nes
-    case snes
-    case n64
+    case atari7800
     case gba
-    case nds
     case genesis
+    case n64
+    case nds
+    case nes
     case ps1
     case psp
-    case atari7800
+    case snes
 
     public var id: String { rawValue }
 

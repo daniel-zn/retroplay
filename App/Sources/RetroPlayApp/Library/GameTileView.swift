@@ -170,11 +170,6 @@ struct GameTileView: View {
                                 .padding(5)
                         }
                     }
-                    .overlay(alignment: .bottomTrailing) {
-                        if lastPlayed != nil {
-                            resumeMark
-                        }
-                    }
                     .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 6, y: 3)
                 }
 
@@ -198,16 +193,5 @@ struct GameTileView: View {
             return lastPlayed.formatted(.relative(presentation: .named, unitsStyle: .abbreviated))
         }
         return RetroPlayTheme.shortName(game.systemID)
-    }
-
-    /// "Resumes where you left off" marker.
-    private var resumeMark: some View {
-        Image(systemName: "play.fill")
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 24, height: 24)
-            .background(RetroPlayTheme.accent, in: Circle())
-            .overlay(Circle().strokeBorder(.black.opacity(0.35), lineWidth: 1))
-            .padding(6)
     }
 }

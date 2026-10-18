@@ -12,7 +12,7 @@ struct LibraryGridView<Header: View>: View {
     var onRequestDelete: ((LibraryGame) -> Void)? = nil
     /// When non-nil, drives inline nav collapse once scroll offset exceeds threshold.
     let titleCollapsed: Binding<Bool>?
-    /// Last played (newest save state) per game, for the tile subtitle and resume mark.
+    /// Last played (newest save state) per game, for the tile subtitle.
     var lastPlayed: [UUID: Date] = [:]
     /// Rows whose ROM was removed in Files; drawn dimmed with a warning mark.
     var missingGameIDs: Set<UUID> = []

@@ -13,9 +13,7 @@ struct SettingsView: View {
     @AppStorage(PlaySettingsKey.sound) private var soundOn = true
     @AppStorage(PlaySettingsKey.respectSilentSwitch) private var respectSilentSwitch = false
     @AppStorage(PlaySettingsKey.haptics) private var haptics = true
-    @AppStorage(PlaySettingsKey.padOpacity) private var padOpacity = 0.75
-    @AppStorage(PlaySettingsKey.smoothScreen) private var smoothScreen = false
-    @AppStorage(PlaySettingsKey.touchWithController) private var touchWithController = false
+    @AppStorage(PlaySettingsKey.flatControls) private var flatControls = false
     @AppStorage(BoxArtUpdater.enabledKey) private var downloadBoxArt = true
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
@@ -36,7 +34,6 @@ struct SettingsView: View {
                 soundSection
                 controlsSection
                 librarySection
-                systemsSection
                 aboutSection
             }
             .scrollContentBackground(.hidden)
@@ -75,13 +72,8 @@ struct SettingsView: View {
                 .labelsHidden()
             }
             .padding(.vertical, 4)
-            Toggle(isOn: $smoothScreen) {
-                SettingsIconLabel("Smooth Screen", symbol: "sparkles.tv", color: .teal)
-            }
         } header: {
             sectionHeader("Display")
-        } footer: {
-            sectionFooter("Smooth Screen blends pixels when the game is scaled up. Off keeps them sharp.")
         }
         .listRowBackground(RetroPlayTheme.card(for: colorScheme))
     }
@@ -106,38 +98,11 @@ struct SettingsView: View {
             Toggle(isOn: $haptics) {
                 SettingsIconLabel("Button Haptics", symbol: "hand.tap.fill", color: .purple)
             }
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    SettingsIconLabel("Landscape Controls", symbol: "rectangle.landscape.rotate", color: .blue)
-                    Spacer()
-                    Text("\(Int((padOpacity * 100).rounded()))%")
-                        .font(RetroPlayFont.caption2)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Slider(value: $padOpacity, in: 0.25...1) {
-                    Text("Landscape controls opacity")
-                }
-                .accessibilityValue("\(Int((padOpacity * 100).rounded())) percent")
-            }
-            .padding(.vertical, 4)
-            Toggle(isOn: $touchWithController) {
-                SettingsIconLabel("Touch Pad with Controller", symbol: "gamecontroller.fill", color: .green)
-            }
-            DisclosureGroup {
-                VStack(alignment: .leading, spacing: 8) {
-                    helpRow("Controllers", "MFi, Xbox, PlayStation and Switch Pro. Buttons map by position; Home opens the menu.")
-                    helpRow("Keyboard", "Arrows: D-pad (and stick on N64 / PSP) · Z X A S: face buttons · Q W: shoulders · E R: triggers · Return: Start · Right Shift or Delete: Select · Esc: menu.")
-                    helpRow("N64", "Left trigger (keyboard E) is Z; the right stick (keyboard I J K L) is the C buttons.")
-                }
-                .padding(.vertical, 6)
-            } label: {
-                SettingsIconLabel("Controller & Keyboard", symbol: "keyboard", color: .gray)
+            Toggle(isOn: $flatControls) {
+                SettingsIconLabel("Flat Controls", symbol: "square.fill", color: .blue)
             }
         } header: {
             sectionHeader("Controls")
-        } footer: {
-            sectionFooter("The touch pad hides while a controller is connected unless Touch Pad with Controller is on.")
         }
         .listRowBackground(RetroPlayTheme.card(for: colorScheme))
     }
@@ -164,39 +129,6 @@ struct SettingsView: View {
             }
         } header: {
             sectionHeader("Library")
-        } footer: {
-            sectionFooter("Box art comes from the libretro thumbnail server (thumbnails.libretro.com), looked up by each game's title. Games without a match keep their label.")
-        }
-        .listRowBackground(RetroPlayTheme.card(for: colorScheme))
-    }
-
-    private var systemsSection: some View {
-        Section {
-            ForEach(SystemID.allCases) { system in
-                let ready = NativeDriverRegistry.isRegistered(system)
-                HStack(spacing: 12) {
-                    SystemBadge(system: system)
-                        .frame(width: 44, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(system.displayName)
-                            .font(RetroPlayFont.caption)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                        Text("\(system.defaultCoreName) · \(gameCountText(gameCounts[SystemTab(system)] ?? 0))")
-                            .font(RetroPlayFont.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 8)
-                    Image(systemName: ready ? "checkmark.circle.fill" : "xmark.circle")
-                        .foregroundStyle(ready ? Color.green : Color.secondary)
-                        .accessibilityLabel(ready ? "Ready" : "Core not built in")
-                }
-                .padding(.vertical, 2)
-            }
-        } header: {
-            sectionHeader("Systems")
-        } footer: {
-            sectionFooter("Every core runs without JIT: mupen64plus-next uses the cached interpreter, melonDS its interpreter, PPSSPP its IR interpreter.")
         }
         .listRowBackground(RetroPlayTheme.card(for: colorScheme))
     }
@@ -241,24 +173,6 @@ struct SettingsView: View {
         Text(title.uppercased())
             .font(RetroPlayFont.caption2)
             .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
-    }
-
-    private func sectionFooter(_ text: String) -> some View {
-        Text(text)
-            .font(RetroPlayFont.caption2)
-            .lineSpacing(3)
-            .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
-    }
-
-    private func helpRow(_ title: String, _ detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(RetroPlayFont.caption2)
-            Text(detail)
-                .font(RetroPlayFont.caption2)
-                .lineSpacing(3)
-                .foregroundStyle(.secondary)
-        }
     }
 
     private static var versionString: String {

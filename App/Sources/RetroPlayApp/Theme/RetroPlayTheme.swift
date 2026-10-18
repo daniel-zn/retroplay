@@ -5,7 +5,7 @@ import SwiftUI
 /// Adaptive chrome: true black sections in dark; light system backgrounds in light.
 @available(iOS 18.0, *)
 enum RetroPlayTheme {
-    static let accent = Color(red: 0.48, green: 0.56, blue: 0.28)
+    static let accent = Color(red: 0.84, green: 0.20, blue: 0.62)
 
     static func canvas(for scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.black : Color(uiColor: .systemGroupedBackground)
@@ -124,7 +124,7 @@ struct RetroPlayPressStyle: ButtonStyle {
     }
 }
 
-/// Filled olive capsule used for primary actions (Play, Import).
+/// Filled accent capsule used for primary actions (Play, Import).
 @available(iOS 18.0, *)
 struct RetroPlayPrimaryButtonStyle: ButtonStyle {
     var tint: Color = RetroPlayTheme.accent

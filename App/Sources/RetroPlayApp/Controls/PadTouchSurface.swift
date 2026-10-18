@@ -151,10 +151,10 @@ final class PadTouchView: UIView {
             case .dpad:
                 tracks[key] = .dpad(regionID: region.id, bits: dpadBits(region, p))
             case .stick:
-                // Zero where the thumb lands; deflection is measured from there.
+                // Absolute: the stick's centre is zero, and the knob goes where the thumb is.
                 var stick = TouchStick(
-                    originX: Double(p.x),
-                    originY: Double(p.y),
+                    originX: Double(region.frame.midX),
+                    originY: Double(region.frame.midY),
                     radius: stickTravel(region)
                 )
                 let v = stick.update(x: Double(p.x), y: Double(p.y))
@@ -328,10 +328,10 @@ final class PadTouchView: UIView {
         return bits
     }
 
-    /// Thumb travel for full tilt: most of the well, and never less than ~a thumb width,
-    /// so 20% tilt is a deliberate ~9 pt move rather than a twitch.
+    /// Thumb travel for full tilt: the distance the knob itself moves on screen
+    /// (`PadStick`'s travel), so the knob sits under the thumb.
     private func stickTravel(_ region: PadRegion) -> Double {
-        max(44, Double(min(region.frame.width, region.frame.height)) * 0.42)
+        Double(min(region.frame.width, region.frame.height)) * PadStick.travelFraction
     }
 
     private func touchscreenPoint(_ region: PadRegion, _ p: CGPoint) -> (x: UInt16, y: UInt16) {

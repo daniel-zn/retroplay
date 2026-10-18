@@ -10,6 +10,8 @@ enum PlaySettingsKey {
     static let haptics = "retroplay.haptics"
     static let padOpacity = "retroplay.padOpacity"
     static let smoothScreen = "retroplay.smoothScreen"
+    /// Settings → Flat Controls: every on-screen control drawn flat instead of Liquid Glass.
+    static let flatControls = "retroplay.flatControls"
     static let touchWithController = "retroplay.touchWithController"
     /// Per system: landscape screen fills the height under the pad instead of fitting
     /// between the control columns.
@@ -409,6 +411,8 @@ public struct PlayView: View {
         let screenHeight = min(fit ? size.height : fullHeight, max(0, availableWidth) / aspect)
         let screenWidth = screenHeight * aspect
         let chromeOpacity = max(padOpacity, 0.6)
+        // The columns run the full height less 6 pt top and bottom (through the home strip).
+        let lifts = pad.landscapeCentreLifts(columnHeight: size.height + safeArea.bottom - 12)
 
         return ZStack {
             // Full-height picture: a live but black-looking layer in the bars (see AmbientScreenView).
@@ -440,6 +444,9 @@ public struct PlayView: View {
                         Spacer(minLength: 6)
                         pad.leftMain
                             .opacity(padOpacity)
+                        // DS: D-pad and face buttons at mid-height, level with each other.
+                        Color.clear
+                            .frame(height: lifts.left)
                         Spacer(minLength: 0)
                             .frame(maxHeight: 8)
                     }
@@ -455,7 +462,7 @@ public struct PlayView: View {
                             .opacity(padOpacity)
                         // PSP: face buttons level with the D-pad.
                         Color.clear
-                            .frame(height: pad.landscapeFaceLift)
+                            .frame(height: pad.landscapeFaceLift + lifts.right)
                         // Beyond the face buttons' 14 pt touch slop, so taps reach the buttons.
                         quickButtons(maxWidth: pad.landscapeColumnWidth)
                             .frame(width: pad.landscapeColumnWidth)

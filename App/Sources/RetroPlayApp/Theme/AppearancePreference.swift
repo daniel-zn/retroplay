@@ -33,6 +33,8 @@ enum AppearancePreference: String, CaseIterable, Identifiable, Sendable {
         where scene.session.role == .windowApplication {
             for window in scene.windows {
                 window.overrideUserInterfaceStyle = userInterfaceStyle
+                // UIKit screens (Files picker, system alerts) take the app's accent too.
+                window.tintColor = UIColor(RetroPlayTheme.accent)
             }
         }
     }
