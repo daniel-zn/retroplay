@@ -453,6 +453,9 @@ public struct PlayView: View {
                         Spacer(minLength: 6)
                         pad.rightMain
                             .opacity(padOpacity)
+                        // PSP: face buttons level with the D-pad.
+                        Color.clear
+                            .frame(height: pad.landscapeFaceLift)
                         // Beyond the face buttons' 14 pt touch slop, so taps reach the buttons.
                         quickButtons(maxWidth: pad.landscapeColumnWidth)
                             .frame(width: pad.landscapeColumnWidth)

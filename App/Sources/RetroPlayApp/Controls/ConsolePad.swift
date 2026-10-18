@@ -244,6 +244,20 @@ struct ConsolePad {
         }
     }
 
+    /// PSP in landscape: room under the face buttons that lines their centre up with the
+    /// D-pad's, which sits above the analog stick in the left column. Measured from each
+    /// column's foot: the left one ends in an 8 pt spacer, the right one in the 18 + 32 pt
+    /// fast-forward / pause / sound row.
+    var landscapeFaceLift: CGFloat {
+        guard system == .psp else { return 0 }
+        let dpad: CGFloat = large ? 144 : 136
+        let stick: CGFloat = large ? 108 : 96
+        let diameter: CGFloat = large ? 60 : 54
+        let dpadCentre = 8 + (stick + 6 + dpad / 2) * scale
+        let faceCentre = 50 + diameter * 1.4 * scale
+        return max(0, dpadCentre - faceCentre)
+    }
+
     /// SELECT / START are easy to miss small; full-size controls get bigger ones.
     private var pillScale: CGFloat { large ? scale * 1.25 : scale }
 
@@ -289,8 +303,10 @@ struct ConsolePad {
         case (.gba, true): (leftCluster, rightCluster) = (156, 78 * 1.84)
         case (.nds, false): (leftCluster, rightCluster) = (146, 54 * 2.8)
         case (.nds, true): (leftCluster, rightCluster) = (152, 60 * 2.8)
-        case (.psp, false): (leftCluster, rightCluster) = (136 + 6 + 96, 54 * 2.8)
-        case (.psp, true): (leftCluster, rightCluster) = (144 + 6 + 108, 60 * 2.8)
+        // PSP's face buttons are lifted level with the D-pad (`landscapeFaceLift`): from their
+        // top, half the diamond, then the D-pad's lower half, the gap and the stick.
+        case (.psp, false): (leftCluster, rightCluster) = (136 + 6 + 96, 54 * 1.4 + 68 + 6 + 96)
+        case (.psp, true): (leftCluster, rightCluster) = (144 + 6 + 108, 60 * 1.4 + 72 + 6 + 108)
         case (.n64, false): (leftCluster, rightCluster) = (100 + 6 + 128, 40 * 2.8 + 6 + 104)
         case (.n64, true): (leftCluster, rightCluster) = (108 + 6 + 136, 44 * 2.8 + 6 + 108 * 1.08)
         case (.nes, false): (leftCluster, rightCluster) = (150, 70)
@@ -309,9 +325,11 @@ struct ConsolePad {
         case .ps1: shoulders = 2 * top * psShoulderRatio + 6
         default: shoulders = top
         }
+        // PSP: the lift replaces the pause row's height under the face buttons (8 pt foot as
+        // on the left instead).
         return [
             (shoulders + leftCluster, left),
-            (shoulders + rightCluster, right),
+            (shoulders + rightCluster, system == .psp ? left + 8 : right),
         ]
     }
 
