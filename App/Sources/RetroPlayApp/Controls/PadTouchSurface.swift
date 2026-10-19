@@ -142,54 +142,60 @@ final class PadTouchView: UIView {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         if hapticsEnabled { haptics.prepare() }
         for touch in touches {
-            let p = touch.location(in: self)
-            guard let region = nearestRegion(to: p) else { continue }
-            let key = ObjectIdentifier(touch)
-            switch region.kind {
-            case .button:
-                tracks[key] = .buttons(buttonBits(at: p, fallback: region))
-            case .dpad:
-                tracks[key] = .dpad(regionID: region.id, bits: dpadBits(region, p))
-            case .stick:
-                // Absolute: the stick's centre is zero, and the knob goes where the thumb is.
-                var stick = TouchStick(
-                    originX: Double(region.frame.midX),
-                    originY: Double(region.frame.midY),
-                    radius: stickTravel(region)
-                )
-                let v = stick.update(x: Double(p.x), y: Double(p.y))
-                tracks[key] = .stick(regionID: region.id, stick: stick, x: Float(v.x), y: Float(v.y))
-            case .touchscreen:
-                let t = touchscreenPoint(region, p)
-                tracks[key] = .touchscreen(regionID: region.id, x: t.x, y: t.y)
-            }
+            began(ObjectIdentifier(touch), at: touch.location(in: self))
         }
         emit()
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
-            let key = ObjectIdentifier(touch)
-            guard let mode = tracks[key] else { continue }
-            let p = touch.location(in: self)
-            switch mode {
-            case .buttons(let old):
-                // Slide between face buttons; keep the old press if the thumb wanders into a gap.
-                let bits = buttonBits(at: p, fallback: nil)
-                tracks[key] = .buttons(bits == 0 && isNearAnyButton(p) ? old : bits)
-            case .dpad(let id, _):
-                guard let region = regionWithID(id) else { continue }
-                tracks[key] = .dpad(regionID: id, bits: dpadBits(region, p))
-            case .stick(let id, var stick, _, _):
-                let v = stick.update(x: Double(p.x), y: Double(p.y))
-                tracks[key] = .stick(regionID: id, stick: stick, x: Float(v.x), y: Float(v.y))
-            case .touchscreen(let id, _, _):
-                guard let region = regionWithID(id) else { continue }
-                let t = touchscreenPoint(region, p)
-                tracks[key] = .touchscreen(regionID: id, x: t.x, y: t.y)
-            }
+            moved(ObjectIdentifier(touch), to: touch.location(in: self))
         }
         emit()
+    }
+
+    /// A finger lands at `p` (view space): it takes the control there, if any.
+    private func began(_ key: ObjectIdentifier, at p: CGPoint) {
+        guard let region = nearestRegion(to: p) else { return }
+        switch region.kind {
+        case .button:
+            tracks[key] = .buttons(buttonBits(at: p, fallback: region))
+        case .dpad:
+            tracks[key] = .dpad(regionID: region.id, bits: dpadBits(region, p))
+        case .stick:
+            // Absolute: the stick's centre is zero, and the knob goes where the thumb is.
+            var stick = TouchStick(
+                originX: Double(region.frame.midX),
+                originY: Double(region.frame.midY),
+                radius: stickTravel(region)
+            )
+            let v = stick.update(x: Double(p.x), y: Double(p.y))
+            tracks[key] = .stick(regionID: region.id, stick: stick, x: Float(v.x), y: Float(v.y))
+        case .touchscreen:
+            let t = touchscreenPoint(region, p)
+            tracks[key] = .touchscreen(regionID: region.id, x: t.x, y: t.y)
+        }
+    }
+
+    /// A held finger moves to `p`: its control follows.
+    private func moved(_ key: ObjectIdentifier, to p: CGPoint) {
+        guard let mode = tracks[key] else { return }
+        switch mode {
+        case .buttons(let old):
+            // Slide between face buttons; keep the old press if the thumb wanders into a gap.
+            let bits = buttonBits(at: p, fallback: nil)
+            tracks[key] = .buttons(bits == 0 && isNearAnyButton(p) ? old : bits)
+        case .dpad(let id, _):
+            guard let region = regionWithID(id) else { return }
+            tracks[key] = .dpad(regionID: id, bits: dpadBits(region, p))
+        case .stick(let id, var stick, _, _):
+            let v = stick.update(x: Double(p.x), y: Double(p.y))
+            tracks[key] = .stick(regionID: id, stick: stick, x: Float(v.x), y: Float(v.y))
+        case .touchscreen(let id, _, _):
+            guard let region = regionWithID(id) else { return }
+            let t = touchscreenPoint(region, p)
+            tracks[key] = .touchscreen(regionID: id, x: t.x, y: t.y)
+        }
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -209,7 +215,50 @@ final class PadTouchView: UIView {
             tracks.removeAll()
             emit()
         }
+        #if DEBUG
+        if window != nil { playSmokeStickDrags() }
+        #endif
     }
+
+    #if DEBUG
+    private static var playedSmokeDrags = false
+    private let smokeThumb = NSObject()
+
+    /// `-RetroPlaySmokeStickDrag YES`: after 25 s, drag a pretend thumb across the analog stick
+    /// through the same began / moved path a real touch takes: slowly from the centre to past
+    /// the rim and hold, then quickly. The PSP driver logs what reaches the core (`RP_ANALOG`).
+    private func playSmokeStickDrags() {
+        guard !Self.playedSmokeDrags, UserDefaults.standard.bool(forKey: "RetroPlaySmokeStickDrag") else { return }
+        Self.playedSmokeDrags = true
+        let key = ObjectIdentifier(smokeThumb)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(25))
+            guard let self, let region = self.regions.first(where: { $0.kind == .stick }) else {
+                NSLog("RP_DRAG no stick on screen")
+                return
+            }
+            let centre = CGPoint(x: region.frame.midX, y: region.frame.midY)
+            let reach = self.stickTravel(region) * 1.3
+            for (label, steps) in [("slow", 360), ("quick", 3)] {
+                NSLog("RP_DRAG %@ push down begins", label)
+                self.began(key, at: centre)
+                self.emit()
+                for step in 1...steps {
+                    try? await Task.sleep(for: .milliseconds(8))
+                    let y = centre.y + CGFloat(reach) * CGFloat(step) / CGFloat(steps)
+                    self.moved(key, to: CGPoint(x: centre.x, y: y))
+                    self.emit()
+                }
+                NSLog("RP_DRAG %@ holding past the rim", label)
+                try? await Task.sleep(for: .seconds(2))
+                self.tracks[key] = nil
+                self.emit()
+                NSLog("RP_DRAG %@ released", label)
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+    #endif
 
     /// The input model was cleared (`releaseAll`) while fingers may still be down.
     /// Forget what was last sent so a held finger is sent again instead of being

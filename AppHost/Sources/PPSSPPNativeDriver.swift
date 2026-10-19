@@ -71,6 +71,9 @@ public final class PPSSPPNativeDriver: NativeEmulatorDriver {
         if input.analogX != lastAnalog.0 || input.analogY != lastAnalog.1 {
             lastAnalog = (input.analogX, input.analogY)
             rp_ppsspp_set_analog(bridge, input.analogX, input.analogY)
+            #if DEBUG
+            NSLog("RP_ANALOG %.3f %.3f", input.analogX, input.analogY)
+            #endif
         }
     }
 
