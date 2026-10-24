@@ -1,33 +1,53 @@
 {
-  "fill-specializations": [
+  "fill-specializations" : [
     {
-      "value": {
-        "solid": "srgb:0.03529,0.07451,0.05882,1.00000"
+      "value" : {
+        "linear-gradient" : [
+          "srgb:0.81176,0.21961,0.41961,1.00000",
+          "srgb:0.58039,0.14902,0.42745,1.00000"
+        ],
+        "orientation" : {
+          "start" : { "x" : 0.5, "y" : 0 },
+          "stop" : { "x" : 0.5, "y" : 1 }
+        }
       }
     },
     {
-      "appearance": "dark",
-      "value": {
-        "solid": "srgb:0.00000,0.00000,0.00000,1.00000"
+      "appearance" : "dark",
+      "value" : {
+        "linear-gradient" : [
+          "srgb:0.42000,0.09000,0.22000,1.00000",
+          "srgb:0.24000,0.05000,0.22000,1.00000"
+        ],
+        "orientation" : {
+          "start" : { "x" : 0.5, "y" : 0 },
+          "stop" : { "x" : 0.5, "y" : 1 }
+        }
       }
     }
   ],
-  "groups": [
+  "groups" : [
     {
-      "layers": [
+      "layers" : [
         {
-          "glass": false,
-          "hidden": false,
-          "image-name": "psp-glass.png",
-          "name": "PSP Device",
-          "opacity": 1
+          "glass" : false,
+          "image-name" : "controller.png",
+          "name" : "Controller",
+          "position" : {
+            "scale" : 0.86,
+            "translation-in-points" : [ 0, 6 ]
+          }
         }
       ],
-      "lighting": "combined",
-      "specular": false
+      "lighting" : "combined",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "specular" : true
     }
   ],
-  "supported-platforms": {
-    "squares": "shared"
+  "supported-platforms" : {
+    "squares" : "shared"
   }
 }
