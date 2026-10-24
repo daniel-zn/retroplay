@@ -6,11 +6,16 @@ A phone in a controller grip, seen from below, on a pink-to-purple gradient.
 
 - `AppIcon.icon` (repo root): the Icon Composer document Xcode builds from (iOS 26+).
   - Background: a linear gradient fill, `#CF386B` → `#94266D`; in Dark appearance `#6B1738` → `#3D0D38`.
-  - The controller in three glass depths, each scaled to 80% so it sits clear of the corners:
+  - The controller in three glass depths, each scaled to 80% and nudged (36, -36) pt so it sits
+    centred and clear of the corners:
     front `controls.png` (sticks, D-pad, buttons), middle `panels.png` + `screen.png` (side panels and
     screen), back `body.png` (the whole grip, with the main shadow). Every layer is glass, so in the
-    Clear and Tinted looks each part keeps its own edge instead of fading. iOS draws the mask, glass
-    and tinting itself.
+    Clear and Tinted looks each part keeps its own edge instead of fading. The layer images are
+    brightened (×1.45) so the controller stands off the magenta. In the tinted appearance (which
+    covers Clear and Tinted) the body, panels and screen get a light pink-white fill
+    (`fill-specializations`, appearance `tinted`) so the object reads bright; the controls layer keeps
+    its real detail. Appearance names `ictool` accepts there: `light`, `dark`, `tinted`.
+    iOS draws the mask, glass and tinting itself.
 - `AppHost/Supporting/Assets.xcassets/AppIcon.appiconset`: flat 1024 px fallbacks (Light and Dark),
   the same picture composed onto the gradient. Square and opaque: no rounding, the system masks it.
 

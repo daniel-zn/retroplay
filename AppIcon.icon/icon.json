@@ -49,8 +49,8 @@
           "position": {
             "scale": 0.8,
             "translation-in-points": [
-              0,
-              0
+              36,
+              -36
             ]
           }
         }
@@ -72,10 +72,21 @@
           "position": {
             "scale": 0.8,
             "translation-in-points": [
-              0,
-              0
+              36,
+              -36
             ]
-          }
+          },
+          "fill-specializations": [
+            {
+              "value": "automatic"
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:1.00000,0.88000,0.96000,0.35000"
+              }
+            }
+          ]
         },
         {
           "glass": true,
@@ -84,10 +95,21 @@
           "position": {
             "scale": 0.8,
             "translation-in-points": [
-              0,
-              0
+              36,
+              -36
             ]
-          }
+          },
+          "fill-specializations": [
+            {
+              "value": "automatic"
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:1.00000,0.88000,0.96000,0.35000"
+              }
+            }
+          ]
         }
       ],
       "lighting": "individual",
@@ -107,10 +129,21 @@
           "position": {
             "scale": 0.8,
             "translation-in-points": [
-              0,
-              0
+              36,
+              -36
             ]
-          }
+          },
+          "fill-specializations": [
+            {
+              "value": "automatic"
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:1.00000,0.88000,0.96000,0.35000"
+              }
+            }
+          ]
         }
       ],
       "lighting": "combined",
