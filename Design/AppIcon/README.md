@@ -6,15 +6,20 @@ A phone in a controller grip, seen from below, on a pink-to-purple gradient.
 
 - `AppIcon.icon` (repo root): the Icon Composer document Xcode builds from (iOS 26+).
   - Background: a linear gradient fill, `#CF386B` → `#94266D`; in Dark appearance `#6B1738` → `#3D0D38`.
-  - One layer, `controller.png` (transparent), scaled to 80% so it sits clear of the corners, with
-    specular highlights and a neutral shadow. iOS draws the mask, glass and tinting itself.
+  - The controller in three glass depths, each scaled to 80% so it sits clear of the corners:
+    front `controls.png` (sticks, D-pad, buttons), middle `panels.png` + `screen.png` (side panels and
+    screen), back `body.png` (the whole grip, with the main shadow). Every layer is glass, so in the
+    Clear and Tinted looks each part keeps its own edge instead of fading. iOS draws the mask, glass
+    and tinting itself.
 - `AppHost/Supporting/Assets.xcassets/AppIcon.appiconset`: flat 1024 px fallbacks (Light and Dark),
   the same picture composed onto the gradient. Square and opaque: no rounding, the system masks it.
 
 ## Files here
 
 - `source.png`: the original artwork on white (metadata stripped). New artwork works best on a transparent or plain white background: the object becomes the layer and the colour stays a native fill.
-- `layers/controller.png`: the controller cut out of it, the layer in `AppIcon.icon`.
+- `layers/controller.png`: the whole controller cut out of it (used for the flat fallbacks).
+- `layers/body.png`, `panels.png`, `screen.png`, `controls.png`: the parts split from it by tone and
+  position, the layers in `AppIcon.icon`.
 - `AppIcon-Light.png`, `AppIcon-Dark.png`: copies of the flat fallbacks.
 
 ## Previewing without opening Icon Composer
