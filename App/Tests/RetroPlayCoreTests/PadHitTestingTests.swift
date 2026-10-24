@@ -139,5 +139,24 @@ final class PadHitTestingTests: XCTestCase {
         XCTAssertEqual(up.x, 0, accuracy: 1e-9)
         XCTAssertEqual(up.y, 1, accuracy: 1e-9)
     }
-}
 
+    func testRoundStickBecomesPSPSquareRange() {
+        // Full diagonal: both axes full, as a PSP nub pushed into its corner.
+        let d = PadHitTesting.circleToSquare(x: 0.7071, y: -0.7071)
+        XCTAssertEqual(d.x, 1, accuracy: 0.001)
+        XCTAssertEqual(d.y, -1, accuracy: 0.001)
+        // Straight pushes and the centre are unchanged.
+        let up = PadHitTesting.circleToSquare(x: 0, y: 1)
+        XCTAssertEqual(up.x, 0); XCTAssertEqual(up.y, 1)
+        let centre = PadHitTesting.circleToSquare(x: 0, y: 0)
+        XCTAssertEqual(centre.x, 0); XCTAssertEqual(centre.y, 0)
+        // Half a push at 45° stays half a push on the larger axis.
+        let half = PadHitTesting.circleToSquare(x: 0.3536, y: 0.3536)
+        XCTAssertEqual(half.x, 0.5, accuracy: 0.001)
+        XCTAssertEqual(half.y, 0.5, accuracy: 0.001)
+        // A shallow angle keeps its direction and reaches full on the main axis.
+        let shallow = PadHitTesting.circleToSquare(x: 0.9, y: 0.4359)
+        XCTAssertEqual(shallow.x, 1, accuracy: 0.001)
+        XCTAssertEqual(shallow.y / shallow.x, 0.4359 / 0.9, accuracy: 0.001)
+    }
+}

@@ -53,6 +53,18 @@ public enum PadHitTesting {
         )
     }
 
+    /// A round stick position (inside the unit circle) as the square range a PSP nub reports:
+    /// the larger axis carries the full push, so a full diagonal is (1, 1), not (0.71, 0.71).
+    /// Games that read speed from the larger axis otherwise walk on every diagonal. Same
+    /// conversion as PPSSPP's own frontends for circular sticks (`ConvertAnalogStick`).
+    public static func circleToSquare(x: Double, y: Double) -> (x: Double, y: Double) {
+        let largest = max(abs(x), abs(y))
+        guard largest > 0 else { return (0, 0) }
+        let push = min((x * x + y * y).squareRoot(), 1)
+        let scale = push / largest
+        return (min(max(x * scale, -1), 1), min(max(y * scale, -1), 1))
+    }
+
     /// Analog stick as −1…1 per axis (Y up-positive), clamped to the unit circle.
     /// The deadzone is rescaled away so small deflections still start from zero smoothly.
     public static func analogUnit(

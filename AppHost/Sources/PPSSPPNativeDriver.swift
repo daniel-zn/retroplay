@@ -70,7 +70,9 @@ public final class PPSSPPNativeDriver: NativeEmulatorDriver {
         }
         if input.analogX != lastAnalog.0 || input.analogY != lastAnalog.1 {
             lastAnalog = (input.analogX, input.analogY)
-            rp_ppsspp_set_analog(bridge, input.analogX, input.analogY)
+            // Touch and controller sticks are round; the PSP's nub reports a square range.
+            let square = PadHitTesting.circleToSquare(x: Double(input.analogX), y: Double(input.analogY))
+            rp_ppsspp_set_analog(bridge, Float(square.x), Float(square.y))
             #if DEBUG
             NSLog("RP_ANALOG %.3f %.3f", input.analogX, input.analogY)
             #endif

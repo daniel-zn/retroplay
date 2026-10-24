@@ -180,7 +180,9 @@ public struct PlayView: View {
         // An auto-hidden home indicator comes back on every touch, which during play is
         // constant. Deferring only the bottom edge keeps it hidden (a first swipe up shows
         // it, a second goes home) while Control Center and notifications stay one swipe.
-        .defersSystemGestures(on: .bottom)
+        // Every edge, not just the bottom: in landscape the stick and D-pad sit by the edges, and a
+        // far pull into an edge's gesture zone could hand the touch to iOS (the stick stopped).
+        .defersSystemGestures(on: .all)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         // Also disables the edge swipe-back that used to fire from the D-pad.
