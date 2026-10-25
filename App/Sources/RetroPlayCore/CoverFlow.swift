@@ -45,7 +45,10 @@ public enum CoverFlow {
         /// middle of the viewport (layout positions, negative to the left).
         public func pose(distance: Double) -> Pose {
             let t = step > 0 ? distance / step : 0
-            let near = min(abs(t), 1)
+            // Between the middle and the first side spot a cover eases: it lingers in the
+            // middle (and at the side), then crosses quickly. Eased the same both ways, so two
+            // passing covers stay `firstGap` apart in all.
+            let near = CoverFlow.linger(min(abs(t), 1))
             let side: Double = t < 0 ? -1 : 1
             // Up to the first side cover they spread from the middle to `firstGap`; past it
             // they stack `stackSpacing` apart.
@@ -70,7 +73,7 @@ public enum CoverFlow {
         public func layoutDistance(forVisual visual: Double) -> Double {
             guard firstGap > 0, stackSpacing > 0 else { return visual }
             let v = abs(visual)
-            if v <= firstGap { return v / firstGap * step }
+            if v <= firstGap { return CoverFlow.unlinger(v / firstGap) * step }
             return (1 + (v - firstGap) / stackSpacing) * step
         }
 
@@ -137,6 +140,29 @@ public enum CoverFlow {
 
     /// How far the side covers turn away.
     public static let sideAngle: Double = 58
+
+    /// How strongly the middle cover lingers before it slides away (0 = it moves in step
+    /// with the finger, 1 = it starts still and catches up in the middle of the move).
+    public static let lingering: Double = 1
+
+    /// Eases `u` (0 in the middle, 1 at the first side spot) along a smoothstep, mixed in by
+    /// `lingering`. Symmetric: `linger(u) + linger(1 - u) == 1`.
+    static func linger(_ u: Double) -> Double {
+        let smooth = u * u * (3 - 2 * u)
+        return u + (smooth - u) * lingering
+    }
+
+    /// The `u` that `linger` maps to `eased` (bisection: it only runs while laying out).
+    static func unlinger(_ eased: Double) -> Double {
+        if eased <= 0 { return 0 }
+        if eased >= 1 { return 1 }
+        var low = 0.0, high = 1.0
+        for _ in 0..<40 {
+            let mid = (low + high) / 2
+            if linger(mid) < eased { low = mid } else { high = mid }
+        }
+        return (low + high) / 2
+    }
     /// How much smaller the side covers are drawn (0.22 = 78% of the middle one).
     public static let sideShrink: Double = 0.22
     /// How strongly the turn leads the slide (1 = in step with it). At 4 a cover halfway

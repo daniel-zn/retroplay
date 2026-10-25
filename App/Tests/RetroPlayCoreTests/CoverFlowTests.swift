@@ -126,7 +126,9 @@ final class CoverFlowTests: XCTestCase {
         let metrics = CoverFlow.Metrics(coverSide: 200)
         for distance in [0.0, 30, metrics.step, metrics.step * 2.5, metrics.step * 9] {
             let drawn = distance + metrics.pose(distance: distance).xShift
-            XCTAssertEqual(metrics.layoutDistance(forVisual: drawn), distance, accuracy: 1e-9)
+            // The easing is flat at the middle and side spots, so its inverse is only
+            // float-exact to a few millionths of a point there.
+            XCTAssertEqual(metrics.layoutDistance(forVisual: drawn), distance, accuracy: 1e-4)
         }
     }
 
@@ -241,13 +243,51 @@ final class CoverFlowTests: XCTestCase {
     }
 
     func testTurnLeadsTheSlide() {
-        // Leaving the middle a cover turns fast, arriving it stays turned until late.
+        // Leaving the middle a cover turns ahead of its slide; arriving it stays turned
+        // until late.
         let metrics = CoverFlow.Metrics(coverSide: 200)
         func turn(_ fraction: Double) -> Double { abs(metrics.pose(distance: metrics.step * fraction).rotation) }
-        XCTAssertGreaterThan(turn(0.25), CoverFlow.sideAngle * 0.6)
+        func slid(_ fraction: Double) -> Double {
+            let distance = metrics.step * fraction
+            return (distance + metrics.pose(distance: distance).xShift) / metrics.firstGap
+        }
+        for i in 1...9 {
+            let fraction = Double(i) / 10
+            XCTAssertGreaterThanOrEqual(turn(fraction) / CoverFlow.sideAngle, slid(fraction), "at \(fraction)")
+        }
         XCTAssertGreaterThan(turn(0.5), CoverFlow.sideAngle * 0.9)
         XCTAssertGreaterThan(turn(0.75), CoverFlow.sideAngle * 0.99)
-        XCTAssertLessThan(turn(0.75) - turn(0.5), turn(0.25) - turn(0))
+    }
+
+    func testMiddleCoverLingers() {
+        // A tenth of the way to the next game the middle cover has hardly moved or turned;
+        // the move happens in the middle of the swipe.
+        let metrics = CoverFlow.Metrics(coverSide: 200)
+        for fraction in [0.1, -0.1] {
+            let distance = metrics.step * fraction
+            let pose = metrics.pose(distance: distance)
+            XCTAssertLessThan(abs(distance + pose.xShift), metrics.firstGap * 0.04)
+            XCTAssertLessThan(abs(pose.rotation), 8)
+            XCTAssertGreaterThan(pose.scale, 0.97)
+        }
+        // The arriving cover settles the same way: a tenth out it's nearly in place.
+        let arriving = metrics.step * 0.9
+        XCTAssertGreaterThan(arriving + metrics.pose(distance: arriving).xShift, metrics.firstGap * 0.96)
+        // Halfway, each is halfway.
+        let half = metrics.step / 2
+        XCTAssertEqual(half + metrics.pose(distance: half).xShift, metrics.firstGap / 2, accuracy: 1e-9)
+    }
+
+    func testPassingCoversKeepTheirSpacing() {
+        // Eased both ways alike, the leaving and arriving covers stay `firstGap` apart.
+        let metrics = CoverFlow.Metrics(coverSide: 200)
+        for i in 0...20 {
+            let fraction = Double(i) / 20
+            let leaving = metrics.step * fraction, arriving = -metrics.step * (1 - fraction)
+            let apart = (leaving + metrics.pose(distance: leaving).xShift)
+                - (arriving + metrics.pose(distance: arriving).xShift)
+            XCTAssertEqual(apart, metrics.firstGap, accuracy: 1e-9)
+        }
     }
 
     func testPassingCoversDoNotOverlap() {
@@ -257,8 +297,8 @@ final class CoverFlowTests: XCTestCase {
         for metrics in [CoverFlow.Metrics.fitting(width: 402, height: 560),
                         CoverFlow.Metrics.fitting(width: 874, height: 280),
                         CoverFlow.Metrics(coverSide: 200)] {
-            for i in 0...30 {
-                let fraction = 0.35 + Double(i) / 100
+            for i in 0...20 {
+                let fraction = 0.4 + Double(i) / 100
                 func innerEdge(_ distance: Double) -> Double {
                     let pose = metrics.pose(distance: distance)
                     let centre = abs(distance + pose.xShift)

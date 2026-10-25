@@ -442,7 +442,7 @@ public struct RetroPlayRootView: View {
                 // Import first (adds to the library), then the two ways to find a game (filter,
                 // search) side by side, and Settings at the edge, as across iOS. One item, so
                 // the four share one glass capsule, close together.
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 0) {
                         LibraryTopBarButton(title: "Import", symbol: "plus") {
                             showImporter = true

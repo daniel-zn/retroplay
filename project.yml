@@ -121,10 +121,6 @@ targets:
       - sdk: CoreText.framework
       - sdk: MobileCoreServices.framework
       - sdk: UniformTypeIdentifiers.framework
-    scheme:
-      testTargets:
-        - RetroPlayCoreTests
-      gatherCoverageData: false
 
   RetroPlayCoreTests:
     type: bundle.unit-test
@@ -137,3 +133,36 @@ targets:
     dependencies:
       - package: RetroPlayPackage
         product: RetroPlayCore
+
+  RetroPlayUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: App/Tests/RetroPlayUITests
+    dependencies:
+      - target: RetroPlay
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: RetroPlay
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
+
+schemes:
+  RetroPlay:
+    build:
+      targets:
+        RetroPlay: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      # No debugger on test runs, and screenshots rather than screen recordings: stopping a UI
+      # test's recording can crash the Simulator's render server.
+      debugEnabled: false
+      preferredScreenCaptureFormat: screenshots
+      targets:
+        - RetroPlayCoreTests
+        - RetroPlayUITests
+    archive:
+      config: Release

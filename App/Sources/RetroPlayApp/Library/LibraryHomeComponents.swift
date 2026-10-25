@@ -124,30 +124,29 @@ struct LibraryTopBarButton: View {
 
     var body: some View {
         Button(action: action) {
-            LibraryTopBarIcon(title: title, symbol: symbol)
+            LibraryTopBarIcon(symbol: symbol)
         }
         .accessibilityLabel(title)
+        .accessibilityIdentifier("library.\(title.lowercased())")
     }
 }
 
+/// A top-bar icon, built as system toolbars expect: a plain symbol in a 44 pt frame, side by
+/// side in one toolbar item, so the bar's one glass capsule holds them close together. (A
+/// `Label`, even icon-only, gets the bar's label padding and spreads them out.)
 @available(iOS 18.0, *)
 struct LibraryTopBarIcon: View {
-    let title: String
     let symbol: String
 
     var body: some View {
-        Label(title, systemImage: symbol)
-            .labelStyle(.iconOnly)
+        Image(systemName: symbol)
             // System body size, as toolbar symbols normally are (and growing with Dynamic
             // Type): the app-wide pixel font is set smaller, which shrank the symbols.
             .font(.body)
             // The bar's scrolled look recolours plain tinted items white; an explicit style
             // keeps the accent.
             .foregroundStyle(RetroPlayTheme.accent)
-            // Side by side in the top bar's one glass capsule; the bar adds its own padding
-            // around each, so a 38 pt frame still gives a 44 pt+ touch target.
-            .frame(minWidth: 38, minHeight: 44)
-            .contentShape(Rectangle())
+            .frame(minWidth: 44, minHeight: 44)
     }
 }
 
@@ -187,7 +186,6 @@ struct LibraryFilterMenu: View {
             }
         } label: {
             LibraryTopBarIcon(
-                title: "Filter",
                 symbol: selection == .all
                     ? "line.3.horizontal.decrease"
                     : "line.3.horizontal.decrease.circle.fill"
@@ -195,6 +193,7 @@ struct LibraryFilterMenu: View {
         }
         .menuOrder(.fixed)
         .accessibilityLabel("Filter")
+        .accessibilityIdentifier("library.filter")
         .accessibilityValue(
             "\(selection == .all ? "All games" : selection.title), sorted by \(sort.title)"
         )
