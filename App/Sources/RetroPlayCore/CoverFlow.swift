@@ -107,13 +107,15 @@ public enum CoverFlow {
         }
     }
 
-    /// Below this (points per second) a released swipe just settles on the nearest cover.
+    /// Below this (points per second) a released swipe just settles on the nearest cover: a
+    /// drag that stopped before letting go lands where the finger left it.
     public static let swipeVelocity: Double = 300
-    /// Faster than this (points per second), a swipe is a flick and carries on.
-    public static let flickVelocity: Double = 1500
+    /// Faster than this (points per second), a swipe is a flick and carries on; slower ones
+    /// (a nudge) move one game.
+    public static let flickVelocity: Double = 700
     /// Each this many points per second above `flickVelocity` carries a flick one cover further
-    /// (about 3 covers at 2500, 8 at 4500, 15 at 8000).
-    public static let flickCoversPer: Double = 480
+    /// (a gentle 1100 pt/s flick about 3 covers, 2000 about 5, 5000 about 12, 8000 about 20).
+    public static let flickCoversPer: Double = 380
     /// The most covers one swipe moves (unless the finger dragged further).
     public static let maxSwipeTravel = 24
 

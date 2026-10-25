@@ -50,9 +50,13 @@ struct LibraryCoverFlowView<Header: View>: View {
 
     var body: some View {
         GeometryReader { outer in
+            // Landscape is short: the row runs down through the home-indicator strip, the caption
+            // sits at the bottom instead of being centred, and the covers take the height saved.
+            let landscape = outer.size.width > outer.size.height
+            let bottomRoom = landscape ? outer.safeAreaInsets.bottom : 0
             let metrics = CoverFlow.Metrics.fitting(
                 width: outer.size.width,
-                height: outer.size.height - headerHeight - captionHeight - 32
+                height: outer.size.height + bottomRoom - headerHeight - captionHeight - (landscape ? 24 : 32)
             )
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
@@ -61,17 +65,20 @@ struct LibraryCoverFlowView<Header: View>: View {
                     if !games.isEmpty {
                         Spacer(minLength: 0)
                         carousel(metrics: metrics, width: outer.size.width)
-                            .padding(.top, 8)
-                            .padding(.bottom, 12)
+                            .padding(.top, landscape ? 4 : 8)
+                            .padding(.bottom, landscape ? 6 : 12)
                         caption
                             .padding(.horizontal, 24)
-                            .padding(.bottom, 16)
+                            .padding(.bottom, landscape ? 14 : 16)
                             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
-                        Spacer(minLength: 0)
+                        if !landscape {
+                            Spacer(minLength: 0)
+                        }
                     }
                 }
-                .frame(minHeight: outer.size.height)
+                .frame(minHeight: outer.size.height + bottomRoom)
             }
+            .ignoresSafeArea(edges: landscape ? .bottom : [])
             // Scrolls only when large text leaves no room (landscape); otherwise it stays put.
             .scrollBounceBehavior(.basedOnSize)
             .onScrollGeometryChange(for: Bool.self) { geometry in

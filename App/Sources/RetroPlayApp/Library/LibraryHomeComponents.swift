@@ -141,8 +141,9 @@ struct LibraryTopBarIcon: View {
             // The bar's scrolled look recolours plain tinted items white; an explicit style
             // keeps the accent.
             .foregroundStyle(RetroPlayTheme.accent)
-            // Tight: the four sit close together in the top bar's one shared glass capsule.
-            .frame(width: 34, height: 34)
+            // Full-size 44 pt touch targets, side by side with no gap, in the top
+            // bar's one shared glass capsule.
+            .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
     }
 }

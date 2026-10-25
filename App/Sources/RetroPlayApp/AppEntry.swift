@@ -443,7 +443,7 @@ public struct RetroPlayRootView: View {
                 // search) side by side, and Settings at the edge, as across iOS. One item, so
                 // the four share one glass capsule, close together.
                 ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 2) {
+                    HStack(spacing: 0) {
                         LibraryTopBarButton(title: "Import", symbol: "plus") {
                             showImporter = true
                         }
@@ -461,7 +461,6 @@ public struct RetroPlayRootView: View {
                             showSettings = true
                         }
                     }
-                    .padding(.horizontal, 4)
                 }
             }
             .navigationDestination(item: $playGame) { game in

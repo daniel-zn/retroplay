@@ -148,23 +148,25 @@ final class CoverFlowTests: XCTestCase {
         XCTAssertEqual(rest(16.2, 100), 16)
     }
 
-    func testNormalSwipeMovesOneGame() {
-        // A short swipe (a third of a step), one that dragged most of the way, and one that
-        // dragged a little past the next cover all land on the next one; and back the same.
-        XCTAssertEqual(rest(10.3, 900), 11)
-        XCTAssertEqual(rest(10.9, 1400), 11)
-        XCTAssertEqual(rest(11.2, 1100), 11)
-        XCTAssertEqual(rest(9.7, -900), 9)
-        XCTAssertEqual(rest(8.8, -1100), 9)
+    func testNudgeMovesOneGame() {
+        // A light push (below a flick) moves to the next game, either way.
+        XCTAssertEqual(rest(10.3, 500), 11)
+        XCTAssertEqual(rest(10.2, 650), 11)
+        XCTAssertEqual(rest(9.7, -500), 9)
+    }
+
+    func testGentleFlicksCarryAFewGames() {
+        XCTAssertEqual(rest(10.3, 900), 12)
+        XCTAssertEqual(rest(10.3, 1100), 13)
+        XCTAssertEqual(rest(9.7, -900), 8)
     }
 
     func testFasterFlicksTravelFurther() {
         // Momentum: the faster the flick, the further it goes.
-        XCTAssertEqual(rest(10.3, 2000), 13)
-        XCTAssertEqual(rest(10.3, 3000), 15)
-        XCTAssertEqual(rest(10.3, 5000), 19)
-        XCTAssertEqual(rest(10.3, 8000), 25)
-        XCTAssertLessThan(rest(10.3, 3000), rest(10.3, 5000))
+        XCTAssertEqual(rest(10.3, 2000), 15)
+        XCTAssertEqual(rest(10.3, 3000), 18)
+        XCTAssertEqual(rest(10.3, 5000), 23)
+        XCTAssertLessThan(rest(10.3, 2000), rest(10.3, 5000))
         // However hard: never past the limit.
         XCTAssertEqual(rest(from: 40, 40.3, 60_000, count: 100), 40 + CoverFlow.maxSwipeTravel)
         XCTAssertEqual(rest(from: 40, 39.7, -60_000, count: 100), 40 - CoverFlow.maxSwipeTravel)
@@ -175,14 +177,14 @@ final class CoverFlowTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(rest(15.1, 2000), 15)
     }
 
-    func testFlickAgainstTheDragGoesBackOne() {
-        // Nudged right, then flicked left: one to the left of where it started.
-        XCTAssertEqual(rest(10.4, -900), 9)
+    func testFlickAgainstTheDragGoesBackwards() {
+        // Nudged right, then flicked left: back past where it started.
+        XCTAssertLessThan(rest(10.4, -900), 10)
     }
 
     func testSwipeStartingMidRowCountsFromTheNearestCover() {
         // Caught while still moving (between 7 and 8): a swipe counts from 8.
-        XCTAssertEqual(rest(from: 7.6, 8.1, 900), 9)
+        XCTAssertEqual(rest(from: 7.6, 8.1, 500), 9)
     }
 
     func testSwipesStopAtTheEnds() {
