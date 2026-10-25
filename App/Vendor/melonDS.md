@@ -11,7 +11,7 @@ revision is in [`SOURCES.md`](SOURCES.md).
 
 Requires Xcode, CMake and Ninja.
 
-1. `App/Vendor/fetch-core-sources.sh` checks out melonDS next to this repo.
+1. `App/Vendor/fetch-core-sources.sh` checks out melonDS into `External/` (git-ignored).
 2. Build melonDS's core as a static library for `iphoneos` and the Simulator with CMake
    (`ENABLE_JIT=OFF`, `ENABLE_OGLRENDERER=OFF`, `BUILD_QT_SDL=OFF`) into `build-ios-device/` and
    `build-ios-sim/` inside the melonDS checkout.

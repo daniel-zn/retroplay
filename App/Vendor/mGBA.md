@@ -8,8 +8,8 @@ MPL-2.0). The exact revision is in [`SOURCES.md`](SOURCES.md).
 Requires Xcode, CMake and Ninja (`brew install cmake ninja`).
 
 ```bash
-App/Vendor/fetch-core-sources.sh            # checks out mgba next to this repo
-RETROPLAY_ROOT="$PWD" MGBA_SRC="$PWD/../mgba" App/Vendor/build-mgba-ios.sh
+App/Vendor/fetch-core-sources.sh            # checks out mgba into External/
+RETROPLAY_ROOT="$PWD" MGBA_SRC="$PWD/External/mgba" App/Vendor/build-mgba-ios.sh
 ```
 
 The script configures mGBA with CMake for device and Simulator (`LIBMGBA_ONLY`, GBA core only,

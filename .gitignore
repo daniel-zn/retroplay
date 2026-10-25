@@ -4,6 +4,8 @@ App/Vendor/Output/
 RetroPlay.xcodeproj/
 *.xcuserdata/
 DerivedData/
+# Emulator-core checkouts the build reads (App/Vendor/fetch-core-sources.sh); not part of the repo.
+External/
 # Build output (xcodebuild -derivedDataPath build/…, SwiftPM)
 build/
 App/build/

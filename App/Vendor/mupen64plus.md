@@ -11,7 +11,7 @@ command are in [`SOURCES.md`](SOURCES.md).
 
 ```bash
 App/Vendor/fetch-core-sources.sh      # checkout + patches/mupen64plus-next-ios-headers.patch
-cd ../mupen64plus-next
+cd External/mupen64plus-next
 make platform=ios-arm64 HAVE_PARALLEL_RDP=0 HAVE_PARALLEL_RSP=0 HAVE_THR_AL=0 LLE=0
 ```
 

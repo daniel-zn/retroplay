@@ -12,7 +12,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/Output"
-SRC="${SRC:-$(cd "$HERE/../../.." && pwd)}"
+SRC="${SRC:-$(cd "$HERE/../.." && pwd)/External}"
 MIN_IOS="${DEPLOYMENT_TARGET:-26.0}"
 SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
 JOBS="$(sysctl -n hw.ncpu)"

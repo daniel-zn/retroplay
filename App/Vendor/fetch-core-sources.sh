@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Check out the exact emulator-core sources RetroPlay is built from (see SOURCES.md)
-# next to this repository, and apply RetroPlay's patches.
-#   ./fetch-core-sources.sh [destination]   (default: the folder containing retroplay/)
+# into External/ in this repository (git-ignored), and apply RetroPlay's patches.
+#   ./fetch-core-sources.sh [destination]   (default: External/ next to App/)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-DEST="${1:-$(cd "$HERE/../../.." && pwd)}"
+DEST="${1:-$(cd "$HERE/../.." && pwd)/External}"
+mkdir -p "$DEST"
 
 fetch() {
   local name="$1" url="$2" commit="$3" recurse="${4:-}"

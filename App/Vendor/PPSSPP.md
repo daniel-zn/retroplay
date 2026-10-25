@@ -10,7 +10,7 @@ GPL-2.0-or-later). The exact revision and submodule states are in [`SOURCES.md`]
 
 ## Build
 
-1. `App/Vendor/fetch-core-sources.sh` checks out PPSSPP with its submodules next to this repo.
+1. `App/Vendor/fetch-core-sources.sh` checks out PPSSPP with its submodules into `External/` (git-ignored).
 2. Build for `iphoneos` with PPSSPP's CMake iOS toolchain
    (`cmake -DCMAKE_TOOLCHAIN_FILE=./cmake/Toolchains/ios.cmake -DIOS_PLATFORM=OS …`, see the
    [PPSSPP build instructions](https://github.com/hrydgard/ppsspp/wiki/Build-instructions)) and
@@ -64,7 +64,7 @@ writes `Output/MoltenVK.xcframework`.
 
 - C++ bridge: `AppHost/Sources/RetroPlayPPSSPPBridge.{h,mm}`; Swift driver
   `AppHost/Sources/PPSSPPNativeDriver.swift` (`RETROPLAY_HAS_PPSSPP`).
-- Header search paths expect the PPSSPP checkout next to this repo (`../ppsspp`).
+- Header search paths expect the PPSSPP checkout at `External/ppsspp` (a folder or a link to one).
 - PPSSPP's runtime data (PPGe atlas, VFPU tables, `compat.ini`, …) is bundled from
   `AppHost/Supporting/assets/` (see `SOURCE.md` there).
 

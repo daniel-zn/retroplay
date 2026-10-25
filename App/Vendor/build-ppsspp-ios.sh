@@ -10,7 +10,7 @@ set -euo pipefail
 
 ROOT="${RETROPLAY_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 OUT="$ROOT/App/Vendor/Output"
-PPSSPP_SRC="${PPSSPP_SRC:-$HOME/src/ppsspp}"
+PPSSPP_SRC="${PPSSPP_SRC:-$ROOT/External/ppsspp}"
 
 echo "RetroPlay PPSSPP XCFramework helper"
 echo "  ROOT=$ROOT"
