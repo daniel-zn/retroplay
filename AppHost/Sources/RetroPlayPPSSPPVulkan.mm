@@ -6,6 +6,8 @@
 #import <Foundation/Foundation.h>
 #import <IOSurface/IOSurfaceRef.h>
 
+#include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdio>
 #include <deque>
@@ -102,6 +104,11 @@ public:
             std::lock_guard<std::mutex> lock(requestMutex_);
             extent_ = requested_;
         }
+#if DEBUG
+        // `-RetroPlayPSPSlowPresent YES`: hold up the render thread for the first frames after
+        // a rebuild, so the emulation thread runs ahead of it (for testing frame handover).
+        if ([NSUserDefaults.standardUserDefaults boolForKey:@"RetroPlayPSPSlowPresent"]) slowAcquires_ = 4;
+#endif
         return Create(vulkan);
     }
 
@@ -111,6 +118,12 @@ public:
     }
 
     VkResult AcquireNextImage(VulkanContext *, VkSemaphore, uint32_t *imageIndex) override {
+#if DEBUG
+        if (slowAcquires_ > 0) {
+            slowAcquires_--;
+            std::this_thread::sleep_for(std::chrono::milliseconds(60));
+        }
+#endif
         std::unique_lock<std::mutex> lock(mutex_);
         // Normally an image is free at once. If the screen holds on to every one (the app is
         // stalled), skip presenting this frame rather than block emulation.
@@ -301,6 +314,9 @@ private:
     uint64_t shownSequence_ = 0;
     bool stopWaiter_ = false;
     std::thread waiter_;
+#if DEBUG
+    std::atomic<int> slowAcquires_{0};
+#endif
 };
 
 namespace RetroPlayVulkan {
@@ -371,9 +387,15 @@ bool GraphicsContext::InitAPI(void *, std::string *, std::string *errorMessage) 
         return false;
     }
     SetGPUBackend(GPUBackend::VULKAN, deviceName_);
-    draw_->HandleEvent(Draw::Event::GOT_BACKBUFFER, width_, height_);
+    // The frames-in-flight count must be set before the backbuffers are first made: the render
+    // manager applies a pending count only when it (re)creates them. Set after, as PPSSPP's
+    // windowed frontends do, the count would change (from the default 3) at the first
+    // resolution change instead, in the middle of BeginFrame, which then works on a different
+    // frame than the rest of the frame records into. That frame's descriptor sets are cleared
+    // while the render thread still encodes them: MoltenVK crashes on a null set at submit.
     auto *renderManager = (VulkanRenderManager *)draw_->GetNativeObject(Draw::NativeObject::RENDER_MANAGER);
     renderManager->SetInflightFrames(g_Config.iInflightFrames);
+    draw_->HandleEvent(Draw::Event::GOT_BACKBUFFER, width_, height_);
     return true;
 }
 
@@ -382,6 +404,9 @@ void GraphicsContext::SetOutputSize(int width, int height) {
     width_ = width;
     height_ = height;
     if (presentation_) presentation_->RequestExtent(VkExtent2D{ (uint32_t)width, (uint32_t)height });
+    // The images are rebuilt inside the next BeginFrame; the frame count must not change there.
+    std::fprintf(stderr, "RetroPlay: PSP output %dx%d, %d frames in flight (now frame %d)\n",
+                 width, height, vulkan_ ? vulkan_->GetInflightFrames() : 0, vulkan_ ? vulkan_->GetCurFrame() : -1);
 }
 
 void GraphicsContext::ShutdownAPI() {

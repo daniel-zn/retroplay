@@ -1185,6 +1185,40 @@ public struct PlayView: View {
                 menuOpen = true
             }
         }
+        // `-RetroPlaySmokeRotateEvery <seconds>`: turn between portrait and landscape over and
+        // over while the game runs, for stress-testing size changes.
+        if let index = args.firstIndex(of: "-RetroPlaySmokeRotateEvery"),
+           args.index(after: index) < args.endIndex,
+           let seconds = Double(args[args.index(after: index)]), seconds > 0 {
+            Task { @MainActor in
+                var landscape = !UserDefaults.standard.bool(forKey: "RetroPlaySmokeLandscape")
+                while true {
+                    try? await Task.sleep(for: .seconds(seconds))
+                    NSLog("RP_SMOKE rotate landscape=%d", landscape ? 1 : 0)
+                    for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+                        scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait)) { _ in }
+                    }
+                    landscape.toggle()
+                }
+            }
+        }
+        // `-RetroPlaySmokeResolutionCycle <seconds>`: step the PSP resolution through every
+        // option (as the pause menu sets it), for stress-testing resolution changes.
+        if system == .psp,
+           let index = args.firstIndex(of: "-RetroPlaySmokeResolutionCycle"),
+           args.index(after: index) < args.endIndex,
+           let seconds = Double(args[args.index(after: index)]), seconds > 0 {
+            Task { @MainActor in
+                let all = PSPRenderResolution.allCases
+                var next = 0
+                while true {
+                    try? await Task.sleep(for: .seconds(seconds))
+                    NSLog("RP_SMOKE resolution %@", all[next].title)
+                    pspResolution = all[next].rawValue
+                    next = (next + 1) % all.count
+                }
+            }
+        }
         // `-RetroPlaySmokeQuitAfter <seconds>`: leave the game, for checking the way back.
         // With `-RetroPlaySmokeQuitSaving YES` it leaves like Quit Game does, writing the
         // resume save (a save state round trip with the next launch's auto-resume).

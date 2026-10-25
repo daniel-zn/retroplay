@@ -36,7 +36,15 @@ into again only after two newer frames were shown and `IOSurfaceIsInUse` is fals
   Animation scales it on screen (Smooth Screen picks linear or nearest). N is the pause menu's
   Resolution option, or for Auto the picture's on-screen size in pixels (largest screen showing
   it) divided by 480×272, rounded, at most 5 (`PSPRenderResolution`). Changes apply between
-  frames (`rp_ppsspp_set_render_scale`).
+  frames (`rp_ppsspp_set_render_scale`): PPSSPP rebuilds the IOSurface ring inside its next
+  `BeginFrame`, after draining the render thread and the queue.
+- **Frames in flight.** The host sets PPSSPP's frames-in-flight count (2) before the first
+  `GOT_BACKBUFFER`, so it is applied at init. Set afterwards (as PPSSPP's windowed frontends do), the
+  render manager would switch from its default 3 at the first resolution change, inside
+  `BeginFrame`, and the rest of that frame would record into another frame's slot: its fence and
+  descriptor sets got out of step with the render thread, and MoltenVK crashed on a null
+  descriptor set in `vkQueueSubmit` (debug builds can force the timing with
+  `-RetroPlayPSPSlowPresent YES`, which holds up the render thread after a rebuild).
 - **Host frame** (`hardwareFrame` in the bridge), as PPSSPP's EmuScreen does it: `BeginFrame`,
   savestate work, `BeginHostFrame`, `PSP_RunLoopWhileState`, copy the display framebuffer to the
   presented image, `EndFrame`, `g_frameTiming.PostSubmit()` (PPSSPP's real-time wait), `Present`.
