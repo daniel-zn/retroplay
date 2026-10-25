@@ -586,7 +586,8 @@ public struct PlayView: View {
         } label: {
             ChromeButtonLabel(symbol: symbol, tint: tint, width: width, fill: fill)
         }
-        .buttonStyle(.plain)
+        // Shrinks while pressed, like the game controls.
+        .buttonStyle(PadPressButtonStyle())
     }
 
     private var castingRemoteNote: some View {

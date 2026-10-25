@@ -38,8 +38,9 @@ public enum CoverFlow {
             let shift = side * near * (firstGap - step)
             return Pose(
                 xShift: shift,
-                // Each side cover's outer edge turns away, so the ones behind it show.
-                rotation: side * near * CoverFlow.sideAngle,
+                // Side covers turn to face the middle, as in Cover Flow and RetroFlow: the
+                // inner edge recedes and the outer edge comes forward.
+                rotation: -side * near * CoverFlow.sideAngle,
                 scale: 1 - near * 0.22,
                 dimming: min(abs(t) * 0.12, 0.45)
             )

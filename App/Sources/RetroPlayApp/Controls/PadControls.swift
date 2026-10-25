@@ -9,6 +9,19 @@ import RetroPlayCore
 
 private let pressAnimation = Animation.easeOut(duration: 0.06)
 
+/// How far every control shrinks while pressed (buttons, shoulders, SELECT / START, the D-pad's
+/// arms and its arrows, the stick's knob, the in-game buttons): one ratio for all of them.
+let padPressScale: CGFloat = 0.94
+
+/// Press feedback for SwiftUI buttons (the in-game fast-forward / pause / sound row).
+struct PadPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? padPressScale : 1)
+            .animation(pressAnimation, value: configuration.isPressed)
+    }
+}
+
 extension EnvironmentValues {
     /// Controls drawn over the game (landscape): fills are see-through so the picture shows.
     @Entry var padGlass = false
@@ -83,6 +96,21 @@ struct PadFaceButton: View {
     var stroke: Color = Color.white.opacity(0.22)
     var accessibilityName: String? = nil
 
+    /// The PSP's △ drawn as a true equilateral triangle (the font's glyph is tall and narrow);
+    /// every other label is text.
+    @ViewBuilder private var label: some View {
+        if title == "△" {
+            let side = diameter * 0.40
+            EquilateralTriangle()
+                .stroke(style: StrokeStyle(lineWidth: max(2, diameter * 0.075), lineJoin: .round))
+                .frame(width: side, height: side * 0.866)
+                // Centre the triangle's centroid, not its box, on the button.
+                .offset(y: -side * 0.866 / 6)
+        } else {
+            Text(title).font(labelFont)
+        }
+    }
+
     /// Letters in the pixel font; symbols (PSP △○✕□, N64 C arrows) larger and heavy so they read.
     private var labelFont: Font {
         if title.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) }) {
@@ -93,8 +121,7 @@ struct PadFaceButton: View {
 
     var body: some View {
         let held = input.isHeld(bits)
-        Text(title)
-            .font(labelFont)
+        label
             .foregroundStyle(Color.padLabel(fill: fill, ink: ink, glass: glass))
             .frame(width: diameter, height: diameter)
             .padSurface(Circle(), tint: fill.padTint(glass: glass, held: held), clear: glass) {
@@ -109,7 +136,7 @@ struct PadFaceButton: View {
                     Circle().strokeBorder(stroke.opacity(held ? 1 : 0.7), lineWidth: held ? 2 : 1)
                 }
             }
-            .scaleEffect(held ? 0.92 : 1)
+            .scaleEffect(held ? padPressScale : 1)
             .animation(pressAnimation, value: held)
             .padRegion("button.\(bits)", .button(bits), shape: .circle)
             .accessibilityElement()
@@ -164,7 +191,7 @@ struct PadShoulderButton: View {
                     shape.strokeBorder(Color.white.opacity(held ? 0.5 : 0.18), lineWidth: held ? 2 : 1)
                 }
             }
-            .scaleEffect(held ? 0.95 : 1)
+            .scaleEffect(held ? padPressScale : 1)
             .animation(pressAnimation, value: held)
             .padRegion("shoulder.\(bits)", .button(bits))
             .accessibilityElement()
@@ -196,12 +223,16 @@ struct PadPillButton: View {
 
     var body: some View {
         let held = input.isHeld(bits)
-        Text(title)
+        // Every pill is as wide as the longest label ("SELECT"), so START, SELECT and the 7800's
+        // switches match; the hidden text sets that width and grows with Dynamic Type.
+        ZStack {
+            Text("SELECT").hidden()
+            Text(title)
+                // Over the game the capsule is mostly see-through, so a dark label would vanish.
+                .foregroundStyle(glass ? Color.white.opacity(0.9) : ink)
+        }
             .font(RetroPlayFont.sized(max(8, 10 * drawn), relativeTo: .caption2))
-            // Over the game the capsule is mostly see-through, so a dark label would vanish.
-            .foregroundStyle(glass ? Color.white.opacity(0.9) : ink)
             .lineLimit(1)
-            // The label grows with Dynamic Type, so the capsule sizes to it instead of a fixed width.
             .fixedSize()
             .padding(.horizontal, 12 * drawn)
             .padding(.vertical, 4 * drawn)
@@ -214,7 +245,7 @@ struct PadPillButton: View {
                     shape.strokeBorder(Color.white.opacity(held ? 0.5 : 0.2), lineWidth: 1)
                 }
             }
-            .scaleEffect(held ? 0.94 : 1)
+            .scaleEffect(held ? padPressScale : 1)
             .animation(pressAnimation, value: held)
             // Pills are small; give them a finger-sized hit area (the full-size pill's height).
             .padding(.vertical, 8 * scale + 13 * (scale - drawn))
@@ -285,7 +316,7 @@ struct PadDPad: View {
         return Image(systemName: arrow)
             .font(.system(size: max(8, arm * 0.26), weight: .bold))
             .foregroundStyle(ink.opacity(held ? 1 : 0.55))
-            .scaleEffect(held ? 0.88 : 1)
+            .scaleEffect(held ? padPressScale : 1)
             .offset(x: direction.width * distance, y: direction.height * distance)
             .animation(pressAnimation, value: held)
     }
@@ -296,9 +327,9 @@ struct PadDPad: View {
 /// shows the press the way the round buttons shrink. Diagonals pull in two arms.
 @available(iOS 18.0, *)
 struct PressablePlusShape: Shape {
-    /// How much of an arm's length a full press takes back, and how much narrower it gets.
-    static let pressedRetract: CGFloat = 0.16
-    static let pressedNarrow: CGFloat = 0.12
+    /// A pressed arm shrinks by the same ratio as every other control, in length and width.
+    static let pressedRetract: CGFloat = 1 - padPressScale
+    static let pressedNarrow: CGFloat = 1 - padPressScale
 
     var armThickness: CGFloat
     var up: CGFloat, down: CGFloat, left: CGFloat, right: CGFloat
@@ -376,7 +407,7 @@ struct PadStick: View {
                 }
                 .shadow(color: .black.opacity(0.45), radius: 3, y: 2)
                 // Pressed down while a thumb (or stick) moves it, like the buttons.
-                .scaleEffect(stick.x != 0 || stick.y != 0 ? 0.92 : 1)
+                .scaleEffect(stick.x != 0 || stick.y != 0 ? padPressScale : 1)
                 .animation(pressAnimation, value: stick.x != 0 || stick.y != 0)
                 .offset(x: CGFloat(stick.x) * travel, y: CGFloat(-stick.y) * travel)
         }
@@ -424,5 +455,19 @@ struct PadDiamond: View {
             ink: item.ink,
             accessibilityName: item.name
         )
+    }
+}
+
+/// Three equal sides, point up, filling its frame's width.
+struct EquilateralTriangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        let h = rect.width * 0.866
+        let top = rect.midY - h / 2
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: top))
+        path.addLine(to: CGPoint(x: rect.maxX, y: top + h))
+        path.addLine(to: CGPoint(x: rect.minX, y: top + h))
+        path.closeSubpath()
+        return path
     }
 }
