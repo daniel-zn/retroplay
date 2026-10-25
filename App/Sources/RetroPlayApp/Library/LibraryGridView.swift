@@ -204,7 +204,7 @@ extension LibraryGridView where Header == EmptyView {
 }
 
 @available(iOS 18.0, *)
-private struct LibraryTileDeleteAccessibilityAction: ViewModifier {
+struct LibraryTileDeleteAccessibilityAction: ViewModifier {
     let game: LibraryGame
     let onRequestDelete: ((LibraryGame) -> Void)?
 

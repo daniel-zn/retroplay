@@ -135,7 +135,7 @@ flowchart TB
 | Module | Responsibility |
 |--------|----------------|
 | `RetroPlayApp` | Entrypoint, scene, appearance |
-| `LibraryFeature` | Grid/list, search, recent, system filters |
+| `LibraryFeature` | Grid or Cover Flow (swipe a row of covers), search, recent, system filters |
 | `ImportFeature` / `ROMImporter` | Document picker, folder import, duplicate detection |
 | `SystemRegistry` | Static map of systems, extensions, default cores |
 | `ROMClassifier` | Heuristics + magic bytes |

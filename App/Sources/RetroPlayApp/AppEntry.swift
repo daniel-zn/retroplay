@@ -52,6 +52,8 @@ public struct RetroPlayRootView: View {
     @State private var boxArt = BoxArtUpdater()
     @AppStorage(BoxArtUpdater.enabledKey) private var downloadBoxArt = true
     @AppStorage("retroplay.librarySort") private var sortRaw = LibrarySort.recentlyPlayed.rawValue
+    @AppStorage("retroplay.libraryLayout") private var layoutRaw = LibraryLayout.grid.rawValue
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// Newest save state per game (Play auto-saves on exit), refreshed after each session.
     @State private var lastPlayed: [UUID: Date] = [:]
 
@@ -71,6 +73,22 @@ public struct RetroPlayRootView: View {
     private var sortBinding: Binding<LibrarySort> {
         Binding(get: { sort }, set: { sortRaw = $0.rawValue })
     }
+
+    private var layout: LibraryLayout {
+        LibraryLayout(rawValue: layoutRaw) ?? .grid
+    }
+
+    private var layoutBinding: Binding<LibraryLayout> {
+        Binding(get: { layout }, set: { layoutRaw = $0.rawValue })
+    }
+
+    /// Cover Flow in landscape needs the height for the covers: the big title gives way
+    /// to the inline one.
+    private var hidesLibraryTitle: Bool {
+        layout == .coverFlow && verticalSizeClass == .compact && !store.games.isEmpty
+    }
+
+    private var showsInlineTitle: Bool { libraryTitleCollapsed || hidesLibraryTitle }
 
     private var filteredGames: [LibraryGame] {
         sort.sorted(store.games(matching: systemTab.systemID), lastPlayed: lastPlayed)
@@ -157,6 +175,12 @@ public struct RetroPlayRootView: View {
             // `-RetroPlaySmokeSettings YES`: open Settings, for screenshots.
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSettings") {
                 showSettings = true
+            }
+            // `-RetroPlaySmokeLandscape YES`: the library in landscape too.
+            if UserDefaults.standard.bool(forKey: "RetroPlaySmokeLandscape") {
+                for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { _ in }
+                }
             }
             if playGame == nil {
                 let args = ProcessInfo.processInfo.arguments
@@ -342,6 +366,32 @@ public struct RetroPlayRootView: View {
                                 .padding(.top, 12)
                         }
                     }
+                } else if layout == .coverFlow {
+                    LibraryCoverFlowView(
+                        games: filteredGames,
+                        filter: systemTab,
+                        onSelect: { play($0) },
+                        artworkProvider: { game in
+                            loadCover(for: game)
+                        },
+                        onRequestDelete: { requestDelete($0) },
+                        lastPlayed: lastPlayed,
+                        missingGameIDs: store.missingGameIDs,
+                        titleCollapsed: $libraryTitleCollapsed,
+                        controllerNavigation: true
+                    ) {
+                        if !hidesLibraryTitle {
+                            libraryTitle
+                        }
+                        libraryFilterBar
+                        if filteredGames.isEmpty {
+                            EmptyFilterView(
+                                tab: systemTab,
+                                onImport: { showImporter = true },
+                                onShowAll: { systemTab = .all }
+                            )
+                        }
+                    }
                 } else {
                     // Custom large title in the scroll header (system large titles stay blank on black).
                     LibraryGridView(
@@ -357,8 +407,7 @@ public struct RetroPlayRootView: View {
                         controllerNavigation: true
                     ) {
                         libraryTitle
-                        LibraryFilterBar(selection: $systemTab, sort: sortBinding, counts: tabCounts)
-                            .padding(.bottom, 12)
+                        libraryFilterBar
                         if filteredGames.isEmpty {
                             EmptyFilterView(
                                 tab: systemTab,
@@ -378,7 +427,8 @@ public struct RetroPlayRootView: View {
             }
             .background(RetroPlayTheme.canvas(for: colorScheme))
             .toolbarVisibility(tabBarHidden ? .hidden : .visible, for: .tabBar)
-            .navigationTitle(libraryTitleCollapsed ? "RetroPlay" : "")
+            .navigationTitle(showsInlineTitle ? "RetroPlay" : "")
+            .onChange(of: layoutRaw) { libraryTitleCollapsed = false }
             .navigationBarTitleDisplayMode(.inline)
             .retroPlayLibraryInlineNav()
             .toolbarColorScheme(colorScheme, for: .navigationBar)
@@ -389,8 +439,8 @@ public struct RetroPlayRootView: View {
                     Text("RetroPlay")
                         .font(RetroPlayFont.sized(17, relativeTo: .headline))
                         .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
-                        .opacity(libraryTitleCollapsed ? 1 : 0)
-                        .animation(.easeOut(duration: 0.15), value: libraryTitleCollapsed)
+                        .opacity(showsInlineTitle ? 1 : 0)
+                        .animation(.easeOut(duration: 0.15), value: showsInlineTitle)
                         .accessibilityAddTraits(.isHeader)
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
@@ -435,6 +485,11 @@ public struct RetroPlayRootView: View {
                 PlayView(game: game, romURL: store.absoluteURL(for: game))
             }
         }
+    }
+
+    private var libraryFilterBar: some View {
+        LibraryFilterBar(selection: $systemTab, sort: sortBinding, layout: layoutBinding, counts: tabCounts)
+            .padding(.bottom, 12)
     }
 
     private var libraryTitle: some View {

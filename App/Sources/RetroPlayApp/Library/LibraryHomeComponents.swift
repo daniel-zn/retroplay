@@ -68,6 +68,30 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Layout
+
+/// How the library shows its games. Search always uses the grid.
+enum LibraryLayout: String, CaseIterable {
+    case grid
+    case coverFlow
+
+    var title: String {
+        switch self {
+        case .grid: return "Grid"
+        case .coverFlow: return "Cover Flow"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .grid: return "square.grid.2x2"
+        case .coverFlow: return "square.stack.3d.forward.dottedline"
+        }
+    }
+
+    var other: LibraryLayout { self == .grid ? .coverFlow : .grid }
+}
+
 @available(iOS 18.0, *)
 struct SectionHeading: View {
     let title: String
@@ -98,6 +122,7 @@ struct SectionHeading: View {
 struct LibraryFilterBar: View {
     @Binding var selection: SystemTab
     @Binding var sort: LibrarySort
+    @Binding var layout: LibraryLayout
     let counts: [SystemTab: Int]
 
     @Environment(\.colorScheme) private var colorScheme
@@ -107,6 +132,7 @@ struct LibraryFilterBar: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 sortMenu
+                layoutToggle
                 ForEach(SystemTab.allCases) { tab in
                     chip(tab)
                 }
@@ -171,6 +197,26 @@ struct LibraryFilterBar: View {
                 }
         }
         .accessibilityLabel("Sort: \(sort.title)")
+    }
+
+    /// Switches between the grid and Cover Flow; shows the layout it switches to.
+    private var layoutToggle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.25)) { layout = layout.other }
+        } label: {
+            Image(systemName: layout.other.symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 36, height: 36)
+                .retroPlayGlass(Circle()) {
+                    Circle().fill(RetroPlayTheme.card(for: colorScheme))
+                    Circle().strokeBorder(RetroPlayTheme.cardStroke(for: colorScheme), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show as \(layout.other.title)")
+        .accessibilityValue("Showing \(layout.title)")
     }
 }
 
