@@ -138,12 +138,15 @@ struct LibraryTopBarIcon: View {
     var body: some View {
         Label(title, systemImage: symbol)
             .labelStyle(.iconOnly)
+            // System body size, as toolbar symbols normally are (and growing with Dynamic
+            // Type): the app-wide pixel font is set smaller, which shrank the symbols.
+            .font(.body)
             // The bar's scrolled look recolours plain tinted items white; an explicit style
             // keeps the accent.
             .foregroundStyle(RetroPlayTheme.accent)
-            // Full-size 44 pt touch targets, side by side with no gap, in the top
-            // bar's one shared glass capsule.
-            .frame(minWidth: 44, minHeight: 44)
+            // Side by side in the top bar's one glass capsule; the bar adds its own padding
+            // around each, so a 38 pt frame still gives a 44 pt+ touch target.
+            .frame(minWidth: 38, minHeight: 44)
             .contentShape(Rectangle())
     }
 }
