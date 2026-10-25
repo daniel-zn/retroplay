@@ -231,9 +231,44 @@ final class CoverFlowTests: XCTestCase {
 
     func testTurningIsContinuousThroughTheMiddle() {
         let metrics = CoverFlow.Metrics(coverSide: 200)
-        let half = metrics.pose(distance: metrics.step / 2)
-        XCTAssertEqual(abs(half.rotation), CoverFlow.sideAngle / 2, accuracy: 1e-9)
-        XCTAssertLessThan(abs(metrics.pose(distance: 1).rotation), 2)
+        XCTAssertLessThan(abs(metrics.pose(distance: 1).rotation), 3)
+        var last = 0.0
+        for i in 1...100 {
+            let turn = abs(metrics.pose(distance: metrics.step * Double(i) / 100).rotation)
+            XCTAssertGreaterThanOrEqual(turn, last)
+            last = turn
+        }
+    }
+
+    func testTurnLeadsTheSlide() {
+        // Leaving the middle a cover turns fast, arriving it stays turned until late.
+        let metrics = CoverFlow.Metrics(coverSide: 200)
+        func turn(_ fraction: Double) -> Double { abs(metrics.pose(distance: metrics.step * fraction).rotation) }
+        XCTAssertGreaterThan(turn(0.25), CoverFlow.sideAngle * 0.6)
+        XCTAssertGreaterThan(turn(0.5), CoverFlow.sideAngle * 0.9)
+        XCTAssertGreaterThan(turn(0.75), CoverFlow.sideAngle * 0.99)
+        XCTAssertLessThan(turn(0.75) - turn(0.5), turn(0.25) - turn(0))
+    }
+
+    func testPassingCoversDoNotOverlap() {
+        // The two covers either side of the middle mid-swipe (where they swap which is in
+        // front) stay apart, for the widest cover the slot holds, in portrait and landscape.
+        // Perspective is left out: it only narrows the inner edge further.
+        for metrics in [CoverFlow.Metrics.fitting(width: 402, height: 560),
+                        CoverFlow.Metrics.fitting(width: 874, height: 280),
+                        CoverFlow.Metrics(coverSide: 200)] {
+            for i in 0...30 {
+                let fraction = 0.35 + Double(i) / 100
+                func innerEdge(_ distance: Double) -> Double {
+                    let pose = metrics.pose(distance: distance)
+                    let centre = abs(distance + pose.xShift)
+                    let half = metrics.coverWidth / 2 * pose.scale * cos(pose.rotation * .pi / 180)
+                    return centre - half
+                }
+                let gap = innerEdge(metrics.step * fraction) + innerEdge(-metrics.step * (1 - fraction))
+                XCTAssertGreaterThanOrEqual(gap, 0, "overlap at \(fraction) for \(metrics.coverWidth)")
+            }
+        }
     }
 
     func testIndexForOffsetRoundsAndClamps() {

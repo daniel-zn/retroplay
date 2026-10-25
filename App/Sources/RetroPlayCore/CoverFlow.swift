@@ -50,12 +50,17 @@ public enum CoverFlow {
             // Up to the first side cover they spread from the middle to `firstGap`; past it
             // they stack `stackSpacing` apart.
             let drawn = near * firstGap + max(abs(t) - 1, 0) * stackSpacing
+            // The turn and the shrink lead the slide: a cover leaving the middle turns fast at
+            // first, one arriving stays turned until it's nearly there. So when the two pass
+            // (and swap which is in front) both are turned edge-on enough not to overlap,
+            // even at the widest cover shape.
+            let turn = 1 - pow(1 - near, CoverFlow.turnCurve)
             return Pose(
                 xShift: side * drawn - distance,
                 // Side covers turn to face the middle, as in Cover Flow and RetroFlow: the
                 // inner edge recedes and the outer edge comes forward.
-                rotation: -side * near * CoverFlow.sideAngle,
-                scale: 1 - near * 0.22,
+                rotation: -side * turn * CoverFlow.sideAngle,
+                scale: 1 - turn * CoverFlow.sideShrink,
                 dimming: min(abs(t) * 0.12, 0.45)
             )
         }
@@ -132,6 +137,12 @@ public enum CoverFlow {
 
     /// How far the side covers turn away.
     public static let sideAngle: Double = 58
+    /// How much smaller the side covers are drawn (0.22 = 78% of the middle one).
+    public static let sideShrink: Double = 0.22
+    /// How strongly the turn leads the slide (1 = in step with it). At 4 a cover halfway
+    /// between the middle and the first side spot is turned 54°, so two passing covers clear
+    /// each other.
+    public static let turnCurve: Double = 4
 
     /// Which game to centre after the list changed.
     ///
