@@ -73,18 +73,127 @@ final class CoverFlowTests: XCTestCase {
     // MARK: Geometry
 
     func testCoverFitsTheSmallerOfHeightAndWidth() {
-        // Portrait phone: the width limits it.
-        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 390, height: 420).coverSide, 218)
         // Landscape: the height does.
-        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 180).coverSide, 180)
+        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 180).coverWidth, 180)
+        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 180).coverHeight, 180)
         // Never below the minimum, even with large text squeezing the space.
-        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 40).coverSide, 110)
+        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 40).coverWidth, 110)
+        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 40).coverHeight, 110)
+    }
+
+    func testPortraitCoverFillsMostOfTheScreen() {
+        // iPhone 17 Pro Max portrait: 440 wide, ~560 left for the covers.
+        let metrics = CoverFlow.Metrics.fitting(width: 440, height: 560)
+        XCTAssertGreaterThanOrEqual(metrics.coverWidth, 440 * 0.78)
+        // The old fit (56% of the width, square) left most of the height empty.
+        XCTAssertGreaterThan(metrics.coverWidth, 440 * 0.56 * 1.25)
+        // Upright boxes get a taller slot, within the height.
+        XCTAssertGreaterThan(metrics.coverHeight, metrics.coverWidth * 1.3)
+        XCTAssertLessThanOrEqual(metrics.coverHeight, 560)
+        // A smaller phone, and a short space (large text): the slot never outgrows it.
+        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 375, height: 500).coverWidth, 300)
+        let squeezed = CoverFlow.Metrics.fitting(width: 402, height: 240)
+        XCTAssertEqual(squeezed.coverWidth, 240)
+        XCTAssertEqual(squeezed.coverHeight, 240)
     }
 
     func testSideCoversStack() {
         let metrics = CoverFlow.Metrics(coverSide: 200)
-        XCTAssertLessThan(metrics.step, metrics.coverSide / 2)
-        XCTAssertGreaterThan(metrics.firstGap, metrics.coverSide / 2)
+        XCTAssertLessThan(metrics.stackSpacing, metrics.coverWidth / 5)
+        XCTAssertGreaterThan(metrics.stackSpacing, metrics.coverWidth / 10)
+    }
+
+    func testFirstSideCoverStandsCloseToTheMiddle() {
+        // Half a cover out: the side cover tucks in behind the middle one's edge.
+        let metrics = CoverFlow.Metrics(coverSide: 300)
+        XCTAssertEqual(metrics.firstGap, 150)
+        XCTAssertEqual(metrics.step + metrics.pose(distance: metrics.step).xShift, metrics.firstGap)
+        // Was 64% of a cover; the stack behind keeps its spacing.
+        XCTAssertLessThan(metrics.firstGap, 300 * 0.64)
+        let second = metrics.step * 2 + metrics.pose(distance: metrics.step * 2).xShift
+        XCTAssertEqual(second - metrics.firstGap, metrics.stackSpacing)
+    }
+
+    func testOneGameIsAFullDragAway() {
+        // The finger drags about as far per game as the middle cover moves to the side, so
+        // the row tracks it calmly instead of racing through the tightly packed stack.
+        let metrics = CoverFlow.Metrics(coverSide: 300)
+        XCTAssertGreaterThan(metrics.step, metrics.stackSpacing * 2.5)
+        XCTAssertGreaterThanOrEqual(metrics.step, 120)
+    }
+
+    func testLayoutDistanceInvertsTheDrawnPosition() {
+        let metrics = CoverFlow.Metrics(coverSide: 200)
+        for distance in [0.0, 30, metrics.step, metrics.step * 2.5, metrics.step * 9] {
+            let drawn = distance + metrics.pose(distance: distance).xShift
+            XCTAssertEqual(metrics.layoutDistance(forVisual: drawn), distance, accuracy: 1e-9)
+        }
+    }
+
+    // MARK: Swipes
+
+    private let swipe = CoverFlow.Metrics(coverSide: 300)
+
+    /// Where a swipe that started centred on `from` and was let go at `release` (in covers)
+    /// comes to rest.
+    private func rest(from: Double = 10, _ release: Double, _ velocity: Double, count: Int = 50) -> Int {
+        swipe.restingIndex(start: from * swipe.step, release: release * swipe.step, velocity: velocity, count: count)
+    }
+
+    func testSlowReleaseSettlesOnTheNearestCover() {
+        XCTAssertEqual(rest(10.3, 0), 10)
+        XCTAssertEqual(rest(10.6, 120), 11)
+        XCTAssertEqual(rest(10.6, -120), 11)
+        // A slow drag across several covers stays where it was let go.
+        XCTAssertEqual(rest(16.2, 100), 16)
+    }
+
+    func testNormalSwipeMovesOneGame() {
+        // A short swipe (a third of a step), one that dragged most of the way, and one that
+        // dragged a little past the next cover all land on the next one; and back the same.
+        XCTAssertEqual(rest(10.3, 900), 11)
+        XCTAssertEqual(rest(10.9, 1400), 11)
+        XCTAssertEqual(rest(11.2, 1100), 11)
+        XCTAssertEqual(rest(9.7, -900), 9)
+        XCTAssertEqual(rest(8.8, -1100), 9)
+    }
+
+    func testStrongFlickMovesABoundedFew() {
+        XCTAssertEqual(rest(10.3, 2000), 12)
+        XCTAssertEqual(rest(10.3, 3000), 13)
+        XCTAssertEqual(rest(10.3, 5000), 14)
+        // A hard flick that also dragged two covers: still at most four.
+        XCTAssertEqual(rest(12.2, 6000), 10 + CoverFlow.maxSwipeTravel)
+        // However hard: never past the limit.
+        XCTAssertEqual(rest(10.3, 60_000), 10 + CoverFlow.maxSwipeTravel)
+        XCTAssertEqual(rest(9.7, -60_000), 10 - CoverFlow.maxSwipeTravel)
+    }
+
+    func testFastLongDragKeepsWhatTheFingerCovered() {
+        // A quick drag across five covers isn't pulled back to four.
+        XCTAssertEqual(rest(15.1, 2000), 15)
+    }
+
+    func testFlickAgainstTheDragGoesBackOne() {
+        // Nudged right, then flicked left: one to the left of where it started.
+        XCTAssertEqual(rest(10.4, -900), 9)
+    }
+
+    func testSwipeStartingMidRowCountsFromTheNearestCover() {
+        // Caught while still moving (between 7 and 8): a swipe counts from 8.
+        XCTAssertEqual(rest(from: 7.6, 8.1, 900), 9)
+    }
+
+    func testSwipesStopAtTheEnds() {
+        XCTAssertEqual(rest(from: 0, 0.2, -5000, count: 5), 0)
+        XCTAssertEqual(rest(from: 4, 3.8, 5000, count: 5), 4)
+        XCTAssertEqual(rest(from: 0, 0, 900, count: 1), 0)
+        XCTAssertEqual(swipe.restingIndex(start: 0, release: 0, velocity: 900, count: 0), 0)
+    }
+
+    func testLandscapeCoversStillNeedAFullDragPerGame() {
+        // Small (height-limited) covers: a game is still at least 120 points of drag.
+        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 874, height: 190).step, 120)
     }
 
     func testMiddleCoverFacesFront() {
@@ -111,9 +220,10 @@ final class CoverFlowTests: XCTestCase {
         let third = metrics.pose(distance: metrics.step * 3)
         XCTAssertEqual(abs(first.rotation), CoverFlow.sideAngle)
         XCTAssertEqual(third.rotation, first.rotation)
-        XCTAssertEqual(third.xShift, first.xShift)
-        // The first side cover stands `firstGap` from the middle.
+        // The first side cover stands `firstGap` from the middle, the third two stack
+        // spacings further.
         XCTAssertEqual(metrics.step + first.xShift, metrics.firstGap)
+        XCTAssertEqual(metrics.step * 3 + third.xShift, metrics.firstGap + 2 * metrics.stackSpacing)
     }
 
     func testTurningIsContinuousThroughTheMiddle() {

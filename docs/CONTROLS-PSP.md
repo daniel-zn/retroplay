@@ -46,7 +46,7 @@ Game frame uses the **full width** (16:9). Pad sits **below**:
 - HOME is **chrome only** (not in `PSPInput`); it must not fire game bits.
 - SELECT / START stay wired.
 
-Library tab bar is hidden while Play is open. Nav title carries the game name.
+Nav title carries the game name while Play is open.
 
 ### Landscape (deferred polish)
 

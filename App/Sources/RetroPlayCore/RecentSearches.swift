@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
-/// Recent search queries for the Search tab, newest first, stored as a JSON string.
+/// Recent search queries for library Search, newest first, stored as a JSON string.
 public enum RecentSearches {
     public static let limit = 10
 

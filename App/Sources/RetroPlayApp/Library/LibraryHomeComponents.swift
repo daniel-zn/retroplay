@@ -70,10 +70,15 @@ enum LibrarySort: String, CaseIterable, Identifiable {
 
 // MARK: - Layout
 
-/// How the library shows its games. Search always uses the grid.
-enum LibraryLayout: String, CaseIterable {
+/// How the library shows its games (Settings → Library Layout). Search always uses the grid.
+enum LibraryLayout: String, CaseIterable, Identifiable {
     case grid
     case coverFlow
+
+    /// The user-defaults key it's remembered under.
+    static let storageKey = "retroplay.libraryLayout"
+
+    var id: String { rawValue }
 
     var title: String {
         switch self {
@@ -81,15 +86,6 @@ enum LibraryLayout: String, CaseIterable {
         case .coverFlow: return "Cover Flow"
         }
     }
-
-    var symbol: String {
-        switch self {
-        case .grid: return "square.grid.2x2"
-        case .coverFlow: return "square.stack.3d.forward.dottedline"
-        }
-    }
-
-    var other: LibraryLayout { self == .grid ? .coverFlow : .grid }
 }
 
 @available(iOS 18.0, *)
@@ -116,107 +112,98 @@ struct SectionHeading: View {
     }
 }
 
-// MARK: - Filter + sort bar
+// MARK: - Top bar
 
+/// An icon button in the library's top bar, kept magenta whether the bar is clear (at the top)
+/// or has its scrolled background.
 @available(iOS 18.0, *)
-struct LibraryFilterBar: View {
-    @Binding var selection: SystemTab
-    @Binding var sort: LibrarySort
-    @Binding var layout: LibraryLayout
-    let counts: [SystemTab: Int]
-
-    @Environment(\.colorScheme) private var colorScheme
+struct LibraryTopBarButton: View {
+    let title: String
+    let symbol: String
+    let action: () -> Void
 
     var body: some View {
-        // Sort first, then the system filters, all in one scrolling row.
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                sortMenu
-                layoutToggle
-                ForEach(SystemTab.allCases) { tab in
-                    chip(tab)
-                }
-            }
-            .retroPlayGlassGroup()
-            .padding(.horizontal, 16)
-            .padding(.vertical, 2)
+        Button(action: action) {
+            LibraryTopBarIcon(title: title, symbol: symbol)
         }
+        .accessibilityLabel(title)
     }
+}
 
-    private func chip(_ tab: SystemTab) -> some View {
-        let selected = selection == tab
-        let count = counts[tab] ?? 0
-        let tint = tab.systemID.map(RetroPlayTheme.systemTint) ?? RetroPlayTheme.accent
-        return Button {
-            withAnimation(.easeOut(duration: 0.15)) { selection = tab }
-        } label: {
-            HStack(spacing: 6) {
-                if tab.systemID != nil {
-                    Circle()
-                        .fill(tint)
-                        .frame(width: 7, height: 7)
-                }
-                Text(tab.title)
-                    .font(RetroPlayFont.caption)
-                Text("\(count)")
-                    .font(RetroPlayFont.caption2)
-                    .foregroundStyle(selected ? RetroPlayTheme.primaryText(for: colorScheme) : RetroPlayTheme.secondaryText(for: colorScheme))
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
-            .retroPlayGlass(Capsule(), tint: selected ? tint.opacity(0.45) : nil) {
-                Capsule().fill(selected ? tint.opacity(0.28) : RetroPlayTheme.card(for: colorScheme))
-                Capsule().strokeBorder(
-                    selected ? tint : RetroPlayTheme.cardStroke(for: colorScheme),
-                    lineWidth: 1
-                )
-            }
-            .opacity(count == 0 && tab != .all && !selected ? 0.5 : 1)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(tab.title), \(gameCountText(count))")
-        .accessibilityAddTraits(selected ? .isSelected : [])
+@available(iOS 18.0, *)
+struct LibraryTopBarIcon: View {
+    let title: String
+    let symbol: String
+
+    var body: some View {
+        Label(title, systemImage: symbol)
+            .labelStyle(.iconOnly)
+            // The bar's scrolled look recolours plain tinted items white; an explicit style
+            // keeps the accent.
+            .foregroundStyle(RetroPlayTheme.accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .retroPlayGlassChrome()
     }
+}
 
-    private var sortMenu: some View {
+/// The sort (first, so it's in reach however many systems follow) and the system filter, in
+/// one menu behind a top-bar button. The filters list
+/// their game counts and mark the one showing; L1 / R1 on a controller step through the same
+/// list.
+@available(iOS 18.0, *)
+struct LibraryFilterMenu: View {
+    @Binding var selection: SystemTab
+    @Binding var sort: LibrarySort
+    let tabs: [SystemTab]
+    let counts: [SystemTab: Int]
+
+    var body: some View {
         Menu {
-            Picker("Sort", selection: $sort) {
-                ForEach(LibrarySort.allCases) { option in
-                    Label(option.title, systemImage: option.symbol).tag(option)
+            Section {
+                Picker(selection: $sort) {
+                    ForEach(LibrarySort.allCases) { option in
+                        Label(option.title, systemImage: option.symbol).tag(option)
+                    }
+                } label: {
+                    Text("Sort By")
+                    Text(sort.title)
+                }
+                .pickerStyle(.menu)
+            }
+            Section {
+                ForEach(tabs) { tab in
+                    // Toggles: the menu marks the one showing, and the second line is the
+                    // row's subtitle.
+                    Toggle(isOn: binding(for: tab)) {
+                        Text(tab == .all ? "All Games" : tab.systemID?.displayName ?? tab.title)
+                        Text(gameCountText(counts[tab] ?? 0))
+                    }
                 }
             }
         } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
-                .frame(width: 36, height: 36)
-                .retroPlayGlass(Circle()) {
-                    Circle().fill(RetroPlayTheme.card(for: colorScheme))
-                    Circle().strokeBorder(RetroPlayTheme.cardStroke(for: colorScheme), lineWidth: 1)
-                }
+            LibraryTopBarIcon(
+                title: "Filter",
+                symbol: selection == .all
+                    ? "line.3.horizontal.decrease"
+                    : "line.3.horizontal.decrease.circle.fill"
+            )
         }
-        .accessibilityLabel("Sort: \(sort.title)")
+        .menuOrder(.fixed)
+        .accessibilityLabel("Filter")
+        .accessibilityValue(
+            "\(selection == .all ? "All games" : selection.title), sorted by \(sort.title)"
+        )
     }
 
-    /// Switches between the grid and Cover Flow; shows the layout it switches to.
-    private var layoutToggle: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.25)) { layout = layout.other }
-        } label: {
-            Image(systemName: layout.other.symbol)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
-                .contentTransition(.symbolEffect(.replace))
-                .frame(width: 36, height: 36)
-                .retroPlayGlass(Circle()) {
-                    Circle().fill(RetroPlayTheme.card(for: colorScheme))
-                    Circle().strokeBorder(RetroPlayTheme.cardStroke(for: colorScheme), lineWidth: 1)
-                }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Show as \(layout.other.title)")
-        .accessibilityValue("Showing \(layout.title)")
+    private func binding(for tab: SystemTab) -> Binding<Bool> {
+        Binding(
+            get: { selection == tab },
+            set: { on in
+                guard on else { return }
+                withAnimation(.easeOut(duration: 0.15)) { selection = tab }
+            }
+        )
     }
 }
 

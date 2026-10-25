@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage(PlaySettingsKey.haptics) private var haptics = true
     @AppStorage(PlaySettingsKey.flatControls) private var flatControls = false
     @AppStorage(BoxArtUpdater.enabledKey) private var downloadBoxArt = true
+    @AppStorage(LibraryLayout.storageKey) private var layoutRaw = LibraryLayout.grid.rawValue
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
 
@@ -107,8 +108,26 @@ struct SettingsView: View {
         .listRowBackground(RetroPlayTheme.card(for: colorScheme))
     }
 
+    private var layoutBinding: Binding<LibraryLayout> {
+        Binding(
+            get: { LibraryLayout(rawValue: layoutRaw) ?? .grid },
+            set: { layoutRaw = $0.rawValue }
+        )
+    }
+
     private var librarySection: some View {
         Section {
+            VStack(alignment: .leading, spacing: 10) {
+                SettingsIconLabel("Library Layout", symbol: "rectangle.stack.fill", color: .mint)
+                Picker("Library Layout", selection: layoutBinding) {
+                    ForEach(LibraryLayout.allCases) { layout in
+                        Text(layout.title).tag(layout)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+            .padding(.vertical, 4)
             LabeledContent {
                 Text("\(gameCounts[.all] ?? 0)")
                     .font(RetroPlayFont.caption)

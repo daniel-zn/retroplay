@@ -41,7 +41,9 @@ enum RetroPlayNavigationBarChrome {
             bar.scrollEdgeAppearance = scrollEdge
             bar.compactAppearance = standard
             bar.compactScrollEdgeAppearance = scrollEdge
-            bar.tintColor = foreground
+            // Bar buttons (top-bar icons, back chevrons) in the accent, scrolled or not: a white
+            // tint here turned the library's buttons white once the bar collapsed.
+            bar.tintColor = UIColor(RetroPlayTheme.accent)
             // Do not force prefersLargeTitles here — Library is .inline with a
             // custom scroll title; forcing true reserves a blank large-title inset.
             bar.isTranslucent = true
@@ -50,7 +52,7 @@ enum RetroPlayNavigationBarChrome {
         let proxy = UINavigationBar.appearance()
         applyToBar(proxy)
 
-        // Already-created bars (Simulator hot rebuild / TabView) need a live walk.
+        // Already-created bars (Simulator hot rebuild) need a live walk.
         for scene in UIApplication.shared.connectedScenes {
             guard let windowScene = scene as? UIWindowScene else { continue }
             for window in windowScene.windows {

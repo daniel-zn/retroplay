@@ -6,25 +6,39 @@ import Foundation
 public enum CoverFlow {
     /// Sizes for one carousel, from the space it has.
     public struct Metrics: Equatable, Sendable {
-        /// The square slot each cover stands in (covers keep their own shape inside it).
-        public let coverSide: Double
-        /// Scroll distance from one cover to the next: the layout width of each item.
-        /// Much less than a cover, so the side covers stack.
+        /// The slot each cover stands in, on its bottom edge (covers keep their own shape
+        /// inside it). Square in landscape; taller in portrait, for upright boxes.
+        public let coverWidth: Double
+        public let coverHeight: Double
+        /// Scroll distance from one cover to the next: the layout width of each item, and how
+        /// far a finger drags to move one game. Wider than the drawn spacing of the stacks, so
+        /// a swipe stays controlled however tightly the side covers stack.
         public let step: Double
         /// How far the first cover on each side stands from the middle one's centre.
         public let firstGap: Double
+        /// How far apart the covers past the first stand in each side stack.
+        public let stackSpacing: Double
+
+        public init(coverWidth: Double, coverHeight: Double) {
+            self.coverWidth = coverWidth
+            self.coverHeight = coverHeight
+            // At least 120 points, so small landscape covers don't make a swipe race.
+            step = max((coverWidth * 0.42).rounded(), 120)
+            firstGap = (coverWidth * 0.5).rounded()
+            stackSpacing = (coverWidth * 0.13).rounded()
+        }
 
         public init(coverSide: Double) {
-            self.coverSide = coverSide
-            step = (coverSide * 0.2).rounded()
-            firstGap = (coverSide * 0.64).rounded()
+            self.init(coverWidth: coverSide, coverHeight: coverSide)
         }
 
         /// The largest cover that fits `height` (above the caption) and leaves room on the
-        /// sides of `width` for the stacks; never smaller than `minimum`.
+        /// sides of `width` for the stacks; never smaller than `minimum`. In portrait the
+        /// width limits it and the slot grows taller, so upright boxes fill the screen.
         public static func fitting(width: Double, height: Double, minimum: Double = 110) -> Metrics {
-            let side = min(height, width * 0.56, 420)
-            return Metrics(coverSide: max(minimum, side.rounded(.down)))
+            let side = max(minimum, min(width * 0.8, height, 440).rounded(.down))
+            let tall = max(side, min(height, side * 1.35).rounded(.down))
+            return Metrics(coverWidth: side, coverHeight: tall)
         }
 
         /// Where a cover is drawn and how it turns, for an item `distance` points from the
@@ -33,11 +47,11 @@ public enum CoverFlow {
             let t = step > 0 ? distance / step : 0
             let near = min(abs(t), 1)
             let side: Double = t < 0 ? -1 : 1
-            // Up to the first gap the covers spread out from their layout spacing; past it
-            // they keep the layout spacing, shifted out by the same amount.
-            let shift = side * near * (firstGap - step)
+            // Up to the first side cover they spread from the middle to `firstGap`; past it
+            // they stack `stackSpacing` apart.
+            let drawn = near * firstGap + max(abs(t) - 1, 0) * stackSpacing
             return Pose(
-                xShift: shift,
+                xShift: side * drawn - distance,
                 // Side covers turn to face the middle, as in Cover Flow and RetroFlow: the
                 // inner edge recedes and the outer edge comes forward.
                 rotation: -side * near * CoverFlow.sideAngle,
@@ -46,13 +60,55 @@ public enum CoverFlow {
             )
         }
 
+        /// How far from the middle (in layout points) an item sits when it's drawn `visual`
+        /// points out: what the row has to lay out to fill the screen.
+        public func layoutDistance(forVisual visual: Double) -> Double {
+            guard firstGap > 0, stackSpacing > 0 else { return visual }
+            let v = abs(visual)
+            if v <= firstGap { return v / firstGap * step }
+            return (1 + (v - firstGap) / stackSpacing) * step
+        }
+
         /// The cover in the middle for a horizontal content offset (measured from the first
         /// cover centred), clamped to the list.
         public func index(forOffset offset: Double, count: Int) -> Int {
             guard count > 0, step > 0 else { return 0 }
             return min(max(Int((offset / step).rounded()), 0), count - 1)
         }
+
+        /// Which cover a swipe comes to rest on, so a flick never runs away.
+        ///
+        /// - `start`: the content offset when the finger went down, `release` when it lifted
+        ///   (both from the first cover centred).
+        /// - `velocity`: points per second, positive towards later games.
+        ///
+        /// A slow release settles on the nearest cover. A swipe moves one game from the cover
+        /// it started on (or as many as the finger dragged past); faster flicks add one more per
+        /// speed tier, and one gesture never goes more than `maxSwipeTravel` covers unless the
+        /// finger itself dragged further.
+        public func restingIndex(start: Double, release: Double, velocity: Double, count: Int) -> Int {
+            guard count > 0, step > 0 else { return 0 }
+            let index: Int
+            if abs(velocity) < CoverFlow.swipeVelocity {
+                index = Int((release / step).rounded())
+            } else {
+                let direction = velocity > 0 ? 1 : -1
+                let from = Int((start / step).rounded())
+                let dragged = Int(((release - Double(from) * step) / step * Double(direction)).rounded())
+                let extra = CoverFlow.flickTiers.filter { abs(velocity) >= $0 }.count
+                let travel = min(max(dragged, 1) + extra, max(CoverFlow.maxSwipeTravel, dragged))
+                index = from + direction * travel
+            }
+            return min(max(index, 0), count - 1)
+        }
     }
+
+    /// Below this (points per second) a released swipe just settles on the nearest cover.
+    public static let swipeVelocity: Double = 300
+    /// Each speed passed (points per second) carries a flick one cover further.
+    public static let flickTiers: [Double] = [1600, 2800, 4200]
+    /// The most covers one swipe moves (unless the finger dragged further).
+    public static let maxSwipeTravel = 4
 
     /// How a cover is drawn at one scroll position.
     public struct Pose: Equatable, Sendable {

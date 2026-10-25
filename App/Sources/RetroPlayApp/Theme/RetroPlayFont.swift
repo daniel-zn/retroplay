@@ -59,26 +59,11 @@ enum RetroPlayFont {
         let bodyFont = uiFont(size: 17, textStyle: .body)
         for state in [UIControl.State.normal, .highlighted, .disabled, .selected] {
             UIBarButtonItem.appearance().setTitleTextAttributes([.font: bodyFont], for: state)
-            UITabBarItem.appearance().setTitleTextAttributes(
-                [.font: uiFont(size: 10, textStyle: .caption2)],
-                for: state
-            )
             UISegmentedControl.appearance().setTitleTextAttributes(
                 [.font: uiFont(size: 13, textStyle: .subheadline)],
                 for: state
             )
         }
-        // The iOS 26 floating tab bar reads UITabBarAppearance, not UITabBarItem's proxy.
-        let tabAttributes: [NSAttributedString.Key: Any] = [.font: uiFont(size: 10, textStyle: .caption2)]
-        let tabAppearance = UITabBarAppearance()
-        tabAppearance.configureWithDefaultBackground()
-        for layout in [tabAppearance.stackedLayoutAppearance, tabAppearance.inlineLayoutAppearance, tabAppearance.compactInlineLayoutAppearance] {
-            layout.normal.titleTextAttributes = tabAttributes
-            layout.selected.titleTextAttributes = tabAttributes
-        }
-        UITabBar.appearance().standardAppearance = tabAppearance
-        UITabBar.appearance().scrollEdgeAppearance = tabAppearance
-
         let searchAppearance = UISearchTextField.appearance()
         searchAppearance.font = bodyFont
         searchAppearance.adjustsFontForContentSizeCategory = true

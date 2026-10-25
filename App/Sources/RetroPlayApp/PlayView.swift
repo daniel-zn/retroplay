@@ -184,7 +184,6 @@ public struct PlayView: View {
         // far pull into an edge's gesture zone could hand the touch to iOS (the stick stopped).
         .defersSystemGestures(on: .all)
         .toolbar(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
         // Also disables the edge swipe-back that used to fire from the D-pad.
         .navigationBarBackButtonHidden(true)
         .task {

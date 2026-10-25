@@ -35,6 +35,9 @@ struct LibraryCoverFlowView<Header: View>: View {
     @State private var listKey: ListKey?
     @State private var headerHeight: CGFloat = 0
     @State private var captionHeight: CGFloat = 0
+    /// Where the row is right now, for the snapping to know where a swipe was let go.
+    @State private var tracker = CoverFlowScrollTracker()
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private struct ListKey: Equatable {
         let filter: SystemTab
@@ -49,7 +52,7 @@ struct LibraryCoverFlowView<Header: View>: View {
         GeometryReader { outer in
             let metrics = CoverFlow.Metrics.fitting(
                 width: outer.size.width,
-                height: outer.size.height - headerHeight - captionHeight - 40
+                height: outer.size.height - headerHeight - captionHeight - 32
             )
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
@@ -58,7 +61,8 @@ struct LibraryCoverFlowView<Header: View>: View {
                     if !games.isEmpty {
                         Spacer(minLength: 0)
                         carousel(metrics: metrics, width: outer.size.width)
-                            .padding(.vertical, 12)
+                            .padding(.top, 8)
+                            .padding(.bottom, 12)
                         caption
                             .padding(.horizontal, 24)
                             .padding(.bottom, 16)
@@ -79,6 +83,16 @@ struct LibraryCoverFlowView<Header: View>: View {
             }
         }
         .background { backdrop }
+        #if DEBUG
+        // UI tests read which cover is in the middle.
+        .overlay(alignment: .bottomLeading) {
+            Text("\(liveIndex)")
+                .font(.system(size: 2))
+                .opacity(0.02)
+                .accessibilityIdentifier("coverFlow.position")
+                .accessibilityValue("\(liveIndex)")
+        }
+        #endif
         .onChange(of: ListKey(filter: filter, ids: games.map(\.id)), initial: true) { old, new in
             listChanged(from: listKey, to: new)
         }
@@ -94,6 +108,15 @@ struct LibraryCoverFlowView<Header: View>: View {
     // MARK: Carousel
 
     private func carousel(metrics: CoverFlow.Metrics, width: CGFloat) -> some View {
+        // A swipe moves the row a full step per game while the side covers are drawn packed
+        // tighter, so covers far out in the stacks are still on screen when their layout slot
+        // is well past the edge. The row is laid out wide enough for every cover that shows
+        // (the lazy stack only builds what's inside its frame), and drawn centred on screen.
+        let reach = min(
+            metrics.layoutDistance(forVisual: width / 2 + metrics.coverWidth / 2),
+            metrics.step * 40
+        ).rounded(.up)
+        let rowWidth = reach * 2 + metrics.step
         // The scroll view's coordinate space starts at its content margin, so the middle
         // of the viewport is half a step in.
         let middle = metrics.step / 2
@@ -101,7 +124,7 @@ struct LibraryCoverFlowView<Header: View>: View {
             LazyHStack(spacing: 0) {
                 ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
                     coverButton(game, index: index, metrics: metrics)
-                        .frame(width: metrics.step, height: metrics.coverSide)
+                        .frame(width: metrics.step, height: metrics.coverHeight)
                         // Covers nearer the middle stand in front.
                         .zIndex(-Double(abs(index - liveIndex)))
                         .visualEffect { content, proxy in
@@ -123,22 +146,28 @@ struct LibraryCoverFlowView<Header: View>: View {
         }
         .scrollIndicators(.hidden)
         .scrollClipDisabled()
-        .contentMargins(.horizontal, max(0, (width - metrics.step) / 2), for: .scrollContent)
-        .scrollTargetBehavior(.viewAligned(limitBehavior: .never))
+        .contentMargins(.horizontal, reach, for: .scrollContent)
+        .scrollTargetBehavior(CoverFlowSnapping(metrics: metrics, count: games.count, tracker: tracker))
         .scrollPosition($position, anchor: .center)
-        .onScrollGeometryChange(for: Int.self) { geometry in
-            metrics.index(forOffset: geometry.contentOffset.x + geometry.contentInsets.leading, count: games.count)
-        } action: { _, index in
-            liveIndex = index
+        .onScrollGeometryChange(for: Double.self) { geometry in
+            geometry.contentOffset.x + geometry.contentInsets.leading
+        } action: { _, offset in
+            tracker.offset = offset
+            let index = metrics.index(forOffset: offset, count: games.count)
+            if liveIndex != index { liveIndex = index }
         }
         .onScrollPhaseChange { old, phase in
+            if phase == .interacting, old != .interacting {
+                tracker.start = tracker.offset
+            }
             // Only a swipe coming to rest; the row also goes idle when the list changes,
             // before it's been moved to the right game.
             if phase == .idle, old == .interacting || old == .decelerating {
                 settle(at: liveIndex)
             }
         }
-        .frame(height: metrics.coverSide)
+        .frame(width: rowWidth, height: metrics.coverHeight)
+        .frame(width: width)
         .sensoryFeedback(.selection, trigger: liveIndex)
     }
 
@@ -152,7 +181,7 @@ struct LibraryCoverFlowView<Header: View>: View {
             }
         } label: {
             CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing)
-                .frame(width: metrics.coverSide, height: metrics.coverSide)
+                .frame(width: metrics.coverWidth, height: metrics.coverHeight)
         }
         .buttonStyle(RetroPlayPressStyle())
         .accessibilityLabel(
@@ -190,13 +219,15 @@ struct LibraryCoverFlowView<Header: View>: View {
     private var caption: some View {
         ZStack {
             if let game = focusedGame {
-                VStack(spacing: 8) {
+                // Landscape has the width for one line: no second line held empty between
+                // the name and the system.
+                VStack(spacing: compactCaption ? 3 : 8) {
                     Text(game.displayName)
                         .font(RetroPlayFont.subheadline)
                         .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
-                        .lineLimit(2, reservesSpace: true)
+                        .lineLimit(compactCaption ? 1 : 2, reservesSpace: !compactCaption)
                         .minimumScaleFactor(0.7)
                     HStack(spacing: 8) {
                         Text(game.systemID.displayName)
@@ -223,6 +254,8 @@ struct LibraryCoverFlowView<Header: View>: View {
         // VoiceOver reads the same on each cover.
         .accessibilityHidden(true)
     }
+
+    private var compactCaption: Bool { verticalSizeClass == .compact }
 
     private func lastPlayedText(_ game: LibraryGame) -> String? {
         lastPlayed[game.id].map {
@@ -443,4 +476,44 @@ private final class CoverFlowBackdropThumbnails {
         cache.setObject(small, forKey: key)
         return small
     }
+}
+
+/// The row's live position, read by the snapping when a swipe is let go (a reference, so the
+/// scroll behaviour sees the latest value without the view redrawing for it).
+final class CoverFlowScrollTracker: @unchecked Sendable {
+    /// Content offset from the first cover centred.
+    var offset: Double = 0
+    /// The offset when the current swipe began.
+    var start: Double = 0
+}
+
+/// Snaps the row to a cover and keeps a flick from running away: one swipe moves about one
+/// game, a hard flick a few (`CoverFlow.Metrics.restingIndex`).
+@available(iOS 18.0, *)
+struct CoverFlowSnapping: ScrollTargetBehavior {
+    let metrics: CoverFlow.Metrics
+    let count: Int
+    let tracker: CoverFlowScrollTracker
+
+    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        guard count > 0, metrics.step > 0 else { return }
+        // The row is laid out a margin wide on each side of one step, so the target's left
+        // edge is the offset from the first cover centred.
+        let proposed = target.rect.minX
+        // A scroll that isn't a swipe (sent to a cover) keeps its cover; a swipe is judged
+        // from where the finger let go, not where the system would coast to.
+        let velocity = Double(context.velocity.dx)
+        let index = velocity == 0
+            ? metrics.index(forOffset: proposed, count: count)
+            : metrics.restingIndex(
+                start: tracker.start,
+                release: tracker.offset,
+                velocity: velocity * Self.velocityScale,
+                count: count
+            )
+        target.rect.origin.x = Double(index) * metrics.step
+    }
+
+    /// `TargetContext.velocity` comes in points per millisecond (UIScrollView's units).
+    static let velocityScale: Double = 1000
 }

@@ -4,25 +4,25 @@ import UniformTypeIdentifiers
 import RetroPlayCore
 import UIKit
 
-/// Root shell: tile library, search, Settings via glass toolbar. Appearance preference (dark default).
+/// Root shell: the library, with filter, search, import and Settings as glass buttons in its
+/// top bar (no tab bar). Appearance preference (dark default).
 @available(iOS 18.0, *)
 public struct RetroPlayRootView: View {
     @StateObject private var store = LibraryStore()
     @AppStorage("retroplay.appearance") private var appearanceRaw = AppearancePreference.dark.rawValue
-    @State private var selectedTab: RootTab = .library
     @State private var systemTab: SystemTab = .all
     @State private var showImporter = false
     @State private var showSettings = false
     @State private var playGame: LibraryGame?
     @State private var navigator = ControllerNavigator()
-    /// The tab bar steps aside while a game plays and fades back in when it's left.
-    @State private var tabBarHidden = false
+    /// Search is a page pushed over the library from its top bar.
+    @State private var showSearch = false
     @State private var searchPlayGame: LibraryGame?
     @State private var searchQuery = ""
     @State private var isSearchPresented = false
     @AppStorage("retroplay.recentSearches") private var recentSearchesRaw = ""
     /// Keyboard focus for the search field. isSearchPresented alone can't re-show the
-    /// keyboard once it's already true (after Search or switching tabs).
+    /// keyboard once it's already true (after Search).
     @FocusState private var searchFocused: Bool
     /// Search results' scroll offset, and where the current drag started: a pull down
     /// hides the keyboard.
@@ -52,7 +52,7 @@ public struct RetroPlayRootView: View {
     @State private var boxArt = BoxArtUpdater()
     @AppStorage(BoxArtUpdater.enabledKey) private var downloadBoxArt = true
     @AppStorage("retroplay.librarySort") private var sortRaw = LibrarySort.recentlyPlayed.rawValue
-    @AppStorage("retroplay.libraryLayout") private var layoutRaw = LibraryLayout.grid.rawValue
+    @AppStorage(LibraryLayout.storageKey) private var layoutRaw = LibraryLayout.grid.rawValue
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// Newest save state per game (Play auto-saves on exit), refreshed after each session.
     @State private var lastPlayed: [UUID: Date] = [:]
@@ -78,10 +78,6 @@ public struct RetroPlayRootView: View {
         LibraryLayout(rawValue: layoutRaw) ?? .grid
     }
 
-    private var layoutBinding: Binding<LibraryLayout> {
-        Binding(get: { layout }, set: { layoutRaw = $0.rawValue })
-    }
-
     /// Cover Flow in landscape needs the height for the covers: the big title gives way
     /// to the inline one.
     private var hidesLibraryTitle: Bool {
@@ -92,6 +88,13 @@ public struct RetroPlayRootView: View {
 
     private var filteredGames: [LibraryGame] {
         sort.sorted(store.games(matching: systemTab.systemID), lastPlayed: lastPlayed)
+    }
+
+    /// The filters the filter menu and L1 / R1 offer: All, the systems that have games, and
+    /// the one showing (so an emptied filter stays marked).
+    private var offeredTabs: [SystemTab] {
+        let counts = tabCounts
+        return SystemTab.allCases.filter { $0 == .all || $0 == systemTab || (counts[$0] ?? 0) > 0 }
     }
 
     private var tabCounts: [SystemTab: Int] {
@@ -122,35 +125,18 @@ public struct RetroPlayRootView: View {
     }
 
     public var body: some View {
-        TabView(selection: tabSelection) {
-            libraryNavigation
-                .tabItem {
-                    Label("Library", systemImage: "square.grid.2x2.fill")
-                        .font(RetroPlayFont.caption2)
-                }
-                .tag(RootTab.library)
-
-            searchNavigation
-                .tabItem {
-                    Label("Search", systemImage: "magnifyingglass")
-                        .font(RetroPlayFont.caption2)
-                }
-                .tag(RootTab.search)
-        }
+        libraryNavigation
         .environment(\.font, RetroPlayFont.body)
         .environment(navigator)
         .task { navigator.start() }
-        .onChange(of: playGame != nil || searchPlayGame != nil) { _, playing in
-            withAnimation(.easeInOut(duration: 0.3)) { tabBarHidden = playing }
-        }
-        .onChange(of: selectedTab == .library && !showSettings && !showImporter, initial: true) { _, front in
+        .onChange(of: !showSearch && !showSettings && !showImporter, initial: true) { _, front in
             navigator.libraryVisible = front
         }
         .onChange(of: navigator.event) { _, event in
             // L1 / R1 step through the system filters that have games.
             guard let event, event.context == .library,
                   event.command == .previousPage || event.command == .nextPage else { return }
-            let tabs = SystemTab.allCases.filter { $0 == .all || (tabCounts[$0] ?? 0) > 0 }
+            let tabs = offeredTabs
             guard let current = tabs.firstIndex(of: systemTab) ?? tabs.firstIndex(of: .all) else { return }
             let step = event.command == .nextPage ? 1 : -1
             withAnimation(.easeOut(duration: 0.15)) {
@@ -158,8 +144,6 @@ public struct RetroPlayRootView: View {
             }
         }
         .tint(RetroPlayTheme.accent)
-        .toolbarBackground(RetroPlayTheme.canvas(for: colorScheme), for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
         // Set on the window, not via preferredColorScheme, so an open Settings sheet
         // follows the Appearance picker live (and "System" really clears the override).
         .onAppear { appearance.applyToWindows() }
@@ -254,18 +238,6 @@ public struct RetroPlayRootView: View {
         }
         .onChange(of: store.libraryLoadFailureMessage) { _, message in
             showLibraryLoadError = message != nil
-        }
-        .onChange(of: selectedTab) { _, tab in
-            if tab == .search {
-                // Landing on Search shows the page and recent searches without the keyboard;
-                // tapping the Search tab again focuses the field (see tabSelection).
-                searchFocused = false
-                isSearchPresented = false
-                searchQuery = ""
-            }
-            if tab == .library {
-                libraryTitleCollapsed = false
-            }
         }
         .fileImporter(
             isPresented: $showImporter,
@@ -383,7 +355,6 @@ public struct RetroPlayRootView: View {
                         if !hidesLibraryTitle {
                             libraryTitle
                         }
-                        libraryFilterBar
                         if filteredGames.isEmpty {
                             EmptyFilterView(
                                 tab: systemTab,
@@ -407,7 +378,6 @@ public struct RetroPlayRootView: View {
                         controllerNavigation: true
                     ) {
                         libraryTitle
-                        libraryFilterBar
                         if filteredGames.isEmpty {
                             EmptyFilterView(
                                 tab: systemTab,
@@ -426,7 +396,6 @@ public struct RetroPlayRootView: View {
                 }
             }
             .background(RetroPlayTheme.canvas(for: colorScheme))
-            .toolbarVisibility(tabBarHidden ? .hidden : .visible, for: .tabBar)
             .navigationTitle(showsInlineTitle ? "RetroPlay" : "")
             .onChange(of: layoutRaw) { libraryTitleCollapsed = false }
             .navigationBarTitleDisplayMode(.inline)
@@ -436,12 +405,23 @@ public struct RetroPlayRootView: View {
                 // The collapsed title, drawn here so it keeps the pixel font: the bar's own
                 // title text falls back to the system font under SwiftUI's toolbar styling.
                 ToolbarItem(placement: .principal) {
-                    Text("RetroPlay")
-                        .font(RetroPlayFont.sized(17, relativeTo: .headline))
-                        .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
-                        .opacity(showsInlineTitle ? 1 : 0)
-                        .animation(.easeOut(duration: 0.15), value: showsInlineTitle)
-                        .accessibilityAddTraits(.isHeader)
+                    VStack(spacing: 2) {
+                        Text("RetroPlay")
+                            .font(RetroPlayFont.sized(17, relativeTo: .headline))
+                            .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        // The filter, when the big title (which names it) is out of sight.
+                        if systemTab != .all {
+                            Text(systemTab.title)
+                                .font(RetroPlayFont.caption2)
+                                .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
+                        }
+                    }
+                    .opacity(showsInlineTitle ? 1 : 0)
+                    .animation(.easeOut(duration: 0.15), value: showsInlineTitle)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isHeader)
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
                     if store.importsInProgress > 0 {
@@ -458,38 +438,33 @@ public struct RetroPlayRootView: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("Importing \(gameCountText(store.importsInProgress))")
                     }
-                    Button {
+                    // Import first (adds to the library), then the two ways to find a game
+                    // (filter, search) side by side, and Settings at the edge, as across iOS.
+                    LibraryTopBarButton(title: "Import", symbol: "plus") {
                         showImporter = true
-                    } label: {
-                        Label("Import", systemImage: "plus")
-                            .labelStyle(.iconOnly)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .retroPlayGlassChrome()
                     }
-                    .accessibilityLabel("Import")
-
-                    Button {
+                    LibraryFilterMenu(
+                        selection: $systemTab,
+                        sort: sortBinding,
+                        tabs: offeredTabs,
+                        counts: tabCounts
+                    )
+                    .disabled(store.games.isEmpty)
+                    LibraryTopBarButton(title: "Search", symbol: "magnifyingglass") {
+                        openSearch()
+                    }
+                    LibraryTopBarButton(title: "Settings", symbol: "gearshape") {
                         showSettings = true
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
-                            .labelStyle(.iconOnly)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .retroPlayGlassChrome()
                     }
-                    .accessibilityLabel("Settings")
                 }
             }
             .navigationDestination(item: $playGame) { game in
                 PlayView(game: game, romURL: store.absoluteURL(for: game))
             }
+            .navigationDestination(isPresented: $showSearch) {
+                searchPage
+            }
         }
-    }
-
-    private var libraryFilterBar: some View {
-        LibraryFilterBar(selection: $systemTab, sort: sortBinding, layout: layoutBinding, counts: tabCounts)
-            .padding(.bottom, 12)
     }
 
     private var libraryTitle: some View {
@@ -502,7 +477,10 @@ public struct RetroPlayRootView: View {
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                 .accessibilityAddTraits(.isHeader)
             if !store.games.isEmpty {
-                Text(gameCountText(store.games.count))
+                // With the filter chips gone, the title says which games are showing.
+                Text(systemTab == .all
+                    ? gameCountText(store.games.count)
+                    : "\(systemTab.title) · \(filteredGames.count) of \(gameCountText(store.games.count))")
                     .font(RetroPlayFont.caption2)
                     .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
             }
@@ -513,87 +491,97 @@ public struct RetroPlayRootView: View {
         .padding(.bottom, 12)
     }
 
-    private var searchNavigation: some View {
-        NavigationStack {
-            Group {
-                if store.games.isEmpty {
+    /// Opens Search with an empty field and the keyboard up.
+    private func openSearch() {
+        searchQuery = ""
+        showSearch = true
+        Task { @MainActor in
+            // Once the page has been pushed: a field that isn't on screen yet can't take focus.
+            try? await Task.sleep(for: .milliseconds(450))
+            guard showSearch else { return }
+            isSearchPresented = true
+            searchFocused = true
+        }
+    }
+
+    private var searchPage: some View {
+        Group {
+            if store.games.isEmpty {
+                RetroPlayUnavailableView(
+                    title: "No Games Yet",
+                    systemImage: "magnifyingglass",
+                    description: "Import games with + in the library, then search them here."
+                )
+            } else if searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if recentSearches.isEmpty {
                     RetroPlayUnavailableView(
-                        title: "No Games Yet",
+                        title: "Search Library",
                         systemImage: "magnifyingglass",
-                        description: "Import games from the Library tab, then search them here."
-                    )
-                } else if searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    if recentSearches.isEmpty {
-                        RetroPlayUnavailableView(
-                            title: "Search Library",
-                            systemImage: "magnifyingglass",
-                            description: "Find games you already imported into RetroPlay."
-                        )
-                        .keyboardSwipeDownDismiss { searchFocused = false }
-                    } else {
-                        recentSearchesList
-                    }
-                } else if searchResults.isEmpty {
-                    RetroPlayUnavailableView(
-                        title: "No Results",
-                        systemImage: "magnifyingglass",
-                        description: "No games match “\(searchQuery)”."
+                        description: "Find games you already imported into RetroPlay."
                     )
                     .keyboardSwipeDownDismiss { searchFocused = false }
                 } else {
-                    LibraryGridView(
-                        games: searchResults,
-                        onSelect: { play($0, fromSearch: true) },
-                        artworkProvider: { game in
-                            loadCover(for: game)
-                        },
-                        onRequestDelete: { requestDelete($0) },
-                        lastPlayed: lastPlayed,
-                        missingGameIDs: store.missingGameIDs
-                    ) {
-                        SectionHeading(
-                            title: searchResults.count == 1 ? "1 Result" : "\(searchResults.count) Results"
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, 10)
-                    }
+                    recentSearchesList
+                }
+            } else if searchResults.isEmpty {
+                RetroPlayUnavailableView(
+                    title: "No Results",
+                    systemImage: "magnifyingglass",
+                    description: "No games match “\(searchQuery)”."
+                )
+                .keyboardSwipeDownDismiss { searchFocused = false }
+            } else {
+                LibraryGridView(
+                    games: searchResults,
+                    onSelect: { play($0, fromSearch: true) },
+                    artworkProvider: { game in
+                        loadCover(for: game)
+                    },
+                    onRequestDelete: { requestDelete($0) },
+                    lastPlayed: lastPlayed,
+                    missingGameIDs: store.missingGameIDs
+                ) {
+                    SectionHeading(
+                        title: searchResults.count == 1 ? "1 Result" : "\(searchResults.count) Results"
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(RetroPlayTheme.canvas(for: colorScheme))
-            // Dragging the results down pulls the keyboard away with the finger, and a pull
-            // down of a short list (nothing to scroll) hides it too.
-            .scrollDismissesKeyboard(.interactively)
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                geometry.contentOffset.y + geometry.contentInsets.top
-            } action: { _, offset in
-                searchScrollOffset = offset
-                if let start = searchDragStart, offset < start - 24 {
-                    searchFocused = false
-                    searchDragStart = nil
-                }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(RetroPlayTheme.canvas(for: colorScheme))
+        // Dragging the results down pulls the keyboard away with the finger, and a pull
+        // down of a short list (nothing to scroll) hides it too.
+        .scrollDismissesKeyboard(.interactively)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top
+        } action: { _, offset in
+            searchScrollOffset = offset
+            if let start = searchDragStart, offset < start - 24 {
+                searchFocused = false
+                searchDragStart = nil
             }
-            .onScrollPhaseChange { _, phase in
-                searchDragStart = phase == .interacting ? searchScrollOffset : nil
-            }
-            .navigationTitle("Search")
-            .navigationBarTitleDisplayMode(.large)
-            // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
-            .toolbarColorScheme(colorScheme, for: .navigationBar)
-            .toolbarVisibility(tabBarHidden ? .hidden : .visible, for: .tabBar)
-            .retroPlayNavigationTitleChrome(for: colorScheme)
-            .searchable(
-                text: $searchQuery,
-                isPresented: $isSearchPresented,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Games"
-            )
-            .searchFocused($searchFocused)
-            .onSubmit(of: .search) { recordSearch() }
-            .navigationDestination(item: $searchPlayGame) { game in
-                PlayView(game: game, romURL: store.absoluteURL(for: game))
-            }
+        }
+        .onScrollPhaseChange { _, phase in
+            searchDragStart = phase == .interacting ? searchScrollOffset : nil
+        }
+        .navigationTitle("Search")
+        .navigationBarTitleDisplayMode(.large)
+        // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
+        .toolbarColorScheme(colorScheme, for: .navigationBar)
+        .retroPlayNavigationTitleChrome(for: colorScheme)
+        .searchable(
+            text: $searchQuery,
+            isPresented: $isSearchPresented,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Games"
+        )
+        .searchFocused($searchFocused)
+        .onSubmit(of: .search) { recordSearch() }
+        .navigationDestination(item: $searchPlayGame) { game in
+            PlayView(game: game, romURL: store.absoluteURL(for: game))
         }
     }
 
@@ -638,26 +626,6 @@ public struct RetroPlayRootView: View {
             .listRowBackground(RetroPlayTheme.card(for: colorScheme))
         }
         .scrollContentBackground(.hidden)
-    }
-
-    /// Tab selection that also reports a tap on the tab that's already showing (SwiftUI sets
-    /// the same value again). The UIKit tab bar delegate isn't consulted by iOS 26's tab bar.
-    private var tabSelection: Binding<RootTab> {
-        Binding(
-            get: { selectedTab },
-            set: { tab in
-                if tab == selectedTab { reselect(tab) }
-                selectedTab = tab
-            }
-        )
-    }
-
-    private func reselect(_ tab: RootTab) {
-        // A second tap on Search (already showing) brings up the keyboard.
-        if tab == .search {
-            isSearchPresented = true
-            searchFocused = true
-        }
     }
 
     /// Starts a game unless its ROM was removed in Files; then offers to delete the row.
@@ -829,10 +797,4 @@ private enum ImportResultAlert {
         if case .error = self { return true }
         return false
     }
-}
-
-@available(iOS 18.0, *)
-private enum RootTab: Int, Hashable {
-    case library = 0
-    case search = 1
 }
