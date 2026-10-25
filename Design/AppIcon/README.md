@@ -16,16 +16,22 @@ A phone in a controller grip, seen from below, on a pink-to-purple gradient.
     (`fill-specializations`, appearance `tinted`) so the object reads bright; the controls layer keeps
     its real detail. Appearance names `ictool` accepts there: `light`, `dark`, `tinted`.
     iOS draws the mask, glass and tinting itself.
-- `AppHost/Supporting/Assets.xcassets/AppIcon.appiconset`: flat 1024 px fallbacks (Light and Dark),
-  the same picture composed onto the gradient. Square and opaque: no rounding, the system masks it.
+- Nothing else: `AppIcon.icon` is the only copy of the icon in the app. Xcode compiles it into the
+  bundle (Assets.car with the Light, Dark and Tinted layer stacks, plus the small PNGs older
+  springboard paths read), and iOS draws every place the icon appears from that: Home Screen,
+  Settings, Spotlight, notifications, the App Switcher, share sheets, TestFlight and App Store
+  Connect. No flat fallback set is needed (the app requires iOS 26).
 
 ## Files here
 
-- `source.png`: the original artwork on white (metadata stripped). New artwork works best on a transparent or plain white background: the object becomes the layer and the colour stays a native fill.
-- `layers/controller.png`: the whole controller cut out of it (used for the flat fallbacks).
-- `layers/body.png`, `panels.png`, `screen.png`, `controls.png`: the parts split from it by tone and
-  position, the layers in `AppIcon.icon`.
-- `AppIcon-Light.png`, `AppIcon-Dark.png`: copies of the flat fallbacks.
+- `source.png`: the original artwork on white (metadata stripped). New artwork works best on a
+  transparent or plain white background: the object becomes the layer and the colour stays a
+  native fill.
+- `layers/controller.png`: the whole controller cut out of it, the input the layers in
+  `AppIcon.icon/Assets` were split from (by tone and position). The layers live only there.
+
+Need a flat picture of the icon (website, docs, a store graphic)? Render it from `AppIcon.icon`
+with `Scripts/render-icon.sh`; don't keep copies in the repo.
 
 ## Previewing without opening Icon Composer
 
