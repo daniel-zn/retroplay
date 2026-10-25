@@ -1155,6 +1155,20 @@ public struct PlayView: View {
             }
             NSLog("RP_SMOKE %@ pulsed Start+A", system.rawValue)
         }
+        // `-RetroPlaySmokeHold YES`: hold D-pad up + right, A / ✕ and L for a minute after the
+        // presses, so screenshots show the pressed look of every kind of control.
+        if UserDefaults.standard.bool(forKey: "RetroPlaySmokeHold") {
+            let held: UInt32
+            switch system {
+            case .psp: held = PSPInput.up.rawValue | PSPInput.right.rawValue | PSPInput.cross.rawValue | PSPInput.l.rawValue
+            case .gba: held = GBAInput.up.bits | GBAInput.right.bits | GBAInput.a.bits | GBAInput.l.bits
+            default: held = presses.last ?? 0
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(6))
+                input.pulse(held, duration: .seconds(60))
+            }
+        }
         // `-RetroPlaySmokeFastForward YES`: hold fast-forward after the presses, for measuring.
         if UserDefaults.standard.bool(forKey: "RetroPlaySmokeFastForward") {
             Task { @MainActor in

@@ -83,10 +83,18 @@ struct PadFaceButton: View {
     var stroke: Color = Color.white.opacity(0.22)
     var accessibilityName: String? = nil
 
+    /// Letters in the pixel font; symbols (PSP △○✕□, N64 C arrows) larger and heavy so they read.
+    private var labelFont: Font {
+        if title.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) }) {
+            return RetroPlayFont.sized(max(11, diameter * 0.34), relativeTo: .body)
+        }
+        return .system(size: max(12, diameter * 0.44), weight: .heavy)
+    }
+
     var body: some View {
         let held = input.isHeld(bits)
         Text(title)
-            .font(RetroPlayFont.sized(max(11, diameter * 0.34), relativeTo: .body))
+            .font(labelFont)
             .foregroundStyle(Color.padLabel(fill: fill, ink: ink, glass: glass))
             .frame(width: diameter, height: diameter)
             .padSurface(Circle(), tint: fill.padTint(glass: glass, held: held), clear: glass) {
@@ -96,8 +104,8 @@ struct PadFaceButton: View {
                     .shadow(color: .black.opacity(held ? 0.08 : 0.3), radius: held ? 1 : 3, y: held ? 0 : 2)
             }
             .overlay {
-                // Glass has its own rim; the outline then only marks a press.
-                if held || !padLiquidGlass {
+                // Glass has its own rim and shows a press by shrinking, so no outline there.
+                if !padLiquidGlass {
                     Circle().strokeBorder(stroke.opacity(held ? 1 : 0.7), lineWidth: held ? 2 : 1)
                 }
             }
@@ -152,7 +160,7 @@ struct PadShoulderButton: View {
                     .brightness(held ? 0.12 : 0)
             }
             .overlay {
-                if held || !padLiquidGlass {
+                if !padLiquidGlass {
                     shape.strokeBorder(Color.white.opacity(held ? 0.5 : 0.18), lineWidth: held ? 2 : 1)
                 }
             }
@@ -202,7 +210,7 @@ struct PadPillButton: View {
                 shape.fill(glass ? fill.opacity(0.3) : fill).brightness(held ? 0.15 : 0)
             }
             .overlay {
-                if held || !padLiquidGlass {
+                if !padLiquidGlass {
                     shape.strokeBorder(Color.white.opacity(held ? 0.5 : 0.2), lineWidth: 1)
                 }
             }
@@ -236,23 +244,29 @@ struct PadDPad: View {
     var body: some View {
         let armWidth = size * 0.36
         let travel = (size - armWidth) / 2
+        let shape = PressablePlusShape(
+            armThickness: armWidth,
+            up: input.isHeld(up) ? 1 : 0, down: input.isHeld(down) ? 1 : 0,
+            left: input.isHeld(left) ? 1 : 0, right: input.isHeld(right) ? 1 : 0
+        )
         ZStack {
             Color.clear
-                .padSurface(PlusShape(armThickness: armWidth), tint: fill.padTint(glass: glass), clear: glass) {
-                    PlusShape(armThickness: armWidth)
+                .padSurface(shape, tint: fill.padTint(glass: glass), clear: glass) {
+                    shape
                         .fill(fill.padFill(glass: glass))
                         .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
-                    PlusShape(armThickness: armWidth)
+                    shape
                         .stroke(Color.white.opacity(0.16), lineWidth: 1)
                 }
-            armView(bits: up, arrow: "arrowtriangle.up.fill", offset: CGSize(width: 0, height: -travel), arm: armWidth)
-            armView(bits: down, arrow: "arrowtriangle.down.fill", offset: CGSize(width: 0, height: travel), arm: armWidth)
-            armView(bits: left, arrow: "arrowtriangle.left.fill", offset: CGSize(width: -travel, height: 0), arm: armWidth)
-            armView(bits: right, arrow: "arrowtriangle.right.fill", offset: CGSize(width: travel, height: 0), arm: armWidth)
+            arrowView(bits: up, arrow: "arrowtriangle.up.fill", direction: CGSize(width: 0, height: -1), travel: travel, arm: armWidth)
+            arrowView(bits: down, arrow: "arrowtriangle.down.fill", direction: CGSize(width: 0, height: 1), travel: travel, arm: armWidth)
+            arrowView(bits: left, arrow: "arrowtriangle.left.fill", direction: CGSize(width: -1, height: 0), travel: travel, arm: armWidth)
+            arrowView(bits: right, arrow: "arrowtriangle.right.fill", direction: CGSize(width: 1, height: 0), travel: travel, arm: armWidth)
             Circle()
                 .fill(Color.black.opacity(0.25))
                 .frame(width: armWidth * 0.42, height: armWidth * 0.42)
         }
+        .animation(pressAnimation, value: shape.animatableData)
         .frame(width: size, height: size)
         .padRegion("dpad.\(up)", .dpad(up: up, down: down, left: left, right: right))
         .accessibilityElement(children: .ignore)
@@ -264,18 +278,58 @@ struct PadDPad: View {
         .accessibilityAction(named: "Right") { input.pulse(right) }
     }
 
-    private func armView(bits: UInt32, arrow: String, offset: CGSize, arm: CGFloat) -> some View {
+    /// The arrow rides on its arm: when the arm pulls in, the arrow comes with it and shrinks.
+    private func arrowView(bits: UInt32, arrow: String, direction: CGSize, travel: CGFloat, arm: CGFloat) -> some View {
         let held = input.isHeld(bits)
-        return ZStack {
-            RoundedRectangle(cornerRadius: arm * 0.2, style: .continuous)
-                .fill(heldFill.opacity(held ? 1 : 0))
-                .frame(width: arm * 0.86, height: arm * 0.86)
-            Image(systemName: arrow)
-                .font(.system(size: max(8, arm * 0.24), weight: .bold))
-                .foregroundStyle(ink.opacity(held ? 1 : 0.5))
+        let distance = travel * (held ? 1 - PressablePlusShape.pressedRetract : 1)
+        return Image(systemName: arrow)
+            .font(.system(size: max(8, arm * 0.26), weight: .bold))
+            .foregroundStyle(ink.opacity(held ? 1 : 0.55))
+            .scaleEffect(held ? 0.88 : 1)
+            .offset(x: direction.width * distance, y: direction.height * distance)
+            .animation(pressAnimation, value: held)
+    }
+}
+
+/// The D-pad as one joined cross whose arms pull in when pressed (0 = up, 1 = pressed): the
+/// pressed arm gets shorter and a little narrower, still attached to the centre, so the glass
+/// shows the press the way the round buttons shrink. Diagonals pull in two arms.
+@available(iOS 18.0, *)
+struct PressablePlusShape: Shape {
+    /// How much of an arm's length a full press takes back, and how much narrower it gets.
+    static let pressedRetract: CGFloat = 0.16
+    static let pressedNarrow: CGFloat = 0.12
+
+    var armThickness: CGFloat
+    var up: CGFloat, down: CGFloat, left: CGFloat, right: CGFloat
+
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+        get { AnimatablePair(AnimatablePair(up, down), AnimatablePair(left, right)) }
+        set { up = newValue.first.first; down = newValue.first.second; left = newValue.second.first; right = newValue.second.second }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let t = min(armThickness, rect.width, rect.height)
+        let cx = rect.midX, cy = rect.midY
+        let reachX = rect.width / 2, reachY = rect.height / 2
+        let radius = t * 0.22
+        var path = Path()
+        func arm(_ press: CGFloat, vertical: Bool, sign: CGFloat) {
+            let reach = (vertical ? reachY : reachX) * (1 - Self.pressedRetract * press)
+            let width = t * (1 - Self.pressedNarrow * press)
+            // From the far side of the centre square out to the arm's tip, so arms always join.
+            let start = -t / 2, end = reach
+            let lo = min(sign * start, sign * end), hi = max(sign * start, sign * end)
+            let r = vertical
+                ? CGRect(x: cx - width / 2, y: cy + lo, width: width, height: hi - lo)
+                : CGRect(x: cx + lo, y: cy - width / 2, width: hi - lo, height: width)
+            path.addRoundedRect(in: r, cornerSize: CGSize(width: radius, height: radius))
         }
-        .offset(offset)
-        .animation(pressAnimation, value: held)
+        arm(up, vertical: true, sign: -1)
+        arm(down, vertical: true, sign: 1)
+        arm(left, vertical: false, sign: -1)
+        arm(right, vertical: false, sign: 1)
+        return path
     }
 }
 
@@ -321,6 +375,9 @@ struct PadStick: View {
                     Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
                 }
                 .shadow(color: .black.opacity(0.45), radius: 3, y: 2)
+                // Pressed down while a thumb (or stick) moves it, like the buttons.
+                .scaleEffect(stick.x != 0 || stick.y != 0 ? 0.92 : 1)
+                .animation(pressAnimation, value: stick.x != 0 || stick.y != 0)
                 .offset(x: CGFloat(stick.x) * travel, y: CGFloat(-stick.y) * travel)
         }
         .frame(width: size, height: size)
