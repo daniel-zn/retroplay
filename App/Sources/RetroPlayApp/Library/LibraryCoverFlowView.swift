@@ -5,7 +5,7 @@ import RetroPlayCore
 
 /// The library as one row of covers you swipe through (the PS Vita RetroFlow launcher's
 /// look): the middle cover faces you, the others stand turned away in a stack on each
-/// side, and the middle game's cover fills the screen behind, blurred.
+/// side, on the same plain background as the grid.
 @available(iOS 18.0, *)
 struct LibraryCoverFlowView<Header: View>: View {
     let games: [LibraryGame]
@@ -82,7 +82,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                 }
             }
         }
-        .background { backdrop }
+        .background(RetroPlayTheme.canvas(for: colorScheme).ignoresSafeArea())
         #if DEBUG
         // UI tests read which cover is in the middle.
         .overlay(alignment: .bottomLeading) {
@@ -268,24 +268,6 @@ struct LibraryCoverFlowView<Header: View>: View {
         return lastPlayedText(game) ?? "Not played yet"
     }
 
-    // MARK: Backdrop
-
-    /// The middle game's cover, blurred and dimmed, cross-fading as the row moves.
-    private var backdrop: some View {
-        ZStack {
-            RetroPlayTheme.canvas(for: colorScheme)
-            if let game = focusedGame {
-                CoverFlowBackdropArt(game: game, cover: artworkProvider(game))
-                    .id(game.id)
-                    .transition(.opacity)
-            }
-            colorScheme == .dark ? Color.black.opacity(0.55) : Color.white.opacity(0.6)
-        }
-        .animation(.easeInOut(duration: 0.45), value: focusedGame?.id)
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
-    }
-
     // MARK: Focus
 
     /// Brings `index` to the middle and remembers it.
@@ -421,62 +403,6 @@ private struct CoverFlowCover: View {
     }
 }
 
-/// The blurred backdrop: a small copy of the cover, scaled up and softened (cheap to draw
-/// at every swipe), or the system's colours for games without a cover.
-@available(iOS 18.0, *)
-private struct CoverFlowBackdropArt: View {
-    let game: LibraryGame
-    let cover: CoverArt?
-
-    var body: some View {
-        Color.clear
-            .overlay {
-                if let cover, let small = CoverFlowBackdropThumbnails.shared.thumbnail(of: cover.image, for: game.id) {
-                    Image(uiImage: small)
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFill()
-                        .blur(radius: 24, opaque: true)
-                        .saturation(1.2)
-                } else {
-                    LinearGradient(
-                        colors: [
-                            RetroPlayTheme.systemTint(game.systemID),
-                            RetroPlayTheme.systemShade(game.systemID)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
-            }
-            .clipped()
-    }
-}
-
-/// Tiny copies of covers for the backdrop, so swiping doesn't blur full-size art.
-@MainActor
-private final class CoverFlowBackdropThumbnails {
-    static let shared = CoverFlowBackdropThumbnails()
-    private let cache = NSCache<NSString, UIImage>()
-
-    init() { cache.countLimit = 64 }
-
-    func thumbnail(of image: UIImage, for id: UUID) -> UIImage? {
-        let key = "\(id.uuidString)-\(ObjectIdentifier(image).hashValue)" as NSString
-        if let cached = cache.object(forKey: key) { return cached }
-        let longest = max(image.size.width, image.size.height)
-        guard longest > 0 else { return nil }
-        let scale = min(1, 48 / longest)
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let small = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
-        }
-        cache.setObject(small, forKey: key)
-        return small
-    }
-}
 
 /// The row's live position, read by the snapping when a swipe is let go (a reference, so the
 /// scroll behaviour sees the latest value without the view redrawing for it).

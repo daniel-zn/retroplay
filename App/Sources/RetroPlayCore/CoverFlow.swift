@@ -83,9 +83,10 @@ public enum CoverFlow {
         /// - `velocity`: points per second, positive towards later games.
         ///
         /// A slow release settles on the nearest cover. A swipe moves one game from the cover
-        /// it started on (or as many as the finger dragged past); faster flicks add one more per
-        /// speed tier, and one gesture never goes more than `maxSwipeTravel` covers unless the
-        /// finger itself dragged further.
+        /// it started on (or as many as the finger dragged past). A fast flick carries on like
+        /// momentum: past `flickVelocity`, one more cover for every `flickCoversPer` points per
+        /// second, up to `maxSwipeTravel` covers in one gesture (unless the finger dragged
+        /// further), so a hard flick runs through the library but never off to the end.
         public func restingIndex(start: Double, release: Double, velocity: Double, count: Int) -> Int {
             guard count > 0, step > 0 else { return 0 }
             let index: Int
@@ -95,7 +96,10 @@ public enum CoverFlow {
                 let direction = velocity > 0 ? 1 : -1
                 let from = Int((start / step).rounded())
                 let dragged = Int(((release - Double(from) * step) / step * Double(direction)).rounded())
-                let extra = CoverFlow.flickTiers.filter { abs(velocity) >= $0 }.count
+                let speed = abs(velocity)
+                let extra = speed > CoverFlow.flickVelocity
+                    ? Int(((speed - CoverFlow.flickVelocity) / CoverFlow.flickCoversPer).rounded(.up))
+                    : 0
                 let travel = min(max(dragged, 1) + extra, max(CoverFlow.maxSwipeTravel, dragged))
                 index = from + direction * travel
             }
@@ -105,10 +109,13 @@ public enum CoverFlow {
 
     /// Below this (points per second) a released swipe just settles on the nearest cover.
     public static let swipeVelocity: Double = 300
-    /// Each speed passed (points per second) carries a flick one cover further.
-    public static let flickTiers: [Double] = [1600, 2800, 4200]
+    /// Faster than this (points per second), a swipe is a flick and carries on.
+    public static let flickVelocity: Double = 1500
+    /// Each this many points per second above `flickVelocity` carries a flick one cover further
+    /// (about 3 covers at 2500, 8 at 4500, 15 at 8000).
+    public static let flickCoversPer: Double = 480
     /// The most covers one swipe moves (unless the finger dragged further).
-    public static let maxSwipeTravel = 4
+    public static let maxSwipeTravel = 24
 
     /// How a cover is drawn at one scroll position.
     public struct Pose: Equatable, Sendable {

@@ -438,24 +438,30 @@ public struct RetroPlayRootView: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("Importing \(gameCountText(store.importsInProgress))")
                     }
-                    // Import first (adds to the library), then the two ways to find a game
-                    // (filter, search) side by side, and Settings at the edge, as across iOS.
-                    LibraryTopBarButton(title: "Import", symbol: "plus") {
-                        showImporter = true
+                }
+                // Import first (adds to the library), then the two ways to find a game (filter,
+                // search) side by side, and Settings at the edge, as across iOS. One item, so
+                // the four share one glass capsule, close together.
+                ToolbarItem(placement: .primaryAction) {
+                    HStack(spacing: 2) {
+                        LibraryTopBarButton(title: "Import", symbol: "plus") {
+                            showImporter = true
+                        }
+                        LibraryFilterMenu(
+                            selection: $systemTab,
+                            sort: sortBinding,
+                            tabs: offeredTabs,
+                            counts: tabCounts
+                        )
+                        .disabled(store.games.isEmpty)
+                        LibraryTopBarButton(title: "Search", symbol: "magnifyingglass") {
+                            openSearch()
+                        }
+                        LibraryTopBarButton(title: "Settings", symbol: "gearshape") {
+                            showSettings = true
+                        }
                     }
-                    LibraryFilterMenu(
-                        selection: $systemTab,
-                        sort: sortBinding,
-                        tabs: offeredTabs,
-                        counts: tabCounts
-                    )
-                    .disabled(store.games.isEmpty)
-                    LibraryTopBarButton(title: "Search", symbol: "magnifyingglass") {
-                        openSearch()
-                    }
-                    LibraryTopBarButton(title: "Settings", symbol: "gearshape") {
-                        showSettings = true
-                    }
+                    .padding(.horizontal, 4)
                 }
             }
             .navigationDestination(item: $playGame) { game in

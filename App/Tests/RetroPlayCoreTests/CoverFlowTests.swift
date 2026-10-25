@@ -158,20 +158,21 @@ final class CoverFlowTests: XCTestCase {
         XCTAssertEqual(rest(8.8, -1100), 9)
     }
 
-    func testStrongFlickMovesABoundedFew() {
-        XCTAssertEqual(rest(10.3, 2000), 12)
-        XCTAssertEqual(rest(10.3, 3000), 13)
-        XCTAssertEqual(rest(10.3, 5000), 14)
-        // A hard flick that also dragged two covers: still at most four.
-        XCTAssertEqual(rest(12.2, 6000), 10 + CoverFlow.maxSwipeTravel)
+    func testFasterFlicksTravelFurther() {
+        // Momentum: the faster the flick, the further it goes.
+        XCTAssertEqual(rest(10.3, 2000), 13)
+        XCTAssertEqual(rest(10.3, 3000), 15)
+        XCTAssertEqual(rest(10.3, 5000), 19)
+        XCTAssertEqual(rest(10.3, 8000), 25)
+        XCTAssertLessThan(rest(10.3, 3000), rest(10.3, 5000))
         // However hard: never past the limit.
-        XCTAssertEqual(rest(10.3, 60_000), 10 + CoverFlow.maxSwipeTravel)
-        XCTAssertEqual(rest(9.7, -60_000), 10 - CoverFlow.maxSwipeTravel)
+        XCTAssertEqual(rest(from: 40, 40.3, 60_000, count: 100), 40 + CoverFlow.maxSwipeTravel)
+        XCTAssertEqual(rest(from: 40, 39.7, -60_000, count: 100), 40 - CoverFlow.maxSwipeTravel)
     }
 
     func testFastLongDragKeepsWhatTheFingerCovered() {
-        // A quick drag across five covers isn't pulled back to four.
-        XCTAssertEqual(rest(15.1, 2000), 15)
+        // A quick drag across five covers, then a flick: at least as far as the finger went.
+        XCTAssertGreaterThanOrEqual(rest(15.1, 2000), 15)
     }
 
     func testFlickAgainstTheDragGoesBackOne() {

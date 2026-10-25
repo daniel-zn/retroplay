@@ -141,9 +141,9 @@ struct LibraryTopBarIcon: View {
             // The bar's scrolled look recolours plain tinted items white; an explicit style
             // keeps the accent.
             .foregroundStyle(RetroPlayTheme.accent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .retroPlayGlassChrome()
+            // Tight: the four sit close together in the top bar's one shared glass capsule.
+            .frame(width: 34, height: 34)
+            .contentShape(Rectangle())
     }
 }
 
