@@ -407,7 +407,7 @@ private struct CoverFlowCover: View {
                     .modifier(CoverFaceEffect(row: row, face: .front, boxWidth: size?.width ?? 0, depth: depth))
                     .background {
                         if let size, depth > 0 {
-                            CoverBoxSide(system: game.systemID, cover: cover)
+                            PackageSpine(system: game.systemID, title: game.displayName, cover: cover)
                                 .opacity(missing ? 0.45 : 1)
                                 .frame(
                                     width: CGFloat(depth),
@@ -435,12 +435,6 @@ private struct CoverFlowCover: View {
             labelTitleSize: 16
         )
         .aspectRatio(aspect, contentMode: .fit)
-        .overlay(alignment: .topLeading) {
-            if let cover, !cover.isBoxArt {
-                SystemBadge(system: game.systemID, style: .onArt)
-                    .padding(6)
-            }
-        }
         .opacity(missing ? 0.45 : 1)
         .overlay(alignment: .topTrailing) {
             if missing {
@@ -450,94 +444,6 @@ private struct CoverFlowCover: View {
                     .padding(8)
             }
         }
-    }
-}
-
-/// The side of a cover's box, drawn (no art: nothing per game is available to use): a
-/// cardboard box takes the colour of its cover's edge, a plastic case its plastic.
-private struct CoverBoxSide: View {
-    let system: SystemID
-    let cover: CoverArt?
-
-    var body: some View {
-        let plastic = CoverBoxSide.plastic(system)
-        Rectangle()
-            .fill(plastic.map { AnyShapeStyle($0) } ?? edgeFill)
-            .overlay {
-                // Rounded towards the back, catching a little light at the front edge.
-                LinearGradient(
-                    stops: [
-                        .init(color: .white.opacity(plastic == nil ? 0.12 : 0.22), location: 0),
-                        .init(color: .clear, location: 0.3),
-                        .init(color: .black.opacity(0.22), location: 1),
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            }
-            .overlay(alignment: .leading) {
-                Rectangle().fill(.white.opacity(0.14)).frame(width: 1)
-            }
-    }
-
-    /// Plastic cases: the PSP's and Genesis's black ones, the DS's white one, the PS1 jewel
-    /// case's dark hinge. Cardboard boxes (nil) take their cover's colour.
-    static func plastic(_ system: SystemID) -> Color? {
-        switch system {
-        case .psp, .genesis: return Color(white: 0.17)
-        case .ps1: return Color(white: 0.24)
-        case .nds: return Color(white: 0.86)
-        case .nes, .snes, .n64, .gba, .atari7800: return nil
-        }
-    }
-
-    /// Box art: the colour down its right edge. The drawn label art: its own gradient.
-    private var edgeFill: AnyShapeStyle {
-        if let cover, cover.isBoxArt, let color = CoverEdgeColor.right(of: cover.image) {
-            return AnyShapeStyle(Color(uiColor: color))
-        }
-        return AnyShapeStyle(LinearGradient(
-            colors: [RetroPlayTheme.systemTint(system).opacity(0.9), RetroPlayTheme.systemShade(system)],
-            startPoint: .top,
-            endPoint: .bottom
-        ))
-    }
-}
-
-/// The average colour down a cover's right edge, so a box's side carries on from its front.
-/// Worked out once per picture.
-@MainActor
-private enum CoverEdgeColor {
-    private static let cache = NSCache<UIImage, UIColor>()
-
-    static func right(of image: UIImage) -> UIColor? {
-        if let known = cache.object(forKey: image) { return known }
-        guard let cg = image.cgImage, cg.width > 4, cg.height > 0 else { return nil }
-        let strip = max(cg.width / 25, 1)
-        guard let edge = cg.cropping(to: CGRect(x: cg.width - strip, y: 0, width: strip, height: cg.height)) else {
-            return nil
-        }
-        var pixel = [UInt8](repeating: 0, count: 4)
-        let drawn = pixel.withUnsafeMutableBytes { bytes -> Bool in
-            guard let context = CGContext(
-                data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ) else { return false }
-            context.interpolationQuality = .medium
-            context.draw(edge, in: CGRect(x: 0, y: 0, width: 1, height: 1))
-            return true
-        }
-        guard drawn else { return nil }
-        // A touch darker than the edge: the side faces away from the light.
-        let color = UIColor(
-            red: CGFloat(pixel[0]) / 255 * 0.9,
-            green: CGFloat(pixel[1]) / 255 * 0.9,
-            blue: CGFloat(pixel[2]) / 255 * 0.9,
-            alpha: 1
-        )
-        cache.setObject(color, forKey: image)
-        return color
     }
 }
 

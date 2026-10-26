@@ -25,10 +25,15 @@ struct GameArtworkView: View {
                         .resizable()
                         .interpolation(.medium)
                         .scaledToFill()
-                } else if let artwork {
-                    artworkImage(artwork)
                 } else {
-                    labelArt
+                    // No box art: the system's own package, with the game's icon or title in it.
+                    PackageFront(package: RetailPackage.of(game.systemID)) {
+                        if let artwork {
+                            artworkImage(artwork)
+                        } else {
+                            labelArt
+                        }
+                    }
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -84,7 +89,6 @@ struct GameArtworkView: View {
                 }
             }
             VStack(alignment: .leading, spacing: 0) {
-                SystemBadge(system: game.systemID, style: .onArt)
                 Spacer(minLength: 4)
                 Text(game.displayName)
                     .font(RetroPlayFont.sized(labelTitleSize + 2, relativeTo: .caption))
@@ -163,13 +167,8 @@ struct GameTileView: View {
                         cornerRadius: 8
                     )
                     .aspectRatio(coverAspect, contentMode: .fit)
-                    // Box art carries the system's own branding, and the subtitle names it.
-                    .overlay(alignment: .topLeading) {
-                        if let cover, !cover.isBoxArt {
-                            SystemBadge(system: game.systemID, style: .onArt)
-                                .padding(5)
-                        }
-                    }
+                    // Box art carries the system's own branding, and any other cover the
+                    // system's package band.
                     .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 6, y: 3)
                 }
 

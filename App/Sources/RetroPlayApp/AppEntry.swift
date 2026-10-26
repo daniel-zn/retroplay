@@ -126,6 +126,9 @@ public struct RetroPlayRootView: View {
 
     public var body: some View {
         libraryNavigation
+        #if DEBUG
+        .overlay { if UserDefaults.standard.bool(forKey: "RetroPlaySmokePackages") { RetailPackageGallery() } }
+        #endif
         .environment(\.font, RetroPlayFont.body)
         .environment(navigator)
         .task { navigator.start() }
