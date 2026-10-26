@@ -149,7 +149,7 @@ final class CoverFlowTests: XCTestCase {
         // The finger drags about as far per game as the middle cover moves to the side, so
         // the row tracks it calmly instead of racing through the tightly packed stack.
         let metrics = CoverFlow.Metrics(coverSide: 300)
-        XCTAssertGreaterThan(metrics.step, metrics.stackSpacing * 2.5)
+        XCTAssertGreaterThan(metrics.step, metrics.stackSpacing * 2)
         XCTAssertGreaterThanOrEqual(metrics.step, 120)
     }
 

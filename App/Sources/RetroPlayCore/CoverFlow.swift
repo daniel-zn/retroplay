@@ -147,7 +147,7 @@ public enum CoverFlow {
             let side = max(minimum, min(width * 0.68, height * aspect, 440).rounded(.down))
             return Metrics(
                 coverWidth: side,
-                coverHeight: (side / aspect).rounded(.down),
+                coverHeight: (side / aspect).rounded(.up),
                 boxDepth: (side * deepestBox).rounded()
             )
         }
