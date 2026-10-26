@@ -22,17 +22,135 @@ extension CoverFlow {
         case bottom
     }
 
-    /// A cover's box: as wide and tall as its cover, `depth` deep.
+    /// A cover's box: as wide and tall as its cover, `depth` deep, its front, side and top
+    /// edges rounded to `radius` (0: sharp).
     public struct Box: Equatable, Sendable {
         public let width: Double
         public let height: Double
         public let depth: Double
+        public let radius: Double
 
-        public init(width: Double, height: Double, depth: Double) {
+        public init(width: Double, height: Double, depth: Double, radius: Double = 0) {
             self.width = width
             self.height = height
             self.depth = depth
+            // No more than half the depth, and a sliver of the width.
+            self.radius = max(0, min(radius, depth / 2, width / 5, height / 5))
         }
+    }
+
+    /// The rounded edges the player sees: front to side, front to top, side to top.
+    public enum Edge: CaseIterable, Sendable {
+        case frontRight
+        case frontTop
+        case rightTop
+    }
+
+    /// One flat piece of a box's surface: a face (trimmed where its edges are rounded), a
+    /// facet of a rounded edge, or a facet of the rounded corner where the three meet.
+    public enum Surface: Hashable, Sendable {
+        case face(Face)
+        case edge(Edge, Int)
+        case corner(Int, Int)
+    }
+
+    /// How many flat facets make up a rounded edge (and each way round the corner).
+    public static let edgeFacets = 3
+
+    /// A flat piece of a box: lying in the plane its `turn` takes the screen's to, centred on
+    /// `centre` (from the box's centre), `width` × `height` as a picture.
+    public struct Panel: Sendable {
+        public let surface: Surface
+        let turn: Matrix
+        let centre: Vector
+        public let width: Double
+        public let height: Double
+    }
+
+    /// Every piece of a box's surface.
+    public static func panels(_ box: Box) -> [Panel] {
+        var all = Face.allCases.map { panel(.face($0), box) }
+        if box.radius > 0 {
+            for edge in Edge.allCases {
+                for k in 0..<edgeFacets { all.append(panel(.edge(edge, k), box)) }
+            }
+            for i in 0..<edgeFacets {
+                for j in 0..<edgeFacets { all.append(panel(.corner(i, j), box)) }
+            }
+        }
+        return all
+    }
+
+    /// The pieces that can ever face the player as the row turns its boxes (left facing,
+    /// seen from above): the front, the right side, the top and the rounding between them.
+    public static func drawnPanels(_ box: Box) -> [Panel] {
+        panels(box).filter { panel in
+            switch panel.surface {
+            case .face(let face): return [.front, .right, .top].contains(face)
+            case .edge, .corner: return true
+            }
+        }
+    }
+
+    public static func panel(_ surface: Surface, _ box: Box) -> Panel {
+        let w = box.width, h = box.height, d = box.depth, r = box.radius
+        let step = 90.0 / Double(edgeFacets)
+        let chord = 2 * r * sin(step / 2 * .pi / 180)
+        let reach = r * cos(step / 2 * .pi / 180)
+        func y(_ degrees: Double) -> Matrix { rotation(axis: (0, 1, 0), degrees: degrees) }
+        func x(_ degrees: Double) -> Matrix { rotation(axis: (1, 0, 0), degrees: degrees) }
+        func z(_ degrees: Double) -> Matrix { rotation(axis: (0, 0, 1), degrees: degrees) }
+        func rad(_ degrees: Double) -> Double { degrees * .pi / 180 }
+        switch surface {
+        case .face(.front):
+            return Panel(surface: surface, turn: y(0), centre: (-r / 2, r / 2, d / 2), width: w - r, height: h - r)
+        case .face(.right):
+            return Panel(surface: surface, turn: y(90), centre: (w / 2, r / 2, -r / 2), width: d - r, height: h - r)
+        case .face(.top):
+            return Panel(surface: surface, turn: x(90), centre: (-r / 2, -h / 2, -r / 2), width: w - r, height: d - r)
+        case .face(.back):
+            return Panel(surface: surface, turn: y(180), centre: (0, 0, -d / 2), width: w, height: h)
+        case .face(.left):
+            return Panel(surface: surface, turn: y(-90), centre: (-w / 2, 0, 0), width: d, height: h)
+        case .face(.bottom):
+            return Panel(surface: surface, turn: x(-90), centre: (0, h / 2, 0), width: w, height: d)
+        case .edge(.frontRight, let k):
+            // Round a vertical axis at the front right, from facing front to facing right.
+            let a = rad((Double(k) + 0.5) * step)
+            return Panel(surface: surface, turn: y((Double(k) + 0.5) * step),
+                         centre: (w / 2 - r + reach * sin(a), r / 2, d / 2 - r + reach * cos(a)),
+                         width: chord, height: h - r)
+        case .edge(.frontTop, let k):
+            // Round a horizontal axis along the front's top, from facing front to facing up.
+            let a = rad((Double(k) + 0.5) * step)
+            return Panel(surface: surface, turn: x((Double(k) + 0.5) * step),
+                         centre: (-r / 2, -h / 2 + r - reach * sin(a), d / 2 - r + reach * cos(a)),
+                         width: w - r, height: chord)
+        case .edge(.rightTop, let k):
+            // Round an axis running back along the side's top, from facing right to facing up.
+            let degrees = (Double(k) + 0.5) * step, a = rad(degrees)
+            return Panel(surface: surface, turn: multiply(z(-degrees), y(90)),
+                         centre: (w / 2 - r + reach * cos(a), -h / 2 + r - reach * sin(a), -r / 2),
+                         width: d - r, height: chord)
+        case .corner(let i, let j):
+            // A patch of a sphere's eighth: round from front to right (i), front to top (j).
+            let around = (Double(i) + 0.5) * step, up = (Double(j) + 0.5) * step
+            let a = rad(around), e = rad(up)
+            let out = reach * reach / r
+            return Panel(surface: surface, turn: multiply(y(around), x(up)),
+                         centre: (w / 2 - r + out * sin(a) * cos(e), -h / 2 + r - out * sin(e),
+                                  d / 2 - r + out * cos(a) * cos(e)),
+                         width: chord * cos(e) + chord * 0.15, height: chord)
+        }
+    }
+
+    /// How much lighter (positive) or darker a piece is drawn for the way it faces, lit from
+    /// above, a little to the left and in front; the front, facing the player, is 0.
+    public static func shade(facing normal: (x: Double, y: Double, z: Double)) -> Double {
+        let light: Vector = (-0.25, -0.75, 0.62)
+        let length = (light.x * light.x + light.y * light.y + light.z * light.z).squareRoot()
+        let lit = (normal.x * light.x + normal.y * light.y + normal.z * light.z) / length
+        return 0.16 * (lit - light.z / length)
     }
 
     typealias Vector = (x: Double, y: Double, z: Double)
@@ -90,19 +208,6 @@ extension CoverFlow {
     /// How a box turned `yaw` degrees (negative faces left) stands: tipped back by `pitch`.
     static func boxTurn(yaw: Double) -> Matrix {
         multiply(rotation(axis: (1, 0, 0), degrees: pitch), rotation(axis: (0, 1, 0), degrees: yaw))
-    }
-
-    /// Where a face lies before the box turns: a turn taking the front's place to the face's,
-    /// and how far out from the centre it stands.
-    static func rest(_ face: Face, _ box: Box) -> (turn: Matrix, offset: Double) {
-        switch face {
-        case .front: return (rotation(axis: (0, 1, 0), degrees: 0), box.depth / 2)
-        case .back: return (rotation(axis: (0, 1, 0), degrees: 180), box.depth / 2)
-        case .right: return (rotation(axis: (0, 1, 0), degrees: 90), box.width / 2)
-        case .left: return (rotation(axis: (0, 1, 0), degrees: -90), box.width / 2)
-        case .top: return (rotation(axis: (1, 0, 0), degrees: 90), box.height / 2)
-        case .bottom: return (rotation(axis: (1, 0, 0), degrees: -90), box.height / 2)
-        }
     }
 
     /// A face's size as a flat picture: the front and back are the cover, the sides as deep
@@ -163,26 +268,55 @@ extension CoverFlow {
 }
 
 extension CoverFlow.Metrics {
-    /// How to draw one face with SwiftUI's `rotation3DEffect`, its view centred on the box:
-    /// move it by `shift`, then turn it by `degrees` about `axis` round the point `anchorY`
-    /// down its height (a unit point) and `anchorZ` behind it. That point is the same for
-    /// every face (level with the box's top, at its centre's depth) and the eye looks out from
-    /// it, so with `facePerspective` all the faces are drawn through one eye and meet.
+    /// How to draw a piece with SwiftUI's `rotation3DEffect`, its view centred on the box: move
+    /// it by `shift`, then turn it by `degrees` about `axis` round the point `anchorY` down its
+    /// height (a unit point) and `anchorZ` behind it. That point is the same for every piece
+    /// (level with the box's top, at its centre's depth) and the eye looks out from it, so with
+    /// `facePerspective` all the pieces are drawn through one eye and meet.
+    public func panelTurn(_ panel: CoverFlow.Panel, _ box: CoverFlow.Box, yaw: Double)
+        -> (axis: (x: Double, y: Double, z: Double), degrees: Double,
+            shift: (x: Double, y: Double), anchorY: Double, anchorZ: Double)
+    {
+        let turn = CoverFlow.multiply(CoverFlow.boxTurn(yaw: yaw), panel.turn)
+        // The piece's place before the turn, so turning round the eye's point lands it right:
+        // its centre in its own frame, plus the pivot less the pivot turned back.
+        let pivot: CoverFlow.Vector = (0, CoverFlow.eyeLevel(box), 0)
+        let own = CoverFlow.apply(CoverFlow.transpose(panel.turn), panel.centre)
+        let back = CoverFlow.apply(CoverFlow.transpose(turn), pivot)
+        let shift = (x: own.x + pivot.x - back.x, y: own.y + pivot.y - back.y, z: own.z + pivot.z - back.z)
+        let axisAngle = CoverFlow.axisAngle(turn)
+        return (axisAngle.axis, axisAngle.degrees, (shift.x, shift.y),
+                panel.height > 0 ? 0.5 + pivot.y / panel.height : 0.5, -shift.z)
+    }
+
+    /// Where a piece's point (`u`, `v` from its top left) is drawn, from the box's centre.
+    public func drawn(_ panel: CoverFlow.Panel, _ box: CoverFlow.Box, yaw: Double, u: Double, v: Double) -> (x: Double, y: Double) {
+        let turn = CoverFlow.boxTurn(yaw: yaw)
+        let local = CoverFlow.apply(panel.turn, (u - panel.width / 2, v - panel.height / 2, 0))
+        let q = CoverFlow.apply(turn, (local.x + panel.centre.x, local.y + panel.centre.y, local.z + panel.centre.z))
+        return CoverFlow.project(q, box, eye: eye)
+    }
+
+    /// Whether a piece is turned towards the eye (otherwise it's hidden behind the box).
+    public func isFacing(_ panel: CoverFlow.Panel, _ box: CoverFlow.Box, yaw: Double) -> Bool {
+        let boxTurn = CoverFlow.boxTurn(yaw: yaw)
+        let normal = CoverFlow.apply(CoverFlow.multiply(boxTurn, panel.turn), (0, 0, 1))
+        let centre = CoverFlow.apply(boxTurn, panel.centre)
+        let level = CoverFlow.eyeLevel(box)
+        return normal.z * (eye - centre.z) - normal.x * centre.x + normal.y * (level - centre.y) > 1e-9
+    }
+
+    /// The way a piece faces once its box is turned `yaw`, for its lighting.
+    public func normal(_ panel: CoverFlow.Panel, yaw: Double) -> (x: Double, y: Double, z: Double) {
+        CoverFlow.apply(CoverFlow.multiply(CoverFlow.boxTurn(yaw: yaw), panel.turn), (0, 0, 1))
+    }
+
+    /// `panelTurn` for one whole face.
     public func faceTurn(_ face: CoverFlow.Face, _ box: CoverFlow.Box, yaw: Double)
         -> (axis: (x: Double, y: Double, z: Double), degrees: Double,
             shift: (x: Double, y: Double), anchorY: Double, anchorZ: Double)
     {
-        let rest = CoverFlow.rest(face, box)
-        let turn = CoverFlow.multiply(CoverFlow.boxTurn(yaw: yaw), rest.turn)
-        // The face's place before the turn, so turning round the eye's point lands it right:
-        // its offset out from the centre, plus the pivot less the pivot turned back.
-        let pivot: CoverFlow.Vector = (0, CoverFlow.eyeLevel(box), 0)
-        let back = CoverFlow.apply(CoverFlow.transpose(turn), pivot)
-        let shift = (x: pivot.x - back.x, y: pivot.y - back.y, z: rest.offset + pivot.z - back.z)
-        let size = CoverFlow.faceSize(face, box)
-        let axisAngle = CoverFlow.axisAngle(turn)
-        return (axisAngle.axis, axisAngle.degrees, (shift.x, shift.y),
-                size.height > 0 ? 0.5 + pivot.y / size.height : 0.5, -shift.z)
+        panelTurn(CoverFlow.panel(.face(face), box), box, yaw: yaw)
     }
 
     /// The `perspective` that puts the eye `eye` points from a face `width` × `height`
@@ -193,21 +327,12 @@ extension CoverFlow.Metrics {
 
     /// Where a face's point (`u`, `v` from its top left) is drawn, from the box's centre.
     public func drawn(_ face: CoverFlow.Face, _ box: CoverFlow.Box, yaw: Double, u: Double, v: Double) -> (x: Double, y: Double) {
-        let rest = CoverFlow.rest(face, box)
-        let size = CoverFlow.faceSize(face, box)
-        let turn = CoverFlow.multiply(CoverFlow.boxTurn(yaw: yaw), rest.turn)
-        let q = CoverFlow.apply(turn, (u - size.width / 2, v - size.height / 2, rest.offset))
-        return CoverFlow.project(q, box, eye: eye)
+        drawn(CoverFlow.panel(.face(face), box), box, yaw: yaw, u: u, v: v)
     }
 
     /// Whether a face is turned towards the eye (otherwise it's hidden behind the box).
     public func isFacing(_ face: CoverFlow.Face, _ box: CoverFlow.Box, yaw: Double) -> Bool {
-        let rest = CoverFlow.rest(face, box)
-        let turn = CoverFlow.multiply(CoverFlow.boxTurn(yaw: yaw), rest.turn)
-        let normal = CoverFlow.apply(turn, (0, 0, 1))
-        let centre = CoverFlow.apply(turn, (0, 0, rest.offset))
-        let level = CoverFlow.eyeLevel(box)
-        return normal.z * (eye - centre.z) - normal.x * centre.x + normal.y * (level - centre.y) > 1e-9
+        isFacing(CoverFlow.panel(.face(face), box), box, yaw: yaw)
     }
 
     /// How far left and right of its centre a box turned `yaw` is drawn.

@@ -397,52 +397,79 @@ private struct CoverFlowCover: View {
         return RetroPlayTheme.boxArtAspect(game.systemID)
     }
 
-    /// The faces a box shows besides its front as it turns (the others always face away).
-    private static let boxFaces = CoverFlow.shownFaces.filter { $0 != .front }
-
     var body: some View {
         let size = row.map { $0.metrics.coverSize(aspect: Double(aspect)) }
         let depth = row.map { ($0.metrics.coverWidth * CoverFlow.boxDepth(game.systemID)).rounded() } ?? 0
-        let box = size.map { CoverFlow.Box(width: $0.width, height: $0.height, depth: depth) }
+        let package = RetailPackage.of(game.systemID)
         Color.clear
             .overlay(alignment: .bottom) {
-                front
-                    .frame(maxWidth: size.map { CGFloat($0.width) }, maxHeight: size.map { CGFloat($0.height) })
-                    .modifier(CoverFaceEffect(row: row, face: .front, box: box))
-                    .background {
-                        // The rest of the box, every face centred on the front's centre and
-                        // turned into place round the box's centre.
-                        if let box, depth > 0 {
-                            ZStack {
-                                ForEach(Self.boxFaces, id: \.self) { face in
-                                    let faceSize = CoverFlow.faceSize(face, box)
-                                    boxFace(face)
-                                        .opacity(missing ? 0.45 : 1)
-                                        .frame(width: CGFloat(faceSize.width), height: CGFloat(faceSize.height))
-                                        .modifier(CoverFaceEffect(row: row, face: face, box: box))
-                                }
-                            }
+                if let row, let size, depth > 0 {
+                    let box = CoverFlow.Box(width: size.width, height: size.height, depth: depth,
+                                            radius: depth * package.edgeRounding)
+                    let colors = BoxColors(system: game.systemID, package: package, cover: cover)
+                    // The whole box: every piece of it centred on the box's centre and turned
+                    // into place round it through one eye (the hidden ones fade out).
+                    // Every piece is drawn in the same square canvas (centred on the box), so the
+                    // 3D turn treats them all alike whatever their own size.
+                    let canvas = CGFloat(max(box.width, box.height))
+                    ZStack {
+                        ForEach(CoverFlow.drawnPanels(box), id: \.surface) { panel in
+                            piece(panel, box: box, colors: colors)
+                                .frame(width: CGFloat(panel.width) + seam(panel).width,
+                                       height: CGFloat(panel.height) + seam(panel).height)
+                                .frame(width: canvas, height: canvas)
+                                .modifier(CoverPanelEffect(row: row, panel: panel, box: box))
                         }
                     }
+                    .frame(width: CGFloat(box.width), height: CGFloat(box.height))
                     .shadow(
                         color: .black.opacity(shadow ? (colorScheme == .dark ? 0.55 : 0.25) : 0),
                         radius: 14,
                         y: 8
                     )
+                } else {
+                    front
+                        .frame(maxWidth: size.map { CGFloat($0.width) }, maxHeight: size.map { CGFloat($0.height) })
+                        .shadow(
+                            color: .black.opacity(shadow ? (colorScheme == .dark ? 0.55 : 0.25) : 0),
+                            radius: 14,
+                            y: 8
+                        )
+                }
             }
             .contentShape(Rectangle())
             .accessibilityHidden(true)
     }
 
+    /// A rounded edge's facets overlap a hair so no seam shows between them.
+    private func seam(_ panel: CoverFlow.Panel) -> CGSize {
+        switch panel.surface {
+        case .face: return .zero
+        case .edge(.frontRight, _): return CGSize(width: 0.8, height: 0)
+        case .edge: return CGSize(width: 0, height: 0.8)
+        case .corner: return CGSize(width: 0.8, height: 0.8)
+        }
+    }
+
     @ViewBuilder
-    private func boxFace(_ face: CoverFlow.Face) -> some View {
-        switch face {
-        case .left, .right:
-            PackageSpine(system: game.systemID, title: game.displayName, cover: cover)
-        case .top, .bottom:
-            PackageTop(system: game.systemID, cover: cover)
-        case .front, .back:
+    private func piece(_ panel: CoverFlow.Panel, box: CoverFlow.Box, colors: BoxColors) -> some View {
+        switch panel.surface {
+        case .face(.front), .face(.back):
+            // The cover, less the strip its rounded right and top edges take.
             front
+                .frame(width: CGFloat(box.width), height: CGFloat(box.height))
+                .frame(width: CGFloat(panel.width), height: CGFloat(panel.height), alignment: .bottomLeading)
+                .clipped()
+        case .face(.left), .face(.right):
+            PackageSpine(system: game.systemID, title: game.displayName, cover: cover, cornerRadius: 0)
+                .opacity(missing ? 0.45 : 1)
+        case .face(.top), .face(.bottom):
+            PackageTop(system: game.systemID, cover: cover, cornerRadius: 0)
+                .opacity(missing ? 0.45 : 1)
+        case .edge(.frontRight, _):
+            colors.side.opacity(missing ? 0.45 : 1)
+        case .edge, .corner:
+            colors.top.opacity(missing ? 0.45 : 1)
         }
     }
 
@@ -467,46 +494,59 @@ private struct CoverFlowCover: View {
     }
 }
 
-/// Turns one face of a cover's box into place for where the cover stands in the row: every
-/// face turns about the box's centre through the same eye, so the faces meet; faces turned
-/// away from the player are hidden.
-private struct CoverFaceEffect: ViewModifier {
-    let row: CoverFlowRow?
-    let face: CoverFlow.Face
-    let box: CoverFlow.Box?
+/// The colours round a box's rounded edges: a case's plastic, or on a cardboard box the
+/// colour of its cover's edge (the art printed round it).
+private struct BoxColors {
+    let side: Color
+    let top: Color
+
+    @MainActor
+    init(system: SystemID, package: RetailPackage, cover: CoverArt?) {
+        let art = cover.flatMap { $0.isBoxArt ? $0.image : nil }
+        if let plastic = package.plastic {
+            side = plastic.color
+            top = plastic.color
+        } else {
+            let tint = RetroPlayTheme.systemTint(system)
+            side = art.flatMap { CoverEdgeColor.right(of: $0) }.map { Color(uiColor: $0) } ?? tint
+            top = art.flatMap { CoverEdgeColor.top(of: $0) }.map { Color(uiColor: $0) } ?? tint
+        }
+    }
+}
+
+/// Turns one piece of a cover's box into place for where the cover stands in the row: every
+/// piece turns about the same point through the same eye, so they meet; pieces turned away
+/// from the player are hidden, and each is lit by the way it faces.
+private struct CoverPanelEffect: ViewModifier {
+    let row: CoverFlowRow
+    let panel: CoverFlow.Panel
+    let box: CoverFlow.Box
 
     func body(content: Content) -> some View {
-        if let row, let box {
-            content.visualEffect { content, proxy in
-                let frame = proxy.frame(in: .scrollView(axis: .horizontal))
-                let pose = row.metrics.pose(distance: Double(frame.midX - row.middle))
-                let turn = row.metrics.faceTurn(face, box, yaw: pose.rotation)
-                let facing = row.metrics.isFacing(face, box, yaw: pose.rotation)
-                // Lit from above: the top a little brighter, the sides a little darker.
-                let light: Double = switch face {
-                case .top: 0.06
-                case .left, .right: -0.05
-                case .bottom: -0.15
-                case .front, .back: 0
-                }
-                return content
-                    .offset(x: turn.shift.x, y: turn.shift.y)
-                    .rotation3DEffect(
-                        .degrees(turn.degrees),
-                        axis: (x: turn.axis.x, y: turn.axis.y, z: turn.axis.z),
-                        anchor: UnitPoint(x: 0.5, y: turn.anchorY),
-                        anchorZ: turn.anchorZ,
-                        perspective: row.metrics.facePerspective(
-                            width: Double(proxy.size.width),
-                            height: Double(proxy.size.height)
-                        )
+        content.visualEffect { content, proxy in
+            let frame = proxy.frame(in: .scrollView(axis: .horizontal))
+            let pose = row.metrics.pose(distance: Double(frame.midX - row.middle))
+            let turn = row.metrics.panelTurn(panel, box, yaw: pose.rotation)
+            let facing = row.metrics.isFacing(panel, box, yaw: pose.rotation)
+            let light = CoverFlow.shade(facing: row.metrics.normal(panel, yaw: pose.rotation))
+            // The anchor's height, as a share of the canvas the piece is drawn in.
+            let height = max(Double(proxy.size.height), 0.001)
+            let anchorY = 0.5 + (turn.anchorY - 0.5) * panel.height / height
+            return content
+                .offset(x: turn.shift.x, y: turn.shift.y)
+                .rotation3DEffect(
+                    .degrees(turn.degrees),
+                    axis: (x: turn.axis.x, y: turn.axis.y, z: turn.axis.z),
+                    anchor: UnitPoint(x: 0.5, y: anchorY),
+                    anchorZ: turn.anchorZ,
+                    perspective: row.metrics.facePerspective(
+                        width: Double(proxy.size.width),
+                        height: Double(proxy.size.height)
                     )
-                    .opacity(facing ? 1 : 0)
-                    .brightness(light - pose.dimming)
-                    .offset(x: pose.xShift)
-            }
-        } else {
-            content
+                )
+                .opacity(facing ? 1 : 0)
+                .brightness(light - pose.dimming)
+                .offset(x: pose.xShift)
         }
     }
 }

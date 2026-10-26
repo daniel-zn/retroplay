@@ -466,6 +466,135 @@ final class CoverFlowTests: XCTestCase {
         }
     }
 
+    private func rounded(_ metrics: CoverFlow.Metrics) -> CoverFlow.Box {
+        CoverFlow.Box(width: metrics.coverWidth, height: metrics.coverHeight,
+                      depth: max(metrics.boxDepth, 20), radius: max(metrics.boxDepth, 20) * 0.45)
+    }
+
+    private func same(_ a: (x: Double, y: Double), _ b: (x: Double, y: Double), _ note: String) {
+        XCTAssertEqual(a.x, b.x, accuracy: 1e-6, note)
+        XCTAssertEqual(a.y, b.y, accuracy: 1e-6, note)
+    }
+
+    func testRoundedEdgesJoinTheFacesWithoutGaps() {
+        // Each rounded edge runs from one face to the next in facets that share their edges:
+        // front → facets → side, front → facets → top, side → facets → top.
+        let n = CoverFlow.edgeFacets
+        for metrics in rows {
+            let box = rounded(metrics)
+            XCTAssertGreaterThan(box.radius, 0)
+            func p(_ s: CoverFlow.Surface) -> CoverFlow.Panel { CoverFlow.panel(s, box) }
+            let front = p(.face(.front)), right = p(.face(.right)), top = p(.face(.top))
+            for yaw in turns {
+                func at(_ panel: CoverFlow.Panel, _ u: Double, _ v: Double) -> (x: Double, y: Double) {
+                    metrics.drawn(panel, box, yaw: yaw, u: u, v: v)
+                }
+                for v in [0, front.height / 2, front.height] {
+                    var edge = at(front, front.width, v)
+                    for k in 0..<n {
+                        let facet = p(.edge(.frontRight, k))
+                        same(at(facet, 0, v), edge, "front-right \(k) at \(yaw)")
+                        edge = at(facet, facet.width, v)
+                    }
+                    same(at(right, 0, v), edge, "into the side at \(yaw)")
+                }
+                for u in [0, front.width / 2, front.width] {
+                    var edge = at(front, u, 0)
+                    for k in 0..<n {
+                        let facet = p(.edge(.frontTop, k))
+                        same(at(facet, u, facet.height), edge, "front-top \(k) at \(yaw)")
+                        edge = at(facet, u, 0)
+                    }
+                    same(at(top, u, top.height), edge, "onto the top at \(yaw)")
+                }
+                for u in [0, right.width / 2, right.width] {
+                    var edge = at(right, u, 0)
+                    for k in 0..<n {
+                        let facet = p(.edge(.rightTop, k))
+                        same(at(facet, u, facet.height), edge, "side-top \(k) at \(yaw)")
+                        edge = at(facet, u, 0)
+                    }
+                    same(at(top, top.width, top.height - u), edge, "onto the top's side at \(yaw)")
+                }
+            }
+        }
+    }
+
+    func testTheCornerRoundsBetweenItsThreeFaces() {
+        // The corner's facets sit on the rounding's sphere and face between front, side and top.
+        let metrics = CoverFlow.Metrics.fitting(width: 402, height: 560, deepestBox: 0.15)
+        let box = rounded(metrics)
+        let centre = (x: box.width / 2 - box.radius, y: -box.height / 2 + box.radius, z: box.depth / 2 - box.radius)
+        for i in 0..<CoverFlow.edgeFacets {
+            for j in 0..<CoverFlow.edgeFacets {
+                let panel = CoverFlow.panel(.corner(i, j), box)
+                let c = panel.centre
+                let distance = ((c.x - centre.x) * (c.x - centre.x) + (c.y - centre.y) * (c.y - centre.y)
+                    + (c.z - centre.z) * (c.z - centre.z)).squareRoot()
+                XCTAssertLessThanOrEqual(distance, box.radius + 1e-9)
+                XCTAssertGreaterThan(distance, box.radius * 0.9)
+                let normal = CoverFlow.apply(panel.turn, (0, 0, 1))
+                XCTAssertGreaterThan(normal.x, 0)
+                XCTAssertLessThan(normal.y, 0)
+                XCTAssertGreaterThan(normal.z, 0)
+            }
+        }
+    }
+
+    func testRotationsDrawEveryPieceWhereTheBoxPlacesIt() {
+        for metrics in rows {
+            let box = rounded(metrics)
+            for yaw in turns {
+                for panel in CoverFlow.panels(box) {
+                    let turn = metrics.panelTurn(panel, box, yaw: yaw)
+                    let eye = max(panel.width, panel.height)
+                        / metrics.facePerspective(width: panel.width, height: panel.height)
+                    let m = CoverFlow.rotation(axis: turn.axis, degrees: turn.degrees)
+                    let anchorY = (turn.anchorY - 0.5) * panel.height
+                    for (u, v) in [(0.0, 0.0), (panel.width, panel.height), (panel.width / 3, panel.height / 2)] {
+                        let q = CoverFlow.apply(m, (u - panel.width / 2 + turn.shift.x,
+                                                    v - panel.height / 2 + turn.shift.y - anchorY,
+                                                    -turn.anchorZ))
+                        let k = eye / (eye - q.z)
+                        let expected = metrics.drawn(panel, box, yaw: yaw, u: u, v: v)
+                        XCTAssertEqual(q.x * k, expected.x, accuracy: 1e-6, "\(panel.surface) at \(yaw)")
+                        XCTAssertEqual(anchorY + q.y * k, expected.y, accuracy: 1e-6, "\(panel.surface) at \(yaw)")
+                    }
+                }
+            }
+        }
+    }
+
+    func testRoundedPiecesAreLitByTheWayTheyFace() {
+        // Lit from above: shading climbs from the front round the edge towards the light; the
+        // top is lighter than the front, the side darker.
+        let box = CoverFlow.Box(width: 200, height: 280, depth: 30, radius: 12)
+        let metrics = CoverFlow.Metrics(coverWidth: 200, coverHeight: 280, boxDepth: 30)
+        func light(_ s: CoverFlow.Surface) -> Double {
+            CoverFlow.shade(facing: metrics.normal(CoverFlow.panel(s, box), yaw: 0))
+        }
+        var last = light(.face(.front))
+        for k in 0..<CoverFlow.edgeFacets {
+            let now = light(.edge(.frontTop, k))
+            XCTAssertGreaterThan(now, last)
+            last = now
+        }
+        XCTAssertGreaterThan(light(.face(.top)), light(.face(.front)))
+        XCTAssertLessThan(CoverFlow.shade(facing: (1, 0, 0)), CoverFlow.shade(facing: (0, 0, 1)))
+        XCTAssertEqual(CoverFlow.shade(facing: (0, 0, 1)), 0, accuracy: 1e-12)
+    }
+
+    func testSharpBoxesHaveJustTheirFaces() {
+        let box = CoverFlow.Box(width: 200, height: 280, depth: 30)
+        XCTAssertEqual(CoverFlow.panels(box).count, 6)
+        XCTAssertEqual(Set(CoverFlow.drawnPanels(box).map(\.surface)), [.face(.front), .face(.right), .face(.top)])
+        let roundedBox = CoverFlow.Box(width: 200, height: 280, depth: 30, radius: 10)
+        let n = CoverFlow.edgeFacets
+        XCTAssertEqual(CoverFlow.panels(roundedBox).count, 6 + 3 * n + n * n)
+        // The rounding stays within the box.
+        XCTAssertEqual(CoverFlow.Box(width: 200, height: 280, depth: 30, radius: 99).radius, 15)
+    }
+
     func testAxisAndAngleGiveBackTheTurn() {
         for axis in [(x: 1.0, y: 0.0, z: 0.0), (0, 1, 0), (0.3, -0.8, 0.2)] {
             for degrees in [0.0, 10, 90, 135, 180] {

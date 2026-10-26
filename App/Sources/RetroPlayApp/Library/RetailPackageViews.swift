@@ -304,13 +304,31 @@ private extension UIColor {
 enum CoverEdgeColor {
     private static let cache = NSCache<UIImage, UIColor>()
 
+    private static let topCache = NSCache<UIImage, UIColor>()
+
     static func right(of image: UIImage) -> UIColor? {
         if let known = cache.object(forKey: image) { return known }
         guard let cg = image.cgImage, cg.width > 4, cg.height > 0 else { return nil }
         let strip = max(cg.width / 25, 1)
-        guard let edge = cg.cropping(to: CGRect(x: cg.width - strip, y: 0, width: strip, height: cg.height)) else {
+        guard let color = average(cg, CGRect(x: cg.width - strip, y: 0, width: strip, height: cg.height)) else {
             return nil
         }
+        cache.setObject(color, forKey: image)
+        return color
+    }
+
+    /// The average colour along a cover's top edge.
+    static func top(of image: UIImage) -> UIColor? {
+        if let known = topCache.object(forKey: image) { return known }
+        guard let cg = image.cgImage, cg.width > 0, cg.height > 4 else { return nil }
+        let strip = max(cg.height / 25, 1)
+        guard let color = average(cg, CGRect(x: 0, y: 0, width: cg.width, height: strip)) else { return nil }
+        topCache.setObject(color, forKey: image)
+        return color
+    }
+
+    private static func average(_ cg: CGImage, _ rect: CGRect) -> UIColor? {
+        guard let edge = cg.cropping(to: rect) else { return nil }
         var pixel = [UInt8](repeating: 0, count: 4)
         let drawn = pixel.withUnsafeMutableBytes { bytes -> Bool in
             guard let context = CGContext(
@@ -324,14 +342,12 @@ enum CoverEdgeColor {
         }
         guard drawn else { return nil }
         // A touch darker than the edge: the side faces away from the light.
-        let color = UIColor(
+        return UIColor(
             red: CGFloat(pixel[0]) / 255 * 0.9,
             green: CGFloat(pixel[1]) / 255 * 0.9,
             blue: CGFloat(pixel[2]) / 255 * 0.9,
             alpha: 1
         )
-        cache.setObject(color, forKey: image)
-        return color
     }
 }
 

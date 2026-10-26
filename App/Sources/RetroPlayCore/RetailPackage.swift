@@ -73,6 +73,19 @@ public struct RetailPackage: Equatable, Sendable {
     public let spineBand: Band
     /// Cardboard boxes carry a strip of the game's art down the spine, under the band.
     public let spineArt: Bool
+    /// The colour of a case's plastic round its edges; nil for cardboard, whose printed art
+    /// runs round the edges.
+    public var plastic: RGB? = nil
+
+    /// How round the box's edges are, as a share of its depth: a moulded case's edges are
+    /// well rounded, a cardboard box's just softened, a jewel case's nearly square.
+    public var edgeRounding: Double {
+        switch material {
+        case .plasticCase: return 0.45
+        case .cardboard: return 0.14
+        case .jewelCase: return 0.08
+        }
+    }
 
     /// The title on the spine reads in a colour that stands out on it.
     public func spineTitleIsLight(edge: RGB? = nil) -> Bool {
@@ -134,7 +147,8 @@ public struct RetailPackage: Equatable, Sendable {
                 frontFrame: nil,
                 spineColor: RGB(white: 0.93),
                 spineBand: Band(edge: .top, thickness: 0.1, color: RGB(white: 0.78), pattern: .plain, label: "DS"),
-                spineArt: false
+                spineArt: false,
+                plastic: RGB(white: 0.88)
             )
         case .psp:
             return RetailPackage(
@@ -143,7 +157,8 @@ public struct RetailPackage: Equatable, Sendable {
                 frontFrame: nil,
                 spineColor: RGB(white: 0.95),
                 spineBand: Band(edge: .top, thickness: 0.16, color: black, pattern: .plain, label: "PSP"),
-                spineArt: false
+                spineArt: false,
+                plastic: RGB(white: 0.1)
             )
         case .ps1:
             return RetailPackage(
@@ -152,7 +167,8 @@ public struct RetailPackage: Equatable, Sendable {
                 frontFrame: nil,
                 spineColor: black,
                 spineBand: Band(edge: .top, thickness: 0.14, color: RGB(white: 0.18), pattern: .plain, label: "PS1"),
-                spineArt: false
+                spineArt: false,
+                plastic: RGB(white: 0.26)
             )
         case .genesis:
             return RetailPackage(
@@ -161,7 +177,8 @@ public struct RetailPackage: Equatable, Sendable {
                 frontFrame: nil,
                 spineColor: black,
                 spineBand: Band(edge: .top, thickness: 0.12, color: black, pattern: .rule(RGB(0.85, 0.12, 0.12)), label: "GENESIS"),
-                spineArt: false
+                spineArt: false,
+                plastic: RGB(white: 0.08)
             )
         }
     }

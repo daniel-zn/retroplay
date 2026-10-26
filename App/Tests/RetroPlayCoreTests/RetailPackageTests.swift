@@ -56,6 +56,19 @@ final class RetailPackageTests: XCTestCase {
         XCTAssertEqual(RetailPackage.of(.snes).frontBand.edge, .bottom)
     }
 
+    func testCasesHaveRoundedEdgesAndBoxesSoftOnes() {
+        // A moulded case is rounder than a cardboard box, a jewel case nearly square.
+        XCTAssertGreaterThan(RetailPackage.of(.psp).edgeRounding, RetailPackage.of(.nes).edgeRounding)
+        XCTAssertGreaterThan(RetailPackage.of(.nes).edgeRounding, RetailPackage.of(.ps1).edgeRounding)
+        for system in SystemID.allCases {
+            let package = RetailPackage.of(system)
+            XCTAssertEqual(package.plastic == nil, package.material == .cardboard, "\(system)")
+            XCTAssertLessThanOrEqual(package.edgeRounding, 0.5, "\(system)")
+        }
+        XCTAssertFalse(RetailPackage.of(.nds).plastic?.isDark ?? true, "DS: white case")
+        XCTAssertTrue(RetailPackage.of(.psp).plastic?.isDark ?? false, "PSP: black case")
+    }
+
     func testSpineTitlesReadOnTheirSpines() {
         // White on dark spines, dark on light ones; on art-coloured spines it follows the art.
         XCTAssertTrue(RetailPackage.of(.nes).spineTitleIsLight())
