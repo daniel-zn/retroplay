@@ -107,22 +107,31 @@ final class CoverFlowTests: XCTestCase {
     func testPortraitCoverFillsMostOfTheScreen() {
         // iPhone 17 Pro Max portrait: 440 wide, ~560 left for the covers.
         let metrics = CoverFlow.Metrics.fitting(width: 440, height: 560, tallestAspect: 0.71)
-        XCTAssertGreaterThanOrEqual(metrics.coverWidth, 440 * 0.7)
+        // About two thirds of the width (it was 80%), leaving the stacks room either side.
+        XCTAssertEqual(metrics.coverWidth, (440 * 0.68).rounded(.down))
+        XCTAssertLessThan(metrics.coverWidth, 440 * 0.7)
         // The old fit (56% of the width, square) left most of the height empty.
-        XCTAssertGreaterThan(metrics.coverWidth, 440 * 0.56 * 1.25)
+        XCTAssertGreaterThan(metrics.coverWidth, 440 * 0.56 * 1.15)
         // The tallest boxes stand within the height.
         XCTAssertLessThanOrEqual(metrics.coverHeight, 560)
         // A smaller phone, and a short space (large text): the slot never outgrows it.
-        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 375, height: 500).coverWidth, 300)
+        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 375, height: 500).coverWidth, 255)
         let squeezed = CoverFlow.Metrics.fitting(width: 402, height: 240)
         XCTAssertEqual(squeezed.coverWidth, (240 * 0.71).rounded(.down))
         XCTAssertLessThanOrEqual(squeezed.coverHeight, 240)
     }
 
     func testSideCoversStack() {
+        // Spread out along the flanks (they were 11% of a cover apart), still overlapping.
         let metrics = CoverFlow.Metrics(coverSide: 200)
         XCTAssertLessThan(metrics.stackSpacing, metrics.coverWidth / 5)
-        XCTAssertGreaterThan(metrics.stackSpacing, metrics.coverWidth / 10)
+        XCTAssertGreaterThanOrEqual(metrics.stackSpacing, metrics.coverWidth * 0.16)
+    }
+
+    func testSideCoversTurnPartWayToShowTheirFronts() {
+        // Turned less than edge-on (they were 70°), so the stacks fill the flanks.
+        XCTAssertLessThanOrEqual(CoverFlow.sideAngle, 56)
+        XCTAssertGreaterThanOrEqual(CoverFlow.sideAngle, 45)
     }
 
     func testFirstSideCoverStandsCloseToTheMiddle() {
@@ -313,7 +322,7 @@ final class CoverFlowTests: XCTestCase {
             let innerEdge = -metrics.step + pose.xShift + side.right
             XCTAssertLessThanOrEqual(innerEdge, middle.left, "for \(metrics.coverWidth)")
             // And not much further: the stack still reads as one row with the middle.
-            XCTAssertLessThan(metrics.leftGap, metrics.coverWidth * 0.82, "for \(metrics.coverWidth)")
+            XCTAssertLessThan(metrics.leftGap, metrics.coverWidth * 0.95, "for \(metrics.coverWidth)")
         }
     }
 

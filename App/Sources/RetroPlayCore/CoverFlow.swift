@@ -36,7 +36,7 @@ public enum CoverFlow {
             // At least 120 points, so small landscape covers don't make a swipe race.
             step = max((coverWidth * 0.42).rounded(), 120)
             firstGap = (coverWidth * 0.45).rounded()
-            stackSpacing = (coverWidth * 0.11).rounded()
+            stackSpacing = (coverWidth * 0.17).rounded()
             eye = max(coverWidth, coverHeight) / CoverFlow.perspective
             // The first left cover's right edge (its side, turned towards the player) stops
             // just short of the middle cover's left edge, with a little air.
@@ -144,7 +144,7 @@ public enum CoverFlow {
             minimum: Double = 110
         ) -> Metrics {
             let aspect = min(max(tallestAspect, 0.3), 2)
-            let side = max(minimum, min(width * 0.8, height * aspect, 440).rounded(.down))
+            let side = max(minimum, min(width * 0.68, height * aspect, 440).rounded(.down))
             return Metrics(
                 coverWidth: side,
                 coverHeight: (side / aspect).rounded(.down),
@@ -258,7 +258,7 @@ public enum CoverFlow {
     }
 
     /// How far the side covers turn away.
-    public static let sideAngle: Double = 70
+    public static let sideAngle: Double = 55
 
     /// How strongly the covers are drawn in perspective: the eye stands the cover's larger
     /// side over this in front of it.
