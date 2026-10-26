@@ -303,19 +303,19 @@ final class CoverFlowTests: XCTestCase {
          CoverFlow.Metrics(coverSide: 200)]
     }
 
-    /// Where a point of a face is drawn, from its 3 × 3 transform (relative to the centre).
-    private func drawn(_ m: [Double], u: Double, v: Double, width: Double, height: Double) -> (x: Double, y: Double) {
-        let x = u * m[0] + v * m[3] + m[6], y = u * m[1] + v * m[4] + m[7], w = u * m[2] + v * m[5] + m[8]
-        return (x / w - width / 2, y / w - height / 2)
+    private func tallest(_ metrics: CoverFlow.Metrics) -> CoverFlow.Box {
+        CoverFlow.Box(width: metrics.coverWidth, height: metrics.coverHeight, depth: metrics.boxDepth)
     }
+
+    private let turns: [Double] = [0, -5, -20, -35, -CoverFlow.sideAngle]
 
     func testLeftStackNeverCoversTheMiddleCover() {
         // Facing left, a left box's right side turns towards the player, and the left stack
         // lies on top: the first one stands far enough out that its side, at the deepest box
         // in the row, stops short of the middle cover's edge.
         for metrics in rows {
-            let middle = metrics.span(width: metrics.coverWidth, depth: metrics.boxDepth, rotation: 0)
-            let side = metrics.span(width: metrics.coverWidth, depth: metrics.boxDepth, rotation: -CoverFlow.sideAngle)
+            let middle = metrics.span(tallest(metrics), yaw: 0)
+            let side = metrics.span(tallest(metrics), yaw: -CoverFlow.sideAngle)
             let pose = metrics.pose(distance: -metrics.step)
             XCTAssertEqual(pose.rotation, -CoverFlow.sideAngle)
             let innerEdge = -metrics.step + pose.xShift + side.right
@@ -326,12 +326,11 @@ final class CoverFlowTests: XCTestCase {
     }
 
     func testRightCoverStillShowsBesideTheMiddle() {
-        // Tucked under the middle cover, the first right box (front and side) still shows a
-        // strip beside it.
+        // Tucked under the middle cover, the first right box still shows a strip beside it.
         for metrics in rows {
-            let middle = metrics.span(width: metrics.coverWidth, depth: metrics.boxDepth, rotation: 0)
-            let side = metrics.span(width: metrics.coverWidth, depth: 0, rotation: -CoverFlow.sideAngle)
-            let shows = metrics.firstGap + side.right - middle.right
+            let middle = metrics.span(tallest(metrics), yaw: 0)
+            let flat = CoverFlow.Box(width: metrics.coverWidth, height: metrics.coverHeight, depth: 0)
+            let shows = metrics.firstGap + metrics.span(flat, yaw: -CoverFlow.sideAngle).right - middle.right
             XCTAssertGreaterThan(shows, metrics.coverWidth * 0.08, "for \(metrics.coverWidth)")
         }
     }
@@ -340,113 +339,141 @@ final class CoverFlowTests: XCTestCase {
         // No growing into the middle or shrinking away from it: a cover's front is drawn the
         // same height down its centre wherever it stands (perspective aside, within 3%).
         for metrics in rows {
-            let width = metrics.coverWidth, height = metrics.coverHeight
-            func centreHeight(_ fraction: Double) -> Double {
-                let pose = metrics.pose(distance: metrics.step * fraction)
-                let m = metrics.faceTransform(.front, width: width, height: height, boxWidth: width,
-                                              depth: metrics.boxDepth, rotation: pose.rotation)
-                return drawn(m, u: width / 2, v: height, width: width, height: height).y
-                    - drawn(m, u: width / 2, v: 0, width: width, height: height).y
+            let box = tallest(metrics)
+            func centreHeight(_ yaw: Double) -> Double {
+                metrics.drawn(.front, box, yaw: yaw, u: box.width / 2, v: box.height).y
+                    - metrics.drawn(.front, box, yaw: yaw, u: box.width / 2, v: 0).y
             }
             let rest = centreHeight(0)
-            XCTAssertEqual(rest, height, accuracy: height * 0.03)
-            for fraction in [0.25, 0.5, 1, 3, -0.5, -1, -3] {
-                XCTAssertEqual(centreHeight(fraction), rest, accuracy: rest * 0.03, "at \(fraction)")
+            // Tipped back, the middle cover's front is drawn a touch shorter than it is.
+            XCTAssertEqual(rest, box.height, accuracy: box.height * 0.06)
+            for yaw in turns {
+                XCTAssertEqual(centreHeight(yaw), rest, accuracy: rest * 0.03, "at \(yaw)")
             }
         }
     }
 
-    func testFlatCoverFacingFrontIsDrawnAsIs() {
-        let metrics = CoverFlow.Metrics(coverSide: 200)
-        let m = metrics.faceTransform(.front, width: 200, height: 300, boxWidth: 200, depth: 0, rotation: 0)
-        XCTAssertEqual(m, [1, 0, 0, 0, 1, 0, 0, 0, 1])
+    func testABoxShowsItsFrontSideAndTop() {
+        // A whole box: turned left and seen a little from above, its front, right side and
+        // top face the player; the back, left side and bottom face away.
+        XCTAssertLessThan(CoverFlow.pitch, 0)
+        let metrics = CoverFlow.Metrics.fitting(width: 402, height: 560, deepestBox: 0.15)
+        let box = tallest(metrics)
+        // Turned far enough for the side to clear the eye (at 5° the box still hides it).
+        for yaw in turns.dropFirst(2) {
+            for face in [CoverFlow.Face.front, .right, .top] {
+                XCTAssertTrue(metrics.isFacing(face, box, yaw: yaw), "\(face) at \(yaw)")
+            }
+            for face in [CoverFlow.Face.back, .left, .bottom] {
+                XCTAssertFalse(metrics.isFacing(face, box, yaw: yaw), "\(face) at \(yaw)")
+            }
+        }
+        // Facing the player, the side is edge-on: hidden.
+        XCTAssertFalse(metrics.isFacing(.right, box, yaw: 0))
+        XCTAssertTrue(metrics.isFacing(.top, box, yaw: 0))
+        XCTAssertEqual(Set(CoverFlow.shownFaces), [.front, .right, .top])
     }
 
-    func testBoxFacesMeetAndMatchTheSpacing() {
-        // The side starts where the front ends, and the drawn box reaches exactly as far as
-        // the spacing allows for, so what's drawn is what's kept clear.
+    func testFacesMeetAtTheBoxsEdges() {
+        // The front's top right corner, the side's top front corner and the top's front right
+        // corner are one point, wherever the box turns; so are the edges between them.
         for metrics in rows {
-            let width = metrics.coverWidth, height = metrics.coverHeight, depth = metrics.boxDepth
-            guard depth > 0 else { continue }
-            for rotation in [-10.0, -35, -CoverFlow.sideAngle] {
-                let front = metrics.faceTransform(.front, width: width, height: height, boxWidth: width,
-                                                  depth: depth, rotation: rotation)
-                let side = metrics.faceTransform(.side, width: depth, height: height, boxWidth: width,
-                                                 depth: depth, rotation: rotation)
-                for v in [0, height] {
-                    let frontEdge = drawn(front, u: width, v: v, width: width, height: height)
-                    let sideEdge = drawn(side, u: 0, v: v, width: depth, height: height)
-                    XCTAssertEqual(frontEdge.x, sideEdge.x, accuracy: 1e-6)
-                    XCTAssertEqual(frontEdge.y, sideEdge.y, accuracy: 1e-6)
+            let box = tallest(metrics)
+            guard box.depth > 0 else { continue }
+            for yaw in turns {
+                let corner = metrics.drawn(.front, box, yaw: yaw, u: box.width, v: 0)
+                let side = metrics.drawn(.right, box, yaw: yaw, u: 0, v: 0)
+                let top = metrics.drawn(.top, box, yaw: yaw, u: box.width, v: box.depth)
+                for other in [side, top] {
+                    XCTAssertEqual(other.x, corner.x, accuracy: 1e-6, "at \(yaw)")
+                    XCTAssertEqual(other.y, corner.y, accuracy: 1e-6, "at \(yaw)")
                 }
-                let span = metrics.span(width: width, depth: depth, rotation: rotation)
-                let back = drawn(side, u: depth, v: height / 2, width: depth, height: height)
-                let left = drawn(front, u: 0, v: height / 2, width: width, height: height)
-                XCTAssertEqual(back.x, span.right, accuracy: 1e-6)
-                XCTAssertEqual(left.x, span.left, accuracy: 1e-6)
+                // The side's back top corner is the top's back right corner.
+                let sideBack = metrics.drawn(.right, box, yaw: yaw, u: box.depth, v: 0)
+                let topBack = metrics.drawn(.top, box, yaw: yaw, u: box.width, v: 0)
+                XCTAssertEqual(sideBack.x, topBack.x, accuracy: 1e-6)
+                XCTAssertEqual(sideBack.y, topBack.y, accuracy: 1e-6)
             }
         }
     }
 
     func testRotationsDrawTheFacesWhereTheBoxPlacesThem() {
-        // The view draws each face with a 3D rotation about the vertical axis, anchored at the
-        // face's centre and `anchorZ` behind it, the eye `max(width, height) / perspective`
-        // from the anchor (SwiftUI's rotation3DEffect). Those land each point where the box
-        // geometry (and so the spacing) puts it.
+        // The view turns each face with one rotation3DEffect (an axis and an angle, anchored at
+        // its centre and `anchorZ` behind it, the eye `max(width, height) / perspective` from
+        // the anchor). That lands every point where the box model puts it, for every face.
         for metrics in rows {
-            let width = metrics.coverWidth, height = metrics.coverHeight, depth = max(metrics.boxDepth, 12)
-            for rotation in [0.0, -10, -35, -CoverFlow.sideAngle] {
-                for (face, faceWidth) in [(CoverFlow.Face.front, width), (.side, depth)] {
-                    let turn = metrics.faceRotation(face, boxWidth: width, depth: depth, rotation: rotation)
-                    let eye = max(faceWidth, height) / metrics.facePerspective(width: faceWidth, height: height)
-                    let m = metrics.faceTransform(face, width: faceWidth, height: height, boxWidth: width,
-                                                  depth: depth, rotation: rotation)
-                    let angle = -turn.angle * .pi / 180
-                    for (u, v) in [(0.0, 0.0), (faceWidth, height), (faceWidth / 3, height / 2)] {
-                        let x = u - faceWidth / 2, y = v - height / 2, z = -turn.anchorZ
-                        let turnedX = cos(angle) * x - sin(angle) * z
-                        let turnedZ = sin(angle) * x + cos(angle) * z
-                        let k = eye / (eye - turnedZ)
-                        let expected = drawn(m, u: u, v: v, width: faceWidth, height: height)
-                        XCTAssertEqual(turnedX * k, expected.x, accuracy: 1e-6, "\(face) at \(rotation)")
-                        XCTAssertEqual(y * k, expected.y, accuracy: 1e-6, "\(face) at \(rotation)")
+            let box = CoverFlow.Box(width: metrics.coverWidth, height: metrics.coverHeight,
+                                    depth: max(metrics.boxDepth, 12))
+            for yaw in turns {
+                for face in CoverFlow.Face.allCases {
+                    let size = CoverFlow.faceSize(face, box)
+                    let turn = metrics.faceTurn(face, box, yaw: yaw)
+                    let eye = max(size.width, size.height) / metrics.facePerspective(width: size.width, height: size.height)
+                    let m = CoverFlow.rotation(axis: turn.axis, degrees: turn.degrees)
+                    // The anchor, from the face's (and the box's) centre.
+                    let anchorY = (turn.anchorY - 0.5) * size.height
+                    for (u, v) in [(0.0, 0.0), (size.width, size.height), (size.width / 3, size.height / 2)] {
+                        // The point, moved by `shift`, relative to the anchor (anchorZ behind it).
+                        let p = (x: u - size.width / 2 + turn.shift.x,
+                                 y: v - size.height / 2 + turn.shift.y - anchorY,
+                                 z: -turn.anchorZ)
+                        let q = CoverFlow.apply(m, p)
+                        let k = eye / (eye - q.z)
+                        let expected = metrics.drawn(face, box, yaw: yaw, u: u, v: v)
+                        XCTAssertEqual(q.x * k, expected.x, accuracy: 1e-6, "\(face) at \(yaw)")
+                        XCTAssertEqual(anchorY + q.y * k, expected.y, accuracy: 1e-6, "\(face) at \(yaw)")
                     }
                 }
             }
         }
     }
 
-    func testSideShowsOnlyOnceTurned() {
-        // Facing the player the side folds back behind the front's edge (hidden under it);
-        // turned, it opens out.
-        let metrics = CoverFlow.Metrics(coverWidth: 200, coverHeight: 280, boxDepth: 30)
-        func sideWidth(_ rotation: Double) -> Double {
-            let m = metrics.faceTransform(.side, width: 30, height: 280, boxWidth: 200, depth: 30, rotation: rotation)
-            return drawn(m, u: 30, v: 140, width: 30, height: 280).x - drawn(m, u: 0, v: 140, width: 30, height: 280).x
+    func testSpacingMatchesTheDrawnBox() {
+        // The box's reach used for spacing is exactly as far as its shown faces are drawn.
+        for metrics in rows {
+            let box = tallest(metrics)
+            for yaw in turns {
+                var xs: [Double] = []
+                for face in CoverFlow.Face.allCases where metrics.isFacing(face, box, yaw: yaw) {
+                    let size = CoverFlow.faceSize(face, box)
+                    for u in [0, size.width] { for v in [0, size.height] {
+                        xs.append(metrics.drawn(face, box, yaw: yaw, u: u, v: v).x)
+                    } }
+                }
+                let span = metrics.span(box, yaw: yaw)
+                XCTAssertEqual(xs.max() ?? 0, span.right, accuracy: 1e-6, "at \(yaw)")
+                XCTAssertEqual(xs.min() ?? 0, span.left, accuracy: 1e-6, "at \(yaw)")
+            }
         }
-        XCTAssertLessThanOrEqual(sideWidth(0), 0)
-        XCTAssertGreaterThan(sideWidth(-35), 10)
-        XCTAssertGreaterThan(sideWidth(-CoverFlow.sideAngle), sideWidth(-35))
     }
 
     func testTurnedCoversStayWithinTheOverhang() {
-        // A turned box's nearest edge is drawn taller than the slot; `overhang` covers it, so
-        // the room left below the row keeps covers off the caption.
+        // Tipped back and in perspective, a box reaches past its slot; `overhang` covers it, so
+        // the room left above and below the row keeps covers off the caption.
         for metrics in rows {
-            let width = metrics.coverWidth, height = metrics.coverHeight, depth = metrics.boxDepth
-            var lowest = 0.0
-            for degrees in stride(from: 0.0, through: CoverFlow.sideAngle, by: 5) {
-                let faces = depth > 0 ? [(CoverFlow.Face.front, width), (.side, depth)] : [(.front, width)]
-                for (face, faceWidth) in faces {
-                    let m = metrics.faceTransform(face, width: faceWidth, height: height, boxWidth: width,
-                                                  depth: metrics.boxDepth, rotation: -degrees)
-                    for u in [0, faceWidth] {
-                        lowest = max(lowest, drawn(m, u: u, v: height, width: faceWidth, height: height).y)
-                    }
+            let box = tallest(metrics)
+            var reach = 0.0
+            for yaw in stride(from: -CoverFlow.sideAngle, through: 0, by: 5) {
+                for face in CoverFlow.Face.allCases where metrics.isFacing(face, box, yaw: yaw) {
+                    let size = CoverFlow.faceSize(face, box)
+                    for u in [0, size.width] { for v in [0, size.height] {
+                        reach = max(reach, abs(metrics.drawn(face, box, yaw: yaw, u: u, v: v).y))
+                    } }
                 }
             }
             XCTAssertGreaterThan(metrics.overhang, 0)
-            XCTAssertLessThanOrEqual(lowest, height / 2 + metrics.overhang + 0.5, "for \(width)")
+            XCTAssertLessThanOrEqual(reach, box.height / 2 + metrics.overhang + 0.5, "for \(box.width)")
+        }
+    }
+
+    func testAxisAndAngleGiveBackTheTurn() {
+        for axis in [(x: 1.0, y: 0.0, z: 0.0), (0, 1, 0), (0.3, -0.8, 0.2)] {
+            for degrees in [0.0, 10, 90, 135, 180] {
+                let m = CoverFlow.rotation(axis: axis, degrees: degrees)
+                let back = CoverFlow.axisAngle(m)
+                let again = CoverFlow.rotation(axis: back.axis, degrees: back.degrees)
+                for r in 0..<3 { for c in 0..<3 { XCTAssertEqual(again[r][c], m[r][c], accuracy: 1e-6) } }
+            }
         }
     }
 

@@ -235,6 +235,61 @@ struct PackageSpine: View {
     }
 }
 
+/// The top of a game's box, seen as the row looks down on it: on a cardboard box the cover's
+/// art runs over the top from its top edge; a case is its plastic. Drawn back edge up.
+struct PackageTop: View {
+    let system: SystemID
+    let cover: CoverArt?
+    /// The front's corner radius: the top's front corners follow it round.
+    var cornerRadius: CGFloat = 10
+
+    var body: some View {
+        let package = RetailPackage.of(system)
+        let boxArt = cover.flatMap { $0.isBoxArt ? $0.image : nil }
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height
+            let front = min(cornerRadius, h * 0.5)
+            let back = min(cornerRadius * 0.6, h * 0.3)
+            ZStack {
+                if let boxArt, package.material == .cardboard {
+                    Image(uiImage: boxArt)
+                        .resizable()
+                        .interpolation(.medium)
+                        .scaledToFill()
+                        .frame(width: w, height: h, alignment: .top)
+                        .clipped()
+                } else if let color = package.spineColor {
+                    color.color
+                } else if let boxArt, let edge = CoverEdgeColor.right(of: boxArt) {
+                    Color(uiColor: edge)
+                } else {
+                    RetroPlayTheme.systemTint(system).opacity(0.9)
+                }
+            }
+            .overlay {
+                // The front edge catches the light; the top falls away towards the back.
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.28), location: 0),
+                        .init(color: .clear, location: 0.6),
+                        .init(color: .white.opacity(package.material == .cardboard ? 0.18 : 0.26), location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .clipShape(UnevenRoundedRectangle(
+                topLeadingRadius: back,
+                bottomLeadingRadius: front,
+                bottomTrailingRadius: front,
+                topTrailingRadius: back,
+                style: .continuous
+            ))
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 private extension UIColor {
     var rgb: RetailPackage.RGB {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
