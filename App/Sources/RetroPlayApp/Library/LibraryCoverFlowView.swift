@@ -132,8 +132,9 @@ struct LibraryCoverFlowView<Header: View>: View {
                 ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
                     coverButton(game, index: index, metrics: metrics)
                         .frame(width: metrics.step, height: metrics.coverHeight)
-                        // Covers nearer the middle stand in front.
-                        .zIndex(-Double(abs(index - liveIndex)))
+                        // One fixed order (earlier games on top), so covers never swap
+                        // places mid-swipe.
+                        .zIndex(CoverFlow.layer(index: index))
                         .visualEffect { content, proxy in
                             let frame = proxy.frame(in: .scrollView(axis: .horizontal))
                             let pose = metrics.pose(distance: frame.midX - middle)
@@ -141,7 +142,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                                 .rotation3DEffect(
                                     .degrees(pose.rotation),
                                     axis: (x: 0, y: 1, z: 0),
-                                    perspective: 0.3
+                                    perspective: CoverFlow.perspective
                                 )
                                 .scaleEffect(pose.scale)
                                 .brightness(-pose.dimming)

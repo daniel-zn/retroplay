@@ -209,106 +209,86 @@ final class CoverFlowTests: XCTestCase {
         XCTAssertEqual(pose.dimming, 0)
     }
 
-    func testSidesAreMirrored() {
+    func testAllSideCoversFaceLeft() {
+        // Like a fanned deck: covers on both sides turn the same way, mirrored only in where
+        // they stand.
         let metrics = CoverFlow.Metrics(coverSide: 200)
-        for distance in [10.0, 48, 100, 500] {
-            let left = metrics.pose(distance: -distance), right = metrics.pose(distance: distance)
-            XCTAssertEqual(left.rotation, -right.rotation, accuracy: 1e-9)
-            XCTAssertEqual(left.xShift, -right.xShift, accuracy: 1e-9)
+        for fraction in [0.25, 0.5, 1, 3] {
+            let right = metrics.pose(distance: metrics.step * fraction)
+            let left = metrics.pose(distance: -metrics.step * fraction)
+            XCTAssertLessThan(right.rotation, 0)
+            XCTAssertEqual(left.rotation, right.rotation, accuracy: 1e-9)
             XCTAssertEqual(left.scale, right.scale, accuracy: 1e-9)
         }
     }
 
     func testCoversPastTheFirstKeepTheirAngleAndGap() {
         let metrics = CoverFlow.Metrics(coverSide: 200)
-        let first = metrics.pose(distance: metrics.step)
-        let third = metrics.pose(distance: metrics.step * 3)
-        XCTAssertEqual(abs(first.rotation), CoverFlow.sideAngle)
-        XCTAssertEqual(third.rotation, first.rotation)
-        // The first side cover stands `firstGap` from the middle, the third two stack
-        // spacings further.
-        XCTAssertEqual(metrics.step + first.xShift, metrics.firstGap)
-        XCTAssertEqual(metrics.step * 3 + third.xShift, metrics.firstGap + 2 * metrics.stackSpacing)
-    }
-
-    func testTurningIsContinuousThroughTheMiddle() {
-        let metrics = CoverFlow.Metrics(coverSide: 200)
-        XCTAssertLessThan(abs(metrics.pose(distance: 1).rotation), 3)
-        var last = 0.0
-        for i in 1...100 {
-            let turn = abs(metrics.pose(distance: metrics.step * Double(i) / 100).rotation)
-            XCTAssertGreaterThanOrEqual(turn, last)
-            last = turn
-        }
-    }
-
-    func testTurnLeadsTheSlide() {
-        // Leaving the middle a cover turns ahead of its slide; arriving it stays turned
-        // until late.
-        let metrics = CoverFlow.Metrics(coverSide: 200)
-        func turn(_ fraction: Double) -> Double { abs(metrics.pose(distance: metrics.step * fraction).rotation) }
-        func slid(_ fraction: Double) -> Double {
+        func drawn(_ fraction: Double) -> Double {
             let distance = metrics.step * fraction
-            return (distance + metrics.pose(distance: distance).xShift) / metrics.firstGap
+            return distance + metrics.pose(distance: distance).xShift
         }
+        XCTAssertEqual(abs(metrics.pose(distance: metrics.step).rotation), CoverFlow.sideAngle)
+        XCTAssertEqual(metrics.pose(distance: -metrics.step * 3).rotation, -CoverFlow.sideAngle)
+        // The first side covers stand at their gaps, the third two stack spacings further.
+        XCTAssertEqual(drawn(1), metrics.firstGap)
+        XCTAssertEqual(drawn(3), metrics.firstGap + 2 * metrics.stackSpacing)
+        XCTAssertEqual(drawn(-1), -metrics.leftGap)
+        XCTAssertEqual(drawn(-3), -(metrics.leftGap + 2 * metrics.stackSpacing))
+    }
+
+    func testCoversSlideInStepWithTheFinger() {
+        // No pause in the middle: between the middle and the first side spot a cover moves
+        // evenly with the drag.
+        let metrics = CoverFlow.Metrics(coverSide: 200)
         for i in 1...9 {
             let fraction = Double(i) / 10
-            XCTAssertGreaterThanOrEqual(turn(fraction) / CoverFlow.sideAngle, slid(fraction), "at \(fraction)")
+            let right = metrics.step * fraction, left = -right
+            XCTAssertEqual(right + metrics.pose(distance: right).xShift, metrics.firstGap * fraction, accuracy: 1e-9)
+            XCTAssertEqual(left + metrics.pose(distance: left).xShift, -metrics.leftGap * fraction, accuracy: 1e-9)
         }
-        XCTAssertGreaterThan(turn(0.5), CoverFlow.sideAngle * 0.9)
-        XCTAssertGreaterThan(turn(0.75), CoverFlow.sideAngle * 0.99)
     }
 
-    func testMiddleCoverLingers() {
-        // A tenth of the way to the next game the middle cover has hardly moved or turned;
-        // the move happens in the middle of the swipe.
+    func testTurnEasesInAndOut() {
+        // The turn starts and ends gently (no snap as a cover leaves the middle or settles
+        // into a stack) and only ever grows away from the middle.
         let metrics = CoverFlow.Metrics(coverSide: 200)
-        for fraction in [0.1, -0.1] {
-            let distance = metrics.step * fraction
-            let pose = metrics.pose(distance: distance)
-            XCTAssertLessThan(abs(distance + pose.xShift), metrics.firstGap * 0.04)
-            XCTAssertLessThan(abs(pose.rotation), 8)
-            XCTAssertGreaterThan(pose.scale, 0.97)
-        }
-        // The arriving cover settles the same way: a tenth out it's nearly in place.
-        let arriving = metrics.step * 0.9
-        XCTAssertGreaterThan(arriving + metrics.pose(distance: arriving).xShift, metrics.firstGap * 0.96)
-        // Halfway, each is halfway.
-        let half = metrics.step / 2
-        XCTAssertEqual(half + metrics.pose(distance: half).xShift, metrics.firstGap / 2, accuracy: 1e-9)
-    }
-
-    func testPassingCoversKeepTheirSpacing() {
-        // Eased both ways alike, the leaving and arriving covers stay `firstGap` apart.
-        let metrics = CoverFlow.Metrics(coverSide: 200)
-        for i in 0...20 {
-            let fraction = Double(i) / 20
-            let leaving = metrics.step * fraction, arriving = -metrics.step * (1 - fraction)
-            let apart = (leaving + metrics.pose(distance: leaving).xShift)
-                - (arriving + metrics.pose(distance: arriving).xShift)
-            XCTAssertEqual(apart, metrics.firstGap, accuracy: 1e-9)
+        func turn(_ fraction: Double) -> Double { abs(metrics.pose(distance: metrics.step * fraction).rotation) }
+        XCTAssertLessThan(turn(0.1), CoverFlow.sideAngle * 0.05)
+        XCTAssertEqual(turn(0.5), CoverFlow.sideAngle / 2, accuracy: 1e-9)
+        XCTAssertGreaterThan(turn(0.9), CoverFlow.sideAngle * 0.95)
+        XCTAssertLessThan(abs(metrics.pose(distance: 1).rotation), 0.1)
+        var last = 0.0
+        for i in 1...100 {
+            let now = turn(Double(i) / 100)
+            XCTAssertGreaterThanOrEqual(now, last)
+            last = now
         }
     }
 
-    func testPassingCoversDoNotOverlap() {
-        // The two covers either side of the middle mid-swipe (where they swap which is in
-        // front) stay apart, for the widest cover the slot holds, in portrait and landscape.
-        // Perspective is left out: it only narrows the inner edge further.
+    func testLeftStackNeverCoversTheMiddleCover() {
+        // Facing left, a left cover's inner edge comes forward, and the left stack lies on top:
+        // the first one stands far enough out that even the widest cover (drawn in a stronger
+        // perspective than the view's, to be safe) clears the middle cover's edge.
         for metrics in [CoverFlow.Metrics.fitting(width: 402, height: 560),
                         CoverFlow.Metrics.fitting(width: 874, height: 280),
                         CoverFlow.Metrics(coverSide: 200)] {
-            for i in 0...20 {
-                let fraction = 0.4 + Double(i) / 100
-                func innerEdge(_ distance: Double) -> Double {
-                    let pose = metrics.pose(distance: distance)
-                    let centre = abs(distance + pose.xShift)
-                    let half = metrics.coverWidth / 2 * pose.scale * cos(pose.rotation * .pi / 180)
-                    return centre - half
-                }
-                let gap = innerEdge(metrics.step * fraction) + innerEdge(-metrics.step * (1 - fraction))
-                XCTAssertGreaterThanOrEqual(gap, 0, "overlap at \(fraction) for \(metrics.coverWidth)")
-            }
+            let pose = metrics.pose(distance: -metrics.step)
+            let half = metrics.coverWidth / 2 * pose.scale
+            let angle = abs(pose.rotation) * .pi / 180
+            let eye = metrics.coverWidth / CoverFlow.perspective
+            let forward = half * cos(angle) / (1 - half * sin(angle) / eye)
+            let innerEdge = -metrics.step + pose.xShift + forward
+            XCTAssertLessThanOrEqual(innerEdge, -metrics.coverWidth / 2, "for \(metrics.coverWidth)")
+            // And not much further: the stack still reads as one row with the middle.
+            XCTAssertLessThan(metrics.leftGap, metrics.coverWidth * 0.85)
         }
+    }
+
+    func testCoversKeepOneDrawingOrder() {
+        // Earlier games on top, always: no two covers swap places mid-swipe.
+        XCTAssertGreaterThan(CoverFlow.layer(index: 0), CoverFlow.layer(index: 1))
+        XCTAssertGreaterThan(CoverFlow.layer(index: 9), CoverFlow.layer(index: 10))
     }
 
     func testIndexForOffsetRoundsAndClamps() {

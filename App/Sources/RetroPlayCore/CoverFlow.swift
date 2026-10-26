@@ -14,8 +14,14 @@ public enum CoverFlow {
         /// far a finger drags to move one game. Wider than the drawn spacing of the stacks, so
         /// a swipe stays controlled however tightly the side covers stack.
         public let step: Double
-        /// How far the first cover on each side stands from the middle one's centre.
+        /// How far the first cover on the right stands from the middle one's centre: it
+        /// tucks in under the middle cover's edge.
         public let firstGap: Double
+        /// How far the first cover on the left stands from the middle one's centre. Every
+        /// side cover faces left, so on the left the edge nearer the middle comes forward and
+        /// the stack lies on top; it stands far enough out that it never covers the middle
+        /// cover, at the widest cover shape.
+        public let leftGap: Double
         /// How far apart the covers past the first stand in each side stack.
         public let stackSpacing: Double
 
@@ -26,6 +32,13 @@ public enum CoverFlow {
             step = max((coverWidth * 0.42).rounded(), 120)
             firstGap = (coverWidth * 0.5).rounded()
             stackSpacing = (coverWidth * 0.13).rounded()
+            // The first left cover's forward (inner) half, as drawn turned and shrunk with the
+            // view's perspective, plus a little air.
+            let half = coverWidth / 2 * (1 - CoverFlow.sideShrink)
+            let angle = CoverFlow.sideAngle * .pi / 180
+            let eye = max(step, coverHeight) / CoverFlow.perspective
+            let forward = half * cos(angle) / max(1 - half * sin(angle) / eye, 0.5)
+            leftGap = (coverWidth / 2 + forward + coverWidth * 0.03).rounded()
         }
 
         public init(coverSide: Double) {
@@ -43,37 +56,36 @@ public enum CoverFlow {
 
         /// Where a cover is drawn and how it turns, for an item `distance` points from the
         /// middle of the viewport (layout positions, negative to the left).
+        ///
+        /// Every side cover faces left, like a fanned deck: coming in from the right a cover
+        /// turns up to face the player in the middle, then turns back the same way as it
+        /// slides on into the left stack. It slides in step with the finger; the turn eases
+        /// in and out.
         public func pose(distance: Double) -> Pose {
             let t = step > 0 ? distance / step : 0
-            // Between the middle and the first side spot a cover eases: it lingers in the
-            // middle (and at the side), then crosses quickly. Eased the same both ways, so two
-            // passing covers stay `firstGap` apart in all.
-            let near = CoverFlow.linger(min(abs(t), 1))
+            let near = min(abs(t), 1)
             let side: Double = t < 0 ? -1 : 1
-            // Up to the first side cover they spread from the middle to `firstGap`; past it
-            // they stack `stackSpacing` apart.
-            let drawn = near * firstGap + max(abs(t) - 1, 0) * stackSpacing
-            // The turn and the shrink lead the slide: a cover leaving the middle turns fast at
-            // first, one arriving stays turned until it's nearly there. So when the two pass
-            // (and swap which is in front) both are turned edge-on enough not to overlap,
-            // even at the widest cover shape.
-            let turn = 1 - pow(1 - near, CoverFlow.turnCurve)
+            // Up to the first side cover they spread from the middle to its gap; past it they
+            // stack `stackSpacing` apart.
+            let gap = side < 0 ? leftGap : firstGap
+            let drawn = near * gap + max(abs(t) - 1, 0) * stackSpacing
+            let turn = near * near * (3 - 2 * near)
             return Pose(
                 xShift: side * drawn - distance,
-                // Side covers turn to face the middle, as in Cover Flow and RetroFlow: the
-                // inner edge recedes and the outer edge comes forward.
-                rotation: -side * turn * CoverFlow.sideAngle,
+                // Facing left: the left edge recedes, the right edge comes forward.
+                rotation: -turn * CoverFlow.sideAngle,
                 scale: 1 - turn * CoverFlow.sideShrink,
                 dimming: min(abs(t) * 0.12, 0.45)
             )
         }
 
         /// How far from the middle (in layout points) an item sits when it's drawn `visual`
-        /// points out: what the row has to lay out to fill the screen.
+        /// points out: what the row has to lay out to fill the screen (on the right, the
+        /// closer-packed side, so it covers both).
         public func layoutDistance(forVisual visual: Double) -> Double {
             guard firstGap > 0, stackSpacing > 0 else { return visual }
             let v = abs(visual)
-            if v <= firstGap { return CoverFlow.unlinger(v / firstGap) * step }
+            if v <= firstGap { return v / firstGap * step }
             return (1 + (v - firstGap) / stackSpacing) * step
         }
 
@@ -141,34 +153,18 @@ public enum CoverFlow {
     /// How far the side covers turn away.
     public static let sideAngle: Double = 58
 
-    /// How strongly the middle cover lingers before it slides away (0 = it moves in step
-    /// with the finger, 1 = it starts still and catches up in the middle of the move).
-    public static let lingering: Double = 1
-
-    /// Eases `u` (0 in the middle, 1 at the first side spot) along a smoothstep, mixed in by
-    /// `lingering`. Symmetric: `linger(u) + linger(1 - u) == 1`.
-    static func linger(_ u: Double) -> Double {
-        let smooth = u * u * (3 - 2 * u)
-        return u + (smooth - u) * lingering
-    }
-
-    /// The `u` that `linger` maps to `eased` (bisection: it only runs while laying out).
-    static func unlinger(_ eased: Double) -> Double {
-        if eased <= 0 { return 0 }
-        if eased >= 1 { return 1 }
-        var low = 0.0, high = 1.0
-        for _ in 0..<40 {
-            let mid = (low + high) / 2
-            if linger(mid) < eased { low = mid } else { high = mid }
-        }
-        return (low + high) / 2
-    }
     /// How much smaller the side covers are drawn (0.22 = 78% of the middle one).
     public static let sideShrink: Double = 0.22
-    /// How strongly the turn leads the slide (1 = in step with it). At 4 a cover halfway
-    /// between the middle and the first side spot is turned 54°, so two passing covers clear
-    /// each other.
-    public static let turnCurve: Double = 4
+    /// How strongly the view's 3D turn is drawn in perspective (`rotation3DEffect`).
+    public static let perspective: Double = 0.3
+
+    /// Which cover is drawn over which: always the same order, so no two covers swap places
+    /// mid-swipe. Earlier games lie on top. On the right each cover tucks under the one nearer
+    /// the middle (covers come in from the top of the stack); on the left the stack lies over
+    /// the cover nearer the middle (covers go in at the bottom).
+    public static func layer(index: Int) -> Double {
+        -Double(index)
+    }
 
     /// Which game to centre after the list changed.
     ///
