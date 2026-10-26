@@ -104,12 +104,12 @@ final class CoverFlowTests: XCTestCase {
     }
 
     func testFirstSideCoverStandsCloseToTheMiddle() {
-        // Half a cover out: the side cover tucks in behind the middle one's edge.
+        // Under half a cover out: the right cover tucks in behind the middle one's edge.
         let metrics = CoverFlow.Metrics(coverSide: 300)
-        XCTAssertEqual(metrics.firstGap, 150)
+        XCTAssertEqual(metrics.firstGap, 135)
         XCTAssertEqual(metrics.step + metrics.pose(distance: metrics.step).xShift, metrics.firstGap)
-        // Was 64% of a cover; the stack behind keeps its spacing.
-        XCTAssertLessThan(metrics.firstGap, 300 * 0.64)
+        // Was 64% of a cover, then 50%; the stack behind keeps its spacing.
+        XCTAssertLessThan(metrics.firstGap, 300 * 0.5)
         let second = metrics.step * 2 + metrics.pose(distance: metrics.step * 2).xShift
         XCTAssertEqual(second - metrics.firstGap, metrics.stackSpacing)
     }
@@ -280,8 +280,21 @@ final class CoverFlowTests: XCTestCase {
             let forward = half * cos(angle) / (1 - half * sin(angle) / eye)
             let innerEdge = -metrics.step + pose.xShift + forward
             XCTAssertLessThanOrEqual(innerEdge, -metrics.coverWidth / 2, "for \(metrics.coverWidth)")
-            // And not much further: the stack still reads as one row with the middle.
-            XCTAssertLessThan(metrics.leftGap, metrics.coverWidth * 0.85)
+            // And not much further: the stack still reads as one row with the middle (it was
+            // 76% of a cover out).
+            XCTAssertLessThan(metrics.leftGap, metrics.coverWidth * 0.7)
+        }
+    }
+
+    func testRightCoverStillShowsBesideTheMiddle() {
+        // Tucked under the middle cover, the first right cover's outer edge (turned towards
+        // the player) still shows a strip beside it, at the narrowest drawing (no perspective).
+        for metrics in [CoverFlow.Metrics.fitting(width: 402, height: 560),
+                        CoverFlow.Metrics.fitting(width: 874, height: 280)] {
+            let pose = metrics.pose(distance: metrics.step)
+            let half = metrics.coverWidth / 2 * pose.scale * cos(abs(pose.rotation) * .pi / 180)
+            let shows = metrics.firstGap + half - metrics.coverWidth / 2
+            XCTAssertGreaterThan(shows, metrics.coverWidth * 0.08, "for \(metrics.coverWidth)")
         }
     }
 

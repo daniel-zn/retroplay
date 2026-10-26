@@ -30,15 +30,15 @@ public enum CoverFlow {
             self.coverHeight = coverHeight
             // At least 120 points, so small landscape covers don't make a swipe race.
             step = max((coverWidth * 0.42).rounded(), 120)
-            firstGap = (coverWidth * 0.5).rounded()
-            stackSpacing = (coverWidth * 0.13).rounded()
+            firstGap = (coverWidth * 0.45).rounded()
+            stackSpacing = (coverWidth * 0.11).rounded()
             // The first left cover's forward (inner) half, as drawn turned and shrunk with the
             // view's perspective, plus a little air.
             let half = coverWidth / 2 * (1 - CoverFlow.sideShrink)
             let angle = CoverFlow.sideAngle * .pi / 180
             let eye = max(step, coverHeight) / CoverFlow.perspective
             let forward = half * cos(angle) / max(1 - half * sin(angle) / eye, 0.5)
-            leftGap = (coverWidth / 2 + forward + coverWidth * 0.03).rounded()
+            leftGap = (coverWidth / 2 + forward + coverWidth * 0.01).rounded()
         }
 
         public init(coverSide: Double) {
@@ -151,10 +151,10 @@ public enum CoverFlow {
     }
 
     /// How far the side covers turn away.
-    public static let sideAngle: Double = 58
+    public static let sideAngle: Double = 66
 
-    /// How much smaller the side covers are drawn (0.22 = 78% of the middle one).
-    public static let sideShrink: Double = 0.22
+    /// How much smaller the side covers are drawn (0.26 = 74% of the middle one).
+    public static let sideShrink: Double = 0.26
     /// How strongly the view's 3D turn is drawn in perspective (`rotation3DEffect`).
     public static let perspective: Double = 0.3
 
