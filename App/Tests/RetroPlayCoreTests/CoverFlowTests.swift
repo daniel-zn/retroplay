@@ -72,29 +72,51 @@ final class CoverFlowTests: XCTestCase {
 
     // MARK: Geometry
 
-    func testCoverFitsTheSmallerOfHeightAndWidth() {
-        // Landscape: the height does.
-        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 180).coverWidth, 180)
-        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 180).coverHeight, 180)
+    func testEveryCoverSharesOneWidth() {
+        // Wide, square and tall boxes in one row: all drawn the same width, each as tall as
+        // its own shape (never stretched).
+        let metrics = CoverFlow.Metrics.fitting(width: 402, height: 560, tallestAspect: 0.58)
+        for aspect in [0.58, 0.71, 1.0, 1.1, 1.37, 1.4] {
+            let size = metrics.coverSize(aspect: aspect)
+            XCTAssertEqual(size.width, metrics.coverWidth, "for \(aspect)")
+            XCTAssertEqual(size.width / size.height, aspect, accuracy: 1e-9, "for \(aspect)")
+            XCTAssertLessThanOrEqual(size.height, metrics.coverHeight + 0.5)
+        }
+        // Box art taller than the row made room for is fitted to the height (narrower) rather
+        // than running over it.
+        let taller = metrics.coverSize(aspect: 0.5)
+        XCTAssertEqual(taller.height, metrics.coverHeight)
+        XCTAssertLessThan(taller.width, metrics.coverWidth)
+    }
+
+    func testTheTallestCoverSetsTheWidth() {
+        // Landscape: the height limits it, so the tallest shape in the list decides the width.
+        let upright = CoverFlow.Metrics.fitting(width: 874, height: 280, tallestAspect: 0.71)
+        XCTAssertEqual(upright.coverWidth, (280 * 0.71).rounded(.down))
+        XCTAssertLessThanOrEqual(upright.coverHeight, 280)
+        let psp = CoverFlow.Metrics.fitting(width: 874, height: 280, tallestAspect: 0.58)
+        XCTAssertLessThan(psp.coverWidth, upright.coverWidth)
+        XCTAssertLessThanOrEqual(psp.coverHeight, 280)
+        // Only wide covers in the list: they grow as wide as the stacks leave room for.
+        let wide = CoverFlow.Metrics.fitting(width: 874, height: 280, tallestAspect: 1.37)
+        XCTAssertEqual(wide.coverWidth, 383)
         // Never below the minimum, even with large text squeezing the space.
         XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 40).coverWidth, 110)
-        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 750, height: 40).coverHeight, 110)
     }
 
     func testPortraitCoverFillsMostOfTheScreen() {
         // iPhone 17 Pro Max portrait: 440 wide, ~560 left for the covers.
-        let metrics = CoverFlow.Metrics.fitting(width: 440, height: 560)
-        XCTAssertGreaterThanOrEqual(metrics.coverWidth, 440 * 0.78)
+        let metrics = CoverFlow.Metrics.fitting(width: 440, height: 560, tallestAspect: 0.71)
+        XCTAssertGreaterThanOrEqual(metrics.coverWidth, 440 * 0.7)
         // The old fit (56% of the width, square) left most of the height empty.
         XCTAssertGreaterThan(metrics.coverWidth, 440 * 0.56 * 1.25)
-        // Upright boxes get a taller slot, within the height.
-        XCTAssertGreaterThan(metrics.coverHeight, metrics.coverWidth * 1.3)
+        // The tallest boxes stand within the height.
         XCTAssertLessThanOrEqual(metrics.coverHeight, 560)
         // A smaller phone, and a short space (large text): the slot never outgrows it.
         XCTAssertEqual(CoverFlow.Metrics.fitting(width: 375, height: 500).coverWidth, 300)
         let squeezed = CoverFlow.Metrics.fitting(width: 402, height: 240)
-        XCTAssertEqual(squeezed.coverWidth, 240)
-        XCTAssertEqual(squeezed.coverHeight, 240)
+        XCTAssertEqual(squeezed.coverWidth, (240 * 0.71).rounded(.down))
+        XCTAssertLessThanOrEqual(squeezed.coverHeight, 240)
     }
 
     func testSideCoversStack() {

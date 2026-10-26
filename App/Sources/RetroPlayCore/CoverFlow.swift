@@ -6,8 +6,8 @@ import Foundation
 public enum CoverFlow {
     /// Sizes for one carousel, from the space it has.
     public struct Metrics: Equatable, Sendable {
-        /// The slot each cover stands in, on its bottom edge (covers keep their own shape
-        /// inside it). Square in landscape; taller in portrait, for upright boxes.
+        /// The slot each cover stands in, on its bottom edge: every cover is `coverWidth`
+        /// wide, and as tall as its shape makes it (up to `coverHeight`, the tallest).
         public let coverWidth: Double
         public let coverHeight: Double
         /// Scroll distance from one cover to the next: the layout width of each item, and how
@@ -45,13 +45,30 @@ public enum CoverFlow {
             self.init(coverWidth: coverSide, coverHeight: coverSide)
         }
 
-        /// The largest cover that fits `height` (above the caption) and leaves room on the
-        /// sides of `width` for the stacks; never smaller than `minimum`. In portrait the
-        /// width limits it and the slot grows taller, so upright boxes fill the screen.
-        public static func fitting(width: Double, height: Double, minimum: Double = 110) -> Metrics {
-            let side = max(minimum, min(width * 0.8, height, 440).rounded(.down))
-            let tall = max(side, min(height, side * 1.35).rounded(.down))
-            return Metrics(coverWidth: side, coverHeight: tall)
+        /// Every cover is drawn this one width (scaled whole, never stretched; heights vary
+        /// with each cover's shape), so the row reads evenly as it scrolls. The width is the
+        /// largest that leaves room on the sides of `width` for the stacks and still fits the
+        /// tallest cover shape in the list (`tallestAspect`, width over height) into `height`;
+        /// never smaller than `minimum`. The slot is that tallest cover's height.
+        public static func fitting(
+            width: Double,
+            height: Double,
+            tallestAspect: Double = 0.71,
+            minimum: Double = 110
+        ) -> Metrics {
+            let aspect = min(max(tallestAspect, 0.3), 2)
+            let side = max(minimum, min(width * 0.8, height * aspect, 440).rounded(.down))
+            return Metrics(coverWidth: side, coverHeight: (side / aspect).rounded(.down))
+        }
+
+        /// How big a cover of `aspect` (width over height) is drawn: the row's one width, as
+        /// tall as its shape makes it. Only a shape taller than the slot allows (box art
+        /// that runs taller than its system's usual box) is fitted to the height instead.
+        public func coverSize(aspect: Double) -> (width: Double, height: Double) {
+            guard aspect > 0 else { return (coverWidth, coverHeight) }
+            let height = coverWidth / aspect
+            if height <= coverHeight + 0.5 { return (coverWidth, height) }
+            return (coverHeight * aspect, coverHeight)
         }
 
         /// Where a cover is drawn and how it turns, for an item `distance` points from the

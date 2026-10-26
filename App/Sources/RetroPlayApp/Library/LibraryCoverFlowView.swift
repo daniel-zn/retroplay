@@ -48,6 +48,13 @@ struct LibraryCoverFlowView<Header: View>: View {
         games.isEmpty ? nil : games[min(liveIndex, games.count - 1)]
     }
 
+    /// The tallest cover shape among the games in the row, so every cover can share one width.
+    /// From each system's box shape, with a little room for box art that runs taller.
+    private var tallestAspect: Double {
+        let shapes = games.map { Double(RetroPlayTheme.boxArtAspect($0.systemID)) }
+        return (shapes.min() ?? 0.71) * 0.97
+    }
+
     var body: some View {
         GeometryReader { outer in
             // Landscape is short: the row runs down through the home-indicator strip, the caption
@@ -56,7 +63,8 @@ struct LibraryCoverFlowView<Header: View>: View {
             let bottomRoom = landscape ? outer.safeAreaInsets.bottom : 0
             let metrics = CoverFlow.Metrics.fitting(
                 width: outer.size.width,
-                height: outer.size.height + bottomRoom - headerHeight - captionHeight - (landscape ? 24 : 32)
+                height: outer.size.height + bottomRoom - headerHeight - captionHeight - (landscape ? 24 : 32),
+                tallestAspect: tallestAspect
             )
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
@@ -188,7 +196,12 @@ struct LibraryCoverFlowView<Header: View>: View {
                 move(to: index, animated: true)
             }
         } label: {
-            CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing)
+            CoverFlowCover(
+                game: game,
+                cover: artworkProvider(game),
+                missing: missing,
+                fitting: metrics
+            )
                 .frame(width: metrics.coverWidth, height: metrics.coverHeight)
         }
         .buttonStyle(RetroPlayPressStyle())
@@ -363,15 +376,20 @@ private struct CoverFlowCover: View {
     let game: LibraryGame
     let cover: CoverArt?
     let missing: Bool
+    /// The row's sizes: every cover is drawn its one width (nil: fit the frame).
+    var fitting: CoverFlow.Metrics?
     var shadow = true
 
     @Environment(\.colorScheme) private var colorScheme
 
     private var aspect: CGFloat {
+        let shape: CGFloat
         if let cover, cover.isBoxArt, cover.image.size.height > 0 {
-            return min(max(cover.image.size.width / cover.image.size.height, 0.5), 1.6)
+            shape = min(max(cover.image.size.width / cover.image.size.height, 0.5), 1.6)
+        } else {
+            shape = RetroPlayTheme.boxArtAspect(game.systemID)
         }
-        return RetroPlayTheme.boxArtAspect(game.systemID)
+        return shape
     }
 
     var body: some View {
@@ -385,6 +403,10 @@ private struct CoverFlowCover: View {
                     labelTitleSize: 16
                 )
                 .aspectRatio(aspect, contentMode: .fit)
+                .frame(
+                    maxWidth: fitting.map { CGFloat($0.coverSize(aspect: Double(aspect)).width) },
+                    maxHeight: fitting.map { CGFloat($0.coverSize(aspect: Double(aspect)).height) }
+                )
                 .overlay(alignment: .topLeading) {
                     if let cover, !cover.isBoxArt {
                         SystemBadge(system: game.systemID, style: .onArt)
