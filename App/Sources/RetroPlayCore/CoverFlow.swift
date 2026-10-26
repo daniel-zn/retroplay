@@ -49,6 +49,19 @@ public enum CoverFlow {
             self.init(coverWidth: coverSide, coverHeight: coverSide)
         }
 
+        /// How far past the slot's top and bottom a turned cover reaches: its edge nearest the
+        /// player is drawn taller by the perspective. Room to leave above and below the row so
+        /// covers don't run into the caption.
+        public var overhang: Double {
+            var nearest = 0.0
+            for degrees in stride(from: 0.0, through: CoverFlow.sideAngle, by: 1) {
+                let turn = degrees * .pi / 180
+                nearest = max(nearest, sin(turn) * coverWidth / 2 + cos(turn) * boxDepth / 2)
+            }
+            guard eye > nearest else { return coverHeight / 2 }
+            return (coverHeight / 2 * (eye / (eye - nearest) - 1)).rounded(.up)
+        }
+
         /// How far a box `width` wide and `depth` deep reaches left and right of its centre as
         /// drawn, turned `rotation` degrees (negative faces left) in this row's perspective.
         public func span(width: Double, depth: Double, rotation: Double) -> (left: Double, right: Double) {
@@ -144,7 +157,7 @@ public enum CoverFlow {
             minimum: Double = 110
         ) -> Metrics {
             let aspect = min(max(tallestAspect, 0.3), 2)
-            let side = max(minimum, min(width * 0.68, height * aspect, 440).rounded(.down))
+            let side = max(minimum, min(width * 0.6, height * aspect, 440).rounded(.down))
             return Metrics(
                 coverWidth: side,
                 coverHeight: (side / aspect).rounded(.up),

@@ -107,15 +107,14 @@ final class CoverFlowTests: XCTestCase {
     func testPortraitCoverFillsMostOfTheScreen() {
         // iPhone 17 Pro Max portrait: 440 wide, ~560 left for the covers.
         let metrics = CoverFlow.Metrics.fitting(width: 440, height: 560, tallestAspect: 0.71)
-        // About two thirds of the width (it was 80%), leaving the stacks room either side.
-        XCTAssertEqual(metrics.coverWidth, (440 * 0.68).rounded(.down))
-        XCTAssertLessThan(metrics.coverWidth, 440 * 0.7)
+        // 60% of the width (it was 80%, then 68%), leaving the stacks room either side.
+        XCTAssertEqual(metrics.coverWidth, (440 * 0.6).rounded(.down))
+        XCTAssertLessThan(metrics.coverWidth, 440 * 0.62)
         // The old fit (56% of the width, square) left most of the height empty.
-        XCTAssertGreaterThan(metrics.coverWidth, 440 * 0.56 * 1.15)
         // The tallest boxes stand within the height.
         XCTAssertLessThanOrEqual(metrics.coverHeight, 560)
         // A smaller phone, and a short space (large text): the slot never outgrows it.
-        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 375, height: 500).coverWidth, 255)
+        XCTAssertEqual(CoverFlow.Metrics.fitting(width: 375, height: 500).coverWidth, 225)
         let squeezed = CoverFlow.Metrics.fitting(width: 402, height: 240)
         XCTAssertEqual(squeezed.coverWidth, (240 * 0.71).rounded(.down))
         XCTAssertLessThanOrEqual(squeezed.coverHeight, 240)
@@ -428,6 +427,27 @@ final class CoverFlowTests: XCTestCase {
         XCTAssertLessThanOrEqual(sideWidth(0), 0)
         XCTAssertGreaterThan(sideWidth(-35), 10)
         XCTAssertGreaterThan(sideWidth(-CoverFlow.sideAngle), sideWidth(-35))
+    }
+
+    func testTurnedCoversStayWithinTheOverhang() {
+        // A turned box's nearest edge is drawn taller than the slot; `overhang` covers it, so
+        // the room left below the row keeps covers off the caption.
+        for metrics in rows {
+            let width = metrics.coverWidth, height = metrics.coverHeight, depth = metrics.boxDepth
+            var lowest = 0.0
+            for degrees in stride(from: 0.0, through: CoverFlow.sideAngle, by: 5) {
+                let faces = depth > 0 ? [(CoverFlow.Face.front, width), (.side, depth)] : [(.front, width)]
+                for (face, faceWidth) in faces {
+                    let m = metrics.faceTransform(face, width: faceWidth, height: height, boxWidth: width,
+                                                  depth: metrics.boxDepth, rotation: -degrees)
+                    for u in [0, faceWidth] {
+                        lowest = max(lowest, drawn(m, u: u, v: height, width: faceWidth, height: height).y)
+                    }
+                }
+            }
+            XCTAssertGreaterThan(metrics.overhang, 0)
+            XCTAssertLessThanOrEqual(lowest, height / 2 + metrics.overhang + 0.5, "for \(width)")
+        }
     }
 
     func testCardboardBoxesAreDeeperThanCases() {

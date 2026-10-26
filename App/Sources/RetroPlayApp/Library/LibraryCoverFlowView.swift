@@ -61,11 +61,18 @@ struct LibraryCoverFlowView<Header: View>: View {
             // sits at the bottom instead of being centred, and the covers take the height saved.
             let landscape = outer.size.width > outer.size.height
             let bottomRoom = landscape ? outer.safeAreaInsets.bottom : 0
+            let room = outer.size.height + bottomRoom - headerHeight - captionHeight - (landscape ? 24 : 32)
+            let deepest = games.map { CoverFlow.boxDepth($0.systemID) }.max() ?? 0
+            // Turned covers' near edges reach past the slot: size the row with that room taken
+            // off, and leave it below the covers so they clear the caption.
+            let overhang = CGFloat(CoverFlow.Metrics.fitting(
+                width: outer.size.width, height: room, tallestAspect: tallestAspect, deepestBox: deepest
+            ).overhang)
             let metrics = CoverFlow.Metrics.fitting(
                 width: outer.size.width,
-                height: outer.size.height + bottomRoom - headerHeight - captionHeight - (landscape ? 24 : 32),
+                height: room - overhang * 2,
                 tallestAspect: tallestAspect,
-                deepestBox: games.map { CoverFlow.boxDepth($0.systemID) }.max() ?? 0
+                deepestBox: deepest
             )
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
@@ -74,8 +81,8 @@ struct LibraryCoverFlowView<Header: View>: View {
                     if !games.isEmpty {
                         Spacer(minLength: 0)
                         carousel(metrics: metrics, width: outer.size.width)
-                            .padding(.top, landscape ? 4 : 8)
-                            .padding(.bottom, landscape ? 6 : 12)
+                            .padding(.top, (landscape ? 4 : 8) + overhang)
+                            .padding(.bottom, (landscape ? 6 : 12) + overhang)
                         caption
                             .padding(.horizontal, 24)
                             .padding(.bottom, landscape ? 14 : 16)
