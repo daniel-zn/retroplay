@@ -133,6 +133,8 @@ struct PackageSpine: View {
     let system: SystemID
     let title: String
     let cover: CoverArt?
+    /// The front's corner radius: the spine's front corners follow it round.
+    var cornerRadius: CGFloat = 10
 
     var body: some View {
         let package = RetailPackage.of(system)
@@ -143,48 +145,76 @@ struct PackageSpine: View {
             // Tall enough for the system's name to read down it at the spine's width.
             let nameLength = CGFloat(package.spineBand.label.count) * w * 0.3 + w * 0.5
             let band = min(max(h * package.spineBand.thickness, nameLength), h * 0.3)
-            let artHeight = package.spineArt && boxArt != nil ? h * 0.2 : 0
-            let lightTitle = package.spineTitleIsLight(edge: edge.map(\.rgb))
+            let cardboard = package.material == .cardboard
+            // A case's spine insert carries a block of the game's art at the foot.
+            let insertArt = !cardboard && boxArt != nil ? h * 0.26 : 0
+            let titleLength = max(h - band - insertArt, 1)
+            let artBehindTitle = cardboard && boxArt != nil
+            let lightTitle = artBehindTitle || package.spineTitleIsLight(edge: edge.map(\.rgb))
+            let front = min(cornerRadius, w * 0.5)
+            let back = min(cornerRadius * 0.6, w * 0.3)
             ZStack(alignment: .top) {
-                base(package, edge: edge)
+                if let boxArt, cardboard {
+                    // The cover's own art, carried round from its right-hand edge.
+                    Image(uiImage: boxArt)
+                        .resizable()
+                        .interpolation(.medium)
+                        .scaledToFill()
+                        .frame(width: w, height: h, alignment: .trailing)
+                        .clipped()
+                } else {
+                    base(package, edge: edge)
+                }
                 VStack(spacing: 0) {
                     PackageBandView(band: package.spineBand, verticalLabel: true)
                         .frame(height: band)
-                    if let boxArt, artHeight > 0 {
-                        // The right-hand edge of the cover, carried round onto the spine.
+                    Text(title)
+                        .font(RetroPlayFont.sized(max(w * 0.4, 7), relativeTo: .caption))
+                        .foregroundStyle(lightTitle ? Color.white : Color(white: 0.12))
+                        .shadow(color: .black.opacity(artBehindTitle ? 0.8 : 0), radius: 1.5)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.45)
+                        .padding(.horizontal, w * 0.35)
+                        .frame(width: titleLength, height: w * (artBehindTitle ? 0.62 : 1), alignment: .leading)
+                        // Printed on a band over the art, so it reads on any cover.
+                        .background(.black.opacity(artBehindTitle ? 0.42 : 0))
+                        .rotationEffect(.degrees(90))
+                        .frame(width: w, height: titleLength)
+                    if let boxArt, insertArt > 0 {
                         Image(uiImage: boxArt)
                             .resizable()
                             .interpolation(.medium)
                             .scaledToFill()
-                            .frame(width: w, height: artHeight, alignment: .trailing)
+                            .frame(width: w, height: insertArt)
                             .clipped()
                     }
-                    Text(title)
-                        .font(RetroPlayFont.sized(max(w * 0.4, 7), relativeTo: .caption))
-                        .foregroundStyle(lightTitle ? Color.white : Color(white: 0.12))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.45)
-                        .padding(.horizontal, w * 0.35)
-                        .frame(width: max(h - band - artHeight, 1), height: w, alignment: .leading)
-                        .rotationEffect(.degrees(90))
-                        .frame(width: w, height: max(h - band - artHeight, 1))
                 }
             }
             .overlay {
-                // Rounded towards the back, catching a little light at the front edge.
+                // The fold is rounded: light catches the front edge, the back curves away. A
+                // plastic case's spine is rounder still.
                 LinearGradient(
-                    stops: [
-                        .init(color: .white.opacity(package.material == .cardboard ? 0.1 : 0.18), location: 0),
-                        .init(color: .clear, location: 0.3),
-                        .init(color: .black.opacity(0.22), location: 1),
-                    ],
+                    stops: cardboard
+                        ? [.init(color: .white.opacity(0.24), location: 0),
+                           .init(color: .white.opacity(0.04), location: 0.12),
+                           .init(color: .clear, location: 0.55),
+                           .init(color: .black.opacity(0.3), location: 1)]
+                        : [.init(color: .black.opacity(0.22), location: 0),
+                           .init(color: .white.opacity(0.26), location: 0.16),
+                           .init(color: .clear, location: 0.45),
+                           .init(color: .black.opacity(0.18), location: 0.8),
+                           .init(color: .black.opacity(0.42), location: 1)],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
             }
-            .overlay(alignment: .leading) {
-                Rectangle().fill(.white.opacity(0.14)).frame(width: 1)
-            }
+            .clipShape(UnevenRoundedRectangle(
+                topLeadingRadius: front,
+                bottomLeadingRadius: front,
+                bottomTrailingRadius: back,
+                topTrailingRadius: back,
+                style: .continuous
+            ))
         }
         .accessibilityHidden(true)
     }
