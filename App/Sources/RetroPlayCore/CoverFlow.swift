@@ -24,25 +24,111 @@ public enum CoverFlow {
         public let leftGap: Double
         /// How far apart the covers past the first stand in each side stack.
         public let stackSpacing: Double
+        /// How deep the deepest box in the row is drawn (its side shows as a cover turns).
+        public let boxDepth: Double
+        /// How far the eye stands in front of each cover: the strength of the perspective.
+        public let eye: Double
 
-        public init(coverWidth: Double, coverHeight: Double) {
+        public init(coverWidth: Double, coverHeight: Double, boxDepth: Double = 0) {
             self.coverWidth = coverWidth
             self.coverHeight = coverHeight
+            self.boxDepth = boxDepth
             // At least 120 points, so small landscape covers don't make a swipe race.
             step = max((coverWidth * 0.42).rounded(), 120)
             firstGap = (coverWidth * 0.45).rounded()
             stackSpacing = (coverWidth * 0.11).rounded()
-            // The first left cover's forward (inner) half, as drawn turned and shrunk with the
-            // view's perspective, plus a little air.
-            let half = coverWidth / 2 * (1 - CoverFlow.sideShrink)
-            let angle = CoverFlow.sideAngle * .pi / 180
-            let eye = max(step, coverHeight) / CoverFlow.perspective
-            let forward = half * cos(angle) / max(1 - half * sin(angle) / eye, 0.5)
-            leftGap = (coverWidth / 2 + forward + coverWidth * 0.01).rounded()
+            eye = max(coverWidth, coverHeight) / CoverFlow.perspective
+            // The first left cover's right edge (its side, turned towards the player) stops
+            // just short of the middle cover's left edge, with a little air.
+            let middle = Self.span(width: coverWidth, depth: boxDepth, rotation: 0, eye: eye)
+            let side = Self.span(width: coverWidth, depth: boxDepth, rotation: -CoverFlow.sideAngle, eye: eye)
+            leftGap = (-middle.left + side.right + coverWidth * 0.01).rounded()
         }
 
         public init(coverSide: Double) {
             self.init(coverWidth: coverSide, coverHeight: coverSide)
+        }
+
+        /// How far a box `width` wide and `depth` deep reaches left and right of its centre as
+        /// drawn, turned `rotation` degrees (negative faces left) in this row's perspective.
+        public func span(width: Double, depth: Double, rotation: Double) -> (left: Double, right: Double) {
+            Self.span(width: width, depth: depth, rotation: rotation, eye: eye)
+        }
+
+        static func span(width: Double, depth: Double, rotation: Double, eye: Double) -> (left: Double, right: Double) {
+            let turn = -rotation * .pi / 180
+            let c = cos(turn), s = sin(turn)
+            var left = Double.infinity, right = -Double.infinity
+            for x in [-width / 2, width / 2] {
+                for z in [depth / 2, -depth / 2] {
+                    let turnedX = c * x - s * z, turnedZ = s * x + c * z
+                    let drawn = turnedX * eye / (eye - turnedZ)
+                    left = min(left, drawn)
+                    right = max(right, drawn)
+                }
+            }
+            return (left, right)
+        }
+
+        /// How to draw one face of a cover's box with a 3D rotation about the vertical axis
+        /// (SwiftUI's `rotation3DEffect`, degrees the same way as `rotation`), the face's view
+        /// centred on the box: both faces turn about the box's centre, so with the same eye
+        /// (`facePerspective`) they're drawn exactly as `faceTransform` places them.
+        ///
+        /// The front stands `depth / 2` in front of the centre and turns with the box. The
+        /// side is the front turned a further quarter turn, `boxWidth / 2` out from the centre.
+        public func faceRotation(_ face: Face, boxWidth: Double, depth: Double, rotation: Double)
+            -> (angle: Double, anchorZ: Double)
+        {
+            switch face {
+            case .front: return (rotation, -depth / 2)
+            case .side: return (rotation + 90, -boxWidth / 2)
+            }
+        }
+
+        /// The `perspective` that puts the eye `eye` points from a face `width` × `height`
+        /// (SwiftUI sets the eye at the view's larger side over `perspective`).
+        public func facePerspective(width: Double, height: Double) -> Double {
+            max(width, height) / eye
+        }
+
+        /// One face of a cover's box, as a 3 × 3 projective transform (row-major, for row
+        /// vectors: x' = u·m11 + v·m21 + m31 …) taking the face's own points (`u`, `v` from
+        /// its top left; `width` × `height`) to where they're drawn around the same centre.
+        /// The box (`boxWidth` wide, `depth` deep) turns `rotation` degrees about its centre
+        /// (negative faces left: its right side turns towards the player), seen from `eye`.
+        public func faceTransform(
+            _ face: Face,
+            width: Double,
+            height: Double,
+            boxWidth: Double,
+            depth: Double,
+            rotation: Double
+        ) -> [Double] {
+            let turn = -rotation * .pi / 180
+            let c = cos(turn), s = sin(turn)
+            // The face's points in the box, turned: x' = a·u + b, z' = cz·u + dz.
+            let a, b, cz, dz: Double
+            switch face {
+            case .front:
+                // x = u − width/2, z = depth/2.
+                a = c
+                b = -c * width / 2 - s * depth / 2
+                cz = s
+                dz = -s * width / 2 + c * depth / 2
+            case .side:
+                // The right side, front edge first: x = boxWidth/2, z = depth/2 − u.
+                a = s
+                b = c * boxWidth / 2 - s * depth / 2
+                cz = -c
+                dz = s * boxWidth / 2 + c * depth / 2
+            }
+            let w = 1 - dz / eye
+            return [
+                a - width / 2 * cz / eye, -height / 2 * cz / eye, -cz / eye,
+                0, 1, 0,
+                b + width / 2 * w, -height / 2 * dz / eye, w,
+            ]
         }
 
         /// Every cover is drawn this one width (scaled whole, never stretched; heights vary
@@ -54,11 +140,16 @@ public enum CoverFlow {
             width: Double,
             height: Double,
             tallestAspect: Double = 0.71,
+            deepestBox: Double = 0,
             minimum: Double = 110
         ) -> Metrics {
             let aspect = min(max(tallestAspect, 0.3), 2)
             let side = max(minimum, min(width * 0.8, height * aspect, 440).rounded(.down))
-            return Metrics(coverWidth: side, coverHeight: (side / aspect).rounded(.down))
+            return Metrics(
+                coverWidth: side,
+                coverHeight: (side / aspect).rounded(.down),
+                boxDepth: (side * deepestBox).rounded()
+            )
         }
 
         /// How big a cover of `aspect` (width over height) is drawn: the row's one width, as
@@ -89,9 +180,9 @@ public enum CoverFlow {
             let turn = near * near * (3 - 2 * near)
             return Pose(
                 xShift: side * drawn - distance,
-                // Facing left: the left edge recedes, the right edge comes forward.
+                // Facing left: the left edge recedes, the right edge comes forward. Covers
+                // keep their size: only the turn and the perspective change how they look.
                 rotation: -turn * CoverFlow.sideAngle,
-                scale: 1 - turn * CoverFlow.sideShrink,
                 dimming: min(abs(t) * 0.12, 0.45)
             )
         }
@@ -162,18 +253,38 @@ public enum CoverFlow {
         public let xShift: Double
         /// Degrees about the vertical axis; 0 faces the player.
         public let rotation: Double
-        public let scale: Double
         /// 0…1 darkening for covers far from the middle.
         public let dimming: Double
     }
 
     /// How far the side covers turn away.
-    public static let sideAngle: Double = 66
+    public static let sideAngle: Double = 70
 
-    /// How much smaller the side covers are drawn (0.26 = 74% of the middle one).
-    public static let sideShrink: Double = 0.26
-    /// How strongly the view's 3D turn is drawn in perspective (`rotation3DEffect`).
+    /// How strongly the covers are drawn in perspective: the eye stands the cover's larger
+    /// side over this in front of it.
     public static let perspective: Double = 0.3
+
+    /// A face of a cover's box.
+    public enum Face: Sendable {
+        case front
+        /// The right side, the one that turns towards the player.
+        case side
+    }
+
+    /// How deep each system's box is, for its width (a little shallower than the real thing,
+    /// so the row stays compact): cardboard boxes for the cartridge systems, plastic cases for
+    /// the disc and card ones.
+    public static func boxDepth(_ system: SystemID) -> Double {
+        switch system {
+        case .atari7800: return 0.16
+        case .nes: return 0.15
+        case .snes, .gba: return 0.13
+        case .n64, .genesis: return 0.11
+        case .psp: return 0.08
+        case .nds: return 0.07
+        case .ps1: return 0.05
+        }
+    }
 
     /// Which cover is drawn over which: always the same order, so no two covers swap places
     /// mid-swipe. Earlier games lie on top. On the right each cover tucks under the one nearer

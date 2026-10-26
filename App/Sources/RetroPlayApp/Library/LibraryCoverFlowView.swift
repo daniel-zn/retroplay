@@ -64,7 +64,8 @@ struct LibraryCoverFlowView<Header: View>: View {
             let metrics = CoverFlow.Metrics.fitting(
                 width: outer.size.width,
                 height: outer.size.height + bottomRoom - headerHeight - captionHeight - (landscape ? 24 : 32),
-                tallestAspect: tallestAspect
+                tallestAspect: tallestAspect,
+                deepestBox: games.map { CoverFlow.boxDepth($0.systemID) }.max() ?? 0
             )
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
@@ -138,24 +139,11 @@ struct LibraryCoverFlowView<Header: View>: View {
         return ScrollView(.horizontal) {
             LazyHStack(spacing: 0) {
                 ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
-                    coverButton(game, index: index, metrics: metrics)
+                    coverButton(game, index: index, metrics: metrics, middle: middle)
                         .frame(width: metrics.step, height: metrics.coverHeight)
                         // One fixed order (earlier games on top), so covers never swap
                         // places mid-swipe.
                         .zIndex(CoverFlow.layer(index: index))
-                        .visualEffect { content, proxy in
-                            let frame = proxy.frame(in: .scrollView(axis: .horizontal))
-                            let pose = metrics.pose(distance: frame.midX - middle)
-                            return content
-                                .rotation3DEffect(
-                                    .degrees(pose.rotation),
-                                    axis: (x: 0, y: 1, z: 0),
-                                    perspective: CoverFlow.perspective
-                                )
-                                .scaleEffect(pose.scale)
-                                .brightness(-pose.dimming)
-                                .offset(x: pose.xShift)
-                        }
                 }
             }
             .scrollTargetLayout()
@@ -187,7 +175,12 @@ struct LibraryCoverFlowView<Header: View>: View {
         .sensoryFeedback(.selection, trigger: liveIndex)
     }
 
-    private func coverButton(_ game: LibraryGame, index: Int, metrics: CoverFlow.Metrics) -> some View {
+    private func coverButton(
+        _ game: LibraryGame,
+        index: Int,
+        metrics: CoverFlow.Metrics,
+        middle: CGFloat
+    ) -> some View {
         let missing = missingGameIDs.contains(game.id)
         return Button {
             if index == liveIndex || voiceOverEnabled {
@@ -200,7 +193,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                 game: game,
                 cover: artworkProvider(game),
                 missing: missing,
-                fitting: metrics
+                row: CoverFlowRow(metrics: metrics, middle: middle)
             )
                 .frame(width: metrics.coverWidth, height: metrics.coverHeight)
         }
@@ -372,64 +365,207 @@ struct LibraryCoverFlowView<Header: View>: View {
 
 /// One cover in its square slot, standing on the bottom edge in its own shape.
 @available(iOS 18.0, *)
+/// Where a cover stands in the carousel: the row's sizes and the middle of the viewport (in
+/// the scroll view's coordinates), so each face can work out its pose as the row scrolls.
+private struct CoverFlowRow {
+    let metrics: CoverFlow.Metrics
+    let middle: CGFloat
+}
+
 private struct CoverFlowCover: View {
     let game: LibraryGame
     let cover: CoverArt?
     let missing: Bool
-    /// The row's sizes: every cover is drawn its one width (nil: fit the frame).
-    var fitting: CoverFlow.Metrics?
+    /// In the carousel: drawn as a 3D box at the row's one width, turned by where it stands
+    /// (nil: a flat cover fitted to its frame).
+    var row: CoverFlowRow?
     var shadow = true
 
     @Environment(\.colorScheme) private var colorScheme
 
     private var aspect: CGFloat {
-        let shape: CGFloat
         if let cover, cover.isBoxArt, cover.image.size.height > 0 {
-            shape = min(max(cover.image.size.width / cover.image.size.height, 0.5), 1.6)
-        } else {
-            shape = RetroPlayTheme.boxArtAspect(game.systemID)
+            return min(max(cover.image.size.width / cover.image.size.height, 0.5), 1.6)
         }
-        return shape
+        return RetroPlayTheme.boxArtAspect(game.systemID)
     }
 
     var body: some View {
+        let size = row.map { $0.metrics.coverSize(aspect: Double(aspect)) }
+        let depth = row.map { ($0.metrics.coverWidth * CoverFlow.boxDepth(game.systemID)).rounded() } ?? 0
         Color.clear
             .overlay(alignment: .bottom) {
-                GameArtworkView(
-                    game: game,
-                    artwork: cover?.image,
-                    isBoxArt: cover?.isBoxArt ?? false,
-                    cornerRadius: 10,
-                    labelTitleSize: 16
-                )
-                .aspectRatio(aspect, contentMode: .fit)
-                .frame(
-                    maxWidth: fitting.map { CGFloat($0.coverSize(aspect: Double(aspect)).width) },
-                    maxHeight: fitting.map { CGFloat($0.coverSize(aspect: Double(aspect)).height) }
-                )
-                .overlay(alignment: .topLeading) {
-                    if let cover, !cover.isBoxArt {
-                        SystemBadge(system: game.systemID, style: .onArt)
-                            .padding(6)
+                front
+                    .frame(maxWidth: size.map { CGFloat($0.width) }, maxHeight: size.map { CGFloat($0.height) })
+                    .modifier(CoverFaceEffect(row: row, face: .front, boxWidth: size?.width ?? 0, depth: depth))
+                    .background {
+                        if let size, depth > 0 {
+                            CoverBoxSide(system: game.systemID, cover: cover)
+                                .opacity(missing ? 0.45 : 1)
+                                .frame(
+                                    width: CGFloat(depth),
+                                    height: CGFloat(size.height)
+                                )
+                                .modifier(CoverFaceEffect(row: row, face: .side, boxWidth: size.width, depth: depth))
+                        }
                     }
-                }
-                .opacity(missing ? 0.45 : 1)
-                .overlay(alignment: .topTrailing) {
-                    if missing {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white, .orange)
-                            .padding(8)
-                    }
-                }
-                .shadow(
-                    color: .black.opacity(shadow ? (colorScheme == .dark ? 0.55 : 0.25) : 0),
-                    radius: 14,
-                    y: 8
-                )
+                    .shadow(
+                        color: .black.opacity(shadow ? (colorScheme == .dark ? 0.55 : 0.25) : 0),
+                        radius: 14,
+                        y: 8
+                    )
             }
             .contentShape(Rectangle())
             .accessibilityHidden(true)
+    }
+
+    private var front: some View {
+        GameArtworkView(
+            game: game,
+            artwork: cover?.image,
+            isBoxArt: cover?.isBoxArt ?? false,
+            cornerRadius: 10,
+            labelTitleSize: 16
+        )
+        .aspectRatio(aspect, contentMode: .fit)
+        .overlay(alignment: .topLeading) {
+            if let cover, !cover.isBoxArt {
+                SystemBadge(system: game.systemID, style: .onArt)
+                    .padding(6)
+            }
+        }
+        .opacity(missing ? 0.45 : 1)
+        .overlay(alignment: .topTrailing) {
+            if missing {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white, .orange)
+                    .padding(8)
+            }
+        }
+    }
+}
+
+/// The side of a cover's box, drawn (no art: nothing per game is available to use): a
+/// cardboard box takes the colour of its cover's edge, a plastic case its plastic.
+private struct CoverBoxSide: View {
+    let system: SystemID
+    let cover: CoverArt?
+
+    var body: some View {
+        let plastic = CoverBoxSide.plastic(system)
+        Rectangle()
+            .fill(plastic.map { AnyShapeStyle($0) } ?? edgeFill)
+            .overlay {
+                // Rounded towards the back, catching a little light at the front edge.
+                LinearGradient(
+                    stops: [
+                        .init(color: .white.opacity(plastic == nil ? 0.12 : 0.22), location: 0),
+                        .init(color: .clear, location: 0.3),
+                        .init(color: .black.opacity(0.22), location: 1),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            }
+            .overlay(alignment: .leading) {
+                Rectangle().fill(.white.opacity(0.14)).frame(width: 1)
+            }
+    }
+
+    /// Plastic cases: the PSP's and Genesis's black ones, the DS's white one, the PS1 jewel
+    /// case's dark hinge. Cardboard boxes (nil) take their cover's colour.
+    static func plastic(_ system: SystemID) -> Color? {
+        switch system {
+        case .psp, .genesis: return Color(white: 0.17)
+        case .ps1: return Color(white: 0.24)
+        case .nds: return Color(white: 0.86)
+        case .nes, .snes, .n64, .gba, .atari7800: return nil
+        }
+    }
+
+    /// Box art: the colour down its right edge. The drawn label art: its own gradient.
+    private var edgeFill: AnyShapeStyle {
+        if let cover, cover.isBoxArt, let color = CoverEdgeColor.right(of: cover.image) {
+            return AnyShapeStyle(Color(uiColor: color))
+        }
+        return AnyShapeStyle(LinearGradient(
+            colors: [RetroPlayTheme.systemTint(system).opacity(0.9), RetroPlayTheme.systemShade(system)],
+            startPoint: .top,
+            endPoint: .bottom
+        ))
+    }
+}
+
+/// The average colour down a cover's right edge, so a box's side carries on from its front.
+/// Worked out once per picture.
+@MainActor
+private enum CoverEdgeColor {
+    private static let cache = NSCache<UIImage, UIColor>()
+
+    static func right(of image: UIImage) -> UIColor? {
+        if let known = cache.object(forKey: image) { return known }
+        guard let cg = image.cgImage, cg.width > 4, cg.height > 0 else { return nil }
+        let strip = max(cg.width / 25, 1)
+        guard let edge = cg.cropping(to: CGRect(x: cg.width - strip, y: 0, width: strip, height: cg.height)) else {
+            return nil
+        }
+        var pixel = [UInt8](repeating: 0, count: 4)
+        let drawn = pixel.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(
+                data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return false }
+            context.interpolationQuality = .medium
+            context.draw(edge, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return true
+        }
+        guard drawn else { return nil }
+        // A touch darker than the edge: the side faces away from the light.
+        let color = UIColor(
+            red: CGFloat(pixel[0]) / 255 * 0.9,
+            green: CGFloat(pixel[1]) / 255 * 0.9,
+            blue: CGFloat(pixel[2]) / 255 * 0.9,
+            alpha: 1
+        )
+        cache.setObject(color, forKey: image)
+        return color
+    }
+}
+
+/// Turns one face of a cover's box into place for where the cover stands in the row: the
+/// front and the side share one camera, so their edges meet.
+private struct CoverFaceEffect: ViewModifier {
+    let row: CoverFlowRow?
+    let face: CoverFlow.Face
+    let boxWidth: Double
+    let depth: Double
+
+    func body(content: Content) -> some View {
+        if let row {
+            content.visualEffect { content, proxy in
+                let frame = proxy.frame(in: .scrollView(axis: .horizontal))
+                let pose = row.metrics.pose(distance: Double(frame.midX - row.middle))
+                let turn = row.metrics.faceRotation(face, boxWidth: boxWidth, depth: depth, rotation: pose.rotation)
+                // The side is lit a little less than the front.
+                let shade = face == .side ? 0.05 : 0
+                return content
+                    .rotation3DEffect(
+                        .degrees(turn.angle),
+                        axis: (x: 0, y: 1, z: 0),
+                        anchorZ: turn.anchorZ,
+                        perspective: row.metrics.facePerspective(
+                            width: Double(proxy.size.width),
+                            height: Double(proxy.size.height)
+                        )
+                    )
+                    .brightness(-pose.dimming - shade)
+                    .offset(x: pose.xShift)
+            }
+        } else {
+            content
+        }
     }
 }
 

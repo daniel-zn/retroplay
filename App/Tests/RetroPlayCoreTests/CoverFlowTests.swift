@@ -226,7 +226,6 @@ final class CoverFlowTests: XCTestCase {
     func testMiddleCoverFacesFront() {
         let pose = CoverFlow.Metrics(coverSide: 200).pose(distance: 0)
         XCTAssertEqual(pose.rotation, 0)
-        XCTAssertEqual(pose.scale, 1)
         XCTAssertEqual(pose.xShift, 0)
         XCTAssertEqual(pose.dimming, 0)
     }
@@ -240,7 +239,6 @@ final class CoverFlowTests: XCTestCase {
             let left = metrics.pose(distance: -metrics.step * fraction)
             XCTAssertLessThan(right.rotation, 0)
             XCTAssertEqual(left.rotation, right.rotation, accuracy: 1e-9)
-            XCTAssertEqual(left.scale, right.scale, accuracy: 1e-9)
         }
     }
 
@@ -288,35 +286,146 @@ final class CoverFlowTests: XCTestCase {
         }
     }
 
+    /// Rows to check: a tall portrait phone with PSP boxes, landscape with NES-shaped boxes
+    /// and the deepest (Atari 7800) boxes, and flat covers.
+    private var rows: [CoverFlow.Metrics] {
+        [CoverFlow.Metrics.fitting(width: 402, height: 560, tallestAspect: 0.56, deepestBox: 0.16),
+         CoverFlow.Metrics.fitting(width: 874, height: 280, tallestAspect: 0.69, deepestBox: 0.16),
+         CoverFlow.Metrics.fitting(width: 402, height: 560, tallestAspect: 0.69, deepestBox: 0.05),
+         CoverFlow.Metrics(coverSide: 200)]
+    }
+
+    /// Where a point of a face is drawn, from its 3 × 3 transform (relative to the centre).
+    private func drawn(_ m: [Double], u: Double, v: Double, width: Double, height: Double) -> (x: Double, y: Double) {
+        let x = u * m[0] + v * m[3] + m[6], y = u * m[1] + v * m[4] + m[7], w = u * m[2] + v * m[5] + m[8]
+        return (x / w - width / 2, y / w - height / 2)
+    }
+
     func testLeftStackNeverCoversTheMiddleCover() {
-        // Facing left, a left cover's inner edge comes forward, and the left stack lies on top:
-        // the first one stands far enough out that even the widest cover (drawn in a stronger
-        // perspective than the view's, to be safe) clears the middle cover's edge.
-        for metrics in [CoverFlow.Metrics.fitting(width: 402, height: 560),
-                        CoverFlow.Metrics.fitting(width: 874, height: 280),
-                        CoverFlow.Metrics(coverSide: 200)] {
+        // Facing left, a left box's right side turns towards the player, and the left stack
+        // lies on top: the first one stands far enough out that its side, at the deepest box
+        // in the row, stops short of the middle cover's edge.
+        for metrics in rows {
+            let middle = metrics.span(width: metrics.coverWidth, depth: metrics.boxDepth, rotation: 0)
+            let side = metrics.span(width: metrics.coverWidth, depth: metrics.boxDepth, rotation: -CoverFlow.sideAngle)
             let pose = metrics.pose(distance: -metrics.step)
-            let half = metrics.coverWidth / 2 * pose.scale
-            let angle = abs(pose.rotation) * .pi / 180
-            let eye = metrics.coverWidth / CoverFlow.perspective
-            let forward = half * cos(angle) / (1 - half * sin(angle) / eye)
-            let innerEdge = -metrics.step + pose.xShift + forward
-            XCTAssertLessThanOrEqual(innerEdge, -metrics.coverWidth / 2, "for \(metrics.coverWidth)")
-            // And not much further: the stack still reads as one row with the middle (it was
-            // 76% of a cover out).
-            XCTAssertLessThan(metrics.leftGap, metrics.coverWidth * 0.7)
+            XCTAssertEqual(pose.rotation, -CoverFlow.sideAngle)
+            let innerEdge = -metrics.step + pose.xShift + side.right
+            XCTAssertLessThanOrEqual(innerEdge, middle.left, "for \(metrics.coverWidth)")
+            // And not much further: the stack still reads as one row with the middle.
+            XCTAssertLessThan(metrics.leftGap, metrics.coverWidth * 0.82, "for \(metrics.coverWidth)")
         }
     }
 
     func testRightCoverStillShowsBesideTheMiddle() {
-        // Tucked under the middle cover, the first right cover's outer edge (turned towards
-        // the player) still shows a strip beside it, at the narrowest drawing (no perspective).
-        for metrics in [CoverFlow.Metrics.fitting(width: 402, height: 560),
-                        CoverFlow.Metrics.fitting(width: 874, height: 280)] {
-            let pose = metrics.pose(distance: metrics.step)
-            let half = metrics.coverWidth / 2 * pose.scale * cos(abs(pose.rotation) * .pi / 180)
-            let shows = metrics.firstGap + half - metrics.coverWidth / 2
+        // Tucked under the middle cover, the first right box (front and side) still shows a
+        // strip beside it.
+        for metrics in rows {
+            let middle = metrics.span(width: metrics.coverWidth, depth: metrics.boxDepth, rotation: 0)
+            let side = metrics.span(width: metrics.coverWidth, depth: 0, rotation: -CoverFlow.sideAngle)
+            let shows = metrics.firstGap + side.right - middle.right
             XCTAssertGreaterThan(shows, metrics.coverWidth * 0.08, "for \(metrics.coverWidth)")
+        }
+    }
+
+    func testCoversKeepTheirSize() {
+        // No growing into the middle or shrinking away from it: a cover's front is drawn the
+        // same height down its centre wherever it stands (perspective aside, within 3%).
+        for metrics in rows {
+            let width = metrics.coverWidth, height = metrics.coverHeight
+            func centreHeight(_ fraction: Double) -> Double {
+                let pose = metrics.pose(distance: metrics.step * fraction)
+                let m = metrics.faceTransform(.front, width: width, height: height, boxWidth: width,
+                                              depth: metrics.boxDepth, rotation: pose.rotation)
+                return drawn(m, u: width / 2, v: height, width: width, height: height).y
+                    - drawn(m, u: width / 2, v: 0, width: width, height: height).y
+            }
+            let rest = centreHeight(0)
+            XCTAssertEqual(rest, height, accuracy: height * 0.03)
+            for fraction in [0.25, 0.5, 1, 3, -0.5, -1, -3] {
+                XCTAssertEqual(centreHeight(fraction), rest, accuracy: rest * 0.03, "at \(fraction)")
+            }
+        }
+    }
+
+    func testFlatCoverFacingFrontIsDrawnAsIs() {
+        let metrics = CoverFlow.Metrics(coverSide: 200)
+        let m = metrics.faceTransform(.front, width: 200, height: 300, boxWidth: 200, depth: 0, rotation: 0)
+        XCTAssertEqual(m, [1, 0, 0, 0, 1, 0, 0, 0, 1])
+    }
+
+    func testBoxFacesMeetAndMatchTheSpacing() {
+        // The side starts where the front ends, and the drawn box reaches exactly as far as
+        // the spacing allows for, so what's drawn is what's kept clear.
+        for metrics in rows {
+            let width = metrics.coverWidth, height = metrics.coverHeight, depth = metrics.boxDepth
+            guard depth > 0 else { continue }
+            for rotation in [-10.0, -35, -CoverFlow.sideAngle] {
+                let front = metrics.faceTransform(.front, width: width, height: height, boxWidth: width,
+                                                  depth: depth, rotation: rotation)
+                let side = metrics.faceTransform(.side, width: depth, height: height, boxWidth: width,
+                                                 depth: depth, rotation: rotation)
+                for v in [0, height] {
+                    let frontEdge = drawn(front, u: width, v: v, width: width, height: height)
+                    let sideEdge = drawn(side, u: 0, v: v, width: depth, height: height)
+                    XCTAssertEqual(frontEdge.x, sideEdge.x, accuracy: 1e-6)
+                    XCTAssertEqual(frontEdge.y, sideEdge.y, accuracy: 1e-6)
+                }
+                let span = metrics.span(width: width, depth: depth, rotation: rotation)
+                let back = drawn(side, u: depth, v: height / 2, width: depth, height: height)
+                let left = drawn(front, u: 0, v: height / 2, width: width, height: height)
+                XCTAssertEqual(back.x, span.right, accuracy: 1e-6)
+                XCTAssertEqual(left.x, span.left, accuracy: 1e-6)
+            }
+        }
+    }
+
+    func testRotationsDrawTheFacesWhereTheBoxPlacesThem() {
+        // The view draws each face with a 3D rotation about the vertical axis, anchored at the
+        // face's centre and `anchorZ` behind it, the eye `max(width, height) / perspective`
+        // from the anchor (SwiftUI's rotation3DEffect). Those land each point where the box
+        // geometry (and so the spacing) puts it.
+        for metrics in rows {
+            let width = metrics.coverWidth, height = metrics.coverHeight, depth = max(metrics.boxDepth, 12)
+            for rotation in [0.0, -10, -35, -CoverFlow.sideAngle] {
+                for (face, faceWidth) in [(CoverFlow.Face.front, width), (.side, depth)] {
+                    let turn = metrics.faceRotation(face, boxWidth: width, depth: depth, rotation: rotation)
+                    let eye = max(faceWidth, height) / metrics.facePerspective(width: faceWidth, height: height)
+                    let m = metrics.faceTransform(face, width: faceWidth, height: height, boxWidth: width,
+                                                  depth: depth, rotation: rotation)
+                    let angle = -turn.angle * .pi / 180
+                    for (u, v) in [(0.0, 0.0), (faceWidth, height), (faceWidth / 3, height / 2)] {
+                        let x = u - faceWidth / 2, y = v - height / 2, z = -turn.anchorZ
+                        let turnedX = cos(angle) * x - sin(angle) * z
+                        let turnedZ = sin(angle) * x + cos(angle) * z
+                        let k = eye / (eye - turnedZ)
+                        let expected = drawn(m, u: u, v: v, width: faceWidth, height: height)
+                        XCTAssertEqual(turnedX * k, expected.x, accuracy: 1e-6, "\(face) at \(rotation)")
+                        XCTAssertEqual(y * k, expected.y, accuracy: 1e-6, "\(face) at \(rotation)")
+                    }
+                }
+            }
+        }
+    }
+
+    func testSideShowsOnlyOnceTurned() {
+        // Facing the player the side folds back behind the front's edge (hidden under it);
+        // turned, it opens out.
+        let metrics = CoverFlow.Metrics(coverWidth: 200, coverHeight: 280, boxDepth: 30)
+        func sideWidth(_ rotation: Double) -> Double {
+            let m = metrics.faceTransform(.side, width: 30, height: 280, boxWidth: 200, depth: 30, rotation: rotation)
+            return drawn(m, u: 30, v: 140, width: 30, height: 280).x - drawn(m, u: 0, v: 140, width: 30, height: 280).x
+        }
+        XCTAssertLessThanOrEqual(sideWidth(0), 0)
+        XCTAssertGreaterThan(sideWidth(-35), 10)
+        XCTAssertGreaterThan(sideWidth(-CoverFlow.sideAngle), sideWidth(-35))
+    }
+
+    func testCardboardBoxesAreDeeperThanCases() {
+        for box in [SystemID.nes, .snes, .n64, .gba, .atari7800] {
+            for disc in [SystemID.psp, .nds, .ps1] {
+                XCTAssertGreaterThan(CoverFlow.boxDepth(box), CoverFlow.boxDepth(disc))
+            }
         }
     }
 
