@@ -1,0 +1,31 @@
+{
+  "keep": [
+    "build/dd-land"
+  ],
+  "workspaces": 1,
+  "checks": [
+    {
+      "name": "package",
+      "run": "s=$(xcrun simctl list devices | grep -F 'RetroPlay Build (' | grep -oE '[0-9A-F-]{36}' | head -1); [ -n \"$s\" ] || { echo 'No RetroPlay Build Simulator'; exit 1; }; xcrun simctl boot \"$s\" 2>/dev/null; xcrun simctl bootstatus \"$s\" >/dev/null && cd App && xcodebuild test -scheme RetroPlay-Package -destination id=$s -derivedDataPath ../build/dd-land/package -collect-test-diagnostics never -quiet; r=$?; xcrun simctl shutdown $s 2>/dev/null; exit $r",
+      "inputs": [
+        "App/Package.swift",
+        "App/Sources/**",
+        "App/Tests/**",
+        "!**/*.md"
+      ],
+      "line": "sim-retroplay",
+      "timeout": 40
+    }
+  ],
+  "release": {
+    "run": "mercurius-agent secret run --env ASC_KEY_ID,ASC_ISSUER_ID,ASC_KEY_P8 -- Scripts/testflight.sh",
+    "inputs": [
+      "**",
+      "!**/*.md",
+      "!docs/**",
+      "!.mercurius/**"
+    ],
+    "line": "build",
+    "timeout": 60
+  }
+}
