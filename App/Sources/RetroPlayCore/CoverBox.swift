@@ -243,11 +243,27 @@ extension CoverFlow {
     /// looking a little down onto the boxes: y of the eye from the box's centre.
     static func eyeLevel(_ box: Box) -> Double { -box.height / 2 }
 
-    /// Where a point (from the box's centre, turned) is drawn, from the box's centre.
+    /// Where a point (from the box's centre, turned) is drawn, from the box's centre. The
+    /// drawing is lifted so a box facing the player sits square in its slot: looked at from
+    /// level with its top, its front would otherwise be drawn lower than the flat cover.
     static func project(_ q: Vector, _ box: Box, eye: Double) -> (x: Double, y: Double) {
+        let drawn = perspective(q, box, eye: eye)
+        return (drawn.x, drawn.y + lift(box, eye: eye))
+    }
+
+    static func perspective(_ q: Vector, _ box: Box, eye: Double) -> (x: Double, y: Double) {
         let level = eyeLevel(box)
         let k = eye / (eye - q.z)
         return (q.x * k, level + (q.y - level) * k)
+    }
+
+    /// How far up a box is moved so its front, facing the player, is centred where the flat
+    /// cover is.
+    static func lift(_ box: Box, eye: Double) -> Double {
+        let turn = boxTurn(yaw: 0)
+        let top = perspective(apply(turn, (0, -box.height / 2, box.depth / 2)), box, eye: eye)
+        let bottom = perspective(apply(turn, (0, box.height / 2, box.depth / 2)), box, eye: eye)
+        return -(top.y + bottom.y) / 2
     }
 
     /// Where the box's eight corners are drawn, from its centre, turned `yaw`.
@@ -356,6 +372,23 @@ extension CoverFlow.Metrics {
     /// How far left and right of its centre a box turned `yaw` is drawn.
     public func span(_ box: CoverFlow.Box, yaw: Double) -> (left: Double, right: Double) {
         CoverFlow.span(box, yaw: yaw, eye: eye)
+    }
+
+    /// How far a box's drawing is moved up so its front sits square in its slot (added after
+    /// the turn, in the view's own coordinates).
+    public func lift(_ box: CoverFlow.Box) -> Double {
+        CoverFlow.lift(box, eye: eye)
+    }
+
+    /// Where a cover `offset` places from the middle is drawn when the row is at rest, left
+    /// and right of its own place in the row: the area a tap on it should land in (a cover's
+    /// layout slot is narrower than the cover and doesn't move with it).
+    public func restSpan(offset: Int) -> (left: Double, right: Double) {
+        let distance = Double(offset) * step
+        let pose = pose(distance: distance)
+        let box = CoverFlow.Box(width: coverWidth, height: coverHeight, depth: boxDepth)
+        let drawn = span(box, yaw: pose.rotation)
+        return (pose.xShift + drawn.left, pose.xShift + drawn.right)
     }
 
     /// How far past the slot's top and bottom the tallest box reaches as it turns (tipped back

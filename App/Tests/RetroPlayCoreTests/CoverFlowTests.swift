@@ -424,7 +424,7 @@ final class CoverFlowTests: XCTestCase {
                         let k = eye / (eye - q.z)
                         let expected = metrics.drawn(face, box, yaw: yaw, u: u, v: v)
                         XCTAssertEqual(q.x * k, expected.x, accuracy: 1e-6, "\(face) at \(yaw)")
-                        XCTAssertEqual(anchorY + q.y * k, expected.y, accuracy: 1e-6, "\(face) at \(yaw)")
+                        XCTAssertEqual(anchorY + q.y * k + metrics.lift(box), expected.y, accuracy: 1e-6, "\(face) at \(yaw)")
                     }
                 }
             }
@@ -561,7 +561,7 @@ final class CoverFlowTests: XCTestCase {
                         let k = eye / (eye - q.z)
                         let expected = metrics.drawn(panel, box, yaw: yaw, u: u, v: v)
                         XCTAssertEqual(q.x * k, expected.x, accuracy: 1e-6, "\(panel.surface) at \(yaw)")
-                        XCTAssertEqual(anchorY + q.y * k, expected.y, accuracy: 1e-6, "\(panel.surface) at \(yaw)")
+                        XCTAssertEqual(anchorY + q.y * k + metrics.lift(box), expected.y, accuracy: 1e-6, "\(panel.surface) at \(yaw)")
                     }
                 }
             }
@@ -596,6 +596,45 @@ final class CoverFlowTests: XCTestCase {
         XCTAssertEqual(CoverFlow.panels(roundedBox).count, 6 + 3 * n + n * n)
         // The rounding stays within the box.
         XCTAssertEqual(CoverFlow.Box(width: 200, height: 280, depth: 30, radius: 99).radius, 15)
+    }
+
+    func testMiddleCoverSitsSquareInItsSlot() {
+        // Looked at from level with the boxes' tops, a front would be drawn lower than the flat
+        // cover; the lift puts the middle cover's front back, centred on its slot.
+        for metrics in rows {
+            for box in [tallest(metrics), rounded(metrics)] {
+                let front = CoverFlow.panel(.face(.front), box)
+                let top = metrics.drawn(front, box, yaw: 0, u: front.width / 2, v: 0).y
+                let bottom = metrics.drawn(front, box, yaw: 0, u: front.width / 2, v: front.height).y
+                let flatTop = -box.height / 2 + box.radius
+                // The front's own top is lower by any rounding; its centre line stays put.
+                XCTAssertEqual((top + bottom) / 2 - (flatTop + box.height / 2) / 2,
+                               0, accuracy: box.height * 0.01, "for \(box.width)")
+            }
+            let sharp = tallest(metrics)
+            let top = metrics.drawn(.front, sharp, yaw: 0, u: sharp.width / 2, v: 0).y
+            let bottom = metrics.drawn(.front, sharp, yaw: 0, u: sharp.width / 2, v: sharp.height).y
+            XCTAssertEqual((top + bottom) / 2, 0, accuracy: 1e-6)
+        }
+    }
+
+    func testTapsLandOnTheCoverDrawnThere() {
+        // A cover's tap area is where it's drawn at rest, not its narrower layout slot: the
+        // middle cover's whole front plays it, and the neighbour stacked over its slot (the
+        // right stack lies on top) doesn't reach into it.
+        for metrics in rows {
+            let middle = metrics.restSpan(offset: 0)
+            XCTAssertLessThanOrEqual(middle.left, -metrics.coverWidth / 2 + 1e-6)
+            XCTAssertGreaterThanOrEqual(middle.right, metrics.coverWidth / 2 - 1e-6)
+            let right = metrics.restSpan(offset: 1)
+            XCTAssertGreaterThanOrEqual(metrics.step + right.left, middle.right, "for \(metrics.coverWidth)")
+            // Its layout slot alone would have reached well into the middle cover.
+            XCTAssertLessThan(metrics.step - metrics.coverWidth / 2, middle.right)
+            // Covers further out stand further out.
+            let left = metrics.restSpan(offset: -1), farLeft = metrics.restSpan(offset: -2)
+            XCTAssertLessThan(-metrics.step + left.left, middle.left)
+            XCTAssertLessThan(-2 * metrics.step + farLeft.left, -metrics.step + left.left)
+        }
     }
 
     func testAxisAndAngleGiveBackTheTurn() {

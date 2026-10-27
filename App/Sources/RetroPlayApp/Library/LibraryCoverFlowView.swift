@@ -200,7 +200,8 @@ struct LibraryCoverFlowView<Header: View>: View {
                 game: game,
                 cover: artworkProvider(game),
                 missing: missing,
-                row: CoverFlowRow(metrics: metrics, middle: middle)
+                row: CoverFlowRow(metrics: metrics, middle: middle),
+                tapArea: metrics.restSpan(offset: index - liveIndex)
             )
                 .frame(width: metrics.coverWidth, height: metrics.coverHeight)
         }
@@ -386,6 +387,9 @@ private struct CoverFlowCover: View {
     /// In the carousel: drawn as a 3D box at the row's one width, turned by where it stands
     /// (nil: a flat cover fitted to its frame).
     var row: CoverFlowRow?
+    /// Where the cover is drawn at rest, left and right of its place in the row: taps land
+    /// there, so a tap on the middle cover can't fall to a neighbour stacked over its slot.
+    var tapArea: (left: Double, right: Double)?
     var shadow = true
 
     @Environment(\.colorScheme) private var colorScheme
@@ -437,7 +441,7 @@ private struct CoverFlowCover: View {
                         )
                 }
             }
-            .contentShape(Rectangle())
+            .contentShape(TapArea(span: tapArea))
             .accessibilityHidden(true)
     }
 
@@ -494,6 +498,17 @@ private struct CoverFlowCover: View {
     }
 }
 
+/// A cover's tap area: the band of the row it's drawn in (from its centre), full height.
+private struct TapArea: Shape {
+    let span: (left: Double, right: Double)?
+
+    func path(in rect: CGRect) -> Path {
+        guard let span else { return Path(rect) }
+        return Path(CGRect(x: rect.midX + span.left, y: rect.minY,
+                           width: max(span.right - span.left, 1), height: rect.height))
+    }
+}
+
 /// The colours round a box's rounded edges: a case's plastic, or on a cardboard box the
 /// colour of its cover's edge (the art printed round it).
 private struct BoxColors {
@@ -546,7 +561,7 @@ private struct CoverPanelEffect: ViewModifier {
                 )
                 .opacity(facing ? 1 : 0)
                 .brightness(light - pose.dimming)
-                .offset(x: pose.xShift)
+                .offset(x: pose.xShift, y: row.metrics.lift(box))
         }
     }
 }
