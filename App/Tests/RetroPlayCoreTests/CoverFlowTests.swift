@@ -137,11 +137,11 @@ final class CoverFlowTests: XCTestCase {
         // Under half a cover out: the right cover tucks in behind the middle one's edge.
         let metrics = CoverFlow.Metrics(coverSide: 300)
         XCTAssertEqual(metrics.firstGap, 135)
-        XCTAssertEqual(metrics.step + metrics.pose(distance: metrics.step).xShift, metrics.firstGap)
+        XCTAssertEqual(-metrics.step + metrics.pose(distance: -metrics.step).xShift, -metrics.firstGap)
         // Was 64% of a cover, then 50%; the stack behind keeps its spacing.
         XCTAssertLessThan(metrics.firstGap, 300 * 0.5)
-        let second = metrics.step * 2 + metrics.pose(distance: metrics.step * 2).xShift
-        XCTAssertEqual(second - metrics.firstGap, metrics.stackSpacing)
+        let second = -metrics.step * 2 + metrics.pose(distance: -metrics.step * 2).xShift
+        XCTAssertEqual(-second - metrics.firstGap, metrics.stackSpacing)
     }
 
     func testOneGameIsAFullDragAway() {
@@ -154,12 +154,15 @@ final class CoverFlowTests: XCTestCase {
 
     func testLayoutDistanceInvertsTheDrawnPosition() {
         let metrics = CoverFlow.Metrics(coverSide: 200)
+        // On the left, the closer-packed side (its first cover tucks under the middle one), so
+        // laying out that far covers the right too.
         for distance in [0.0, 30, metrics.step, metrics.step * 2.5, metrics.step * 9] {
-            let drawn = distance + metrics.pose(distance: distance).xShift
-            // The easing is flat at the middle and side spots, so its inverse is only
-            // float-exact to a few millionths of a point there.
+            let drawn = -distance + metrics.pose(distance: -distance).xShift
             XCTAssertEqual(metrics.layoutDistance(forVisual: drawn), distance, accuracy: 1e-4)
         }
+        // The right stands further out for the same layout distance.
+        let right = metrics.step + metrics.pose(distance: metrics.step).xShift
+        XCTAssertGreaterThan(right, metrics.firstGap)
     }
 
     // MARK: Swipes
@@ -238,14 +241,14 @@ final class CoverFlowTests: XCTestCase {
         XCTAssertEqual(pose.dimming, 0)
     }
 
-    func testAllSideCoversFaceLeft() {
+    func testAllSideCoversFaceRight() {
         // Like a fanned deck: covers on both sides turn the same way, mirrored only in where
         // they stand.
         let metrics = CoverFlow.Metrics(coverSide: 200)
         for fraction in [0.25, 0.5, 1, 3] {
             let right = metrics.pose(distance: metrics.step * fraction)
             let left = metrics.pose(distance: -metrics.step * fraction)
-            XCTAssertLessThan(right.rotation, 0)
+            XCTAssertGreaterThan(right.rotation, 0)
             XCTAssertEqual(left.rotation, right.rotation, accuracy: 1e-9)
         }
     }
@@ -257,12 +260,12 @@ final class CoverFlowTests: XCTestCase {
             return distance + metrics.pose(distance: distance).xShift
         }
         XCTAssertEqual(abs(metrics.pose(distance: metrics.step).rotation), CoverFlow.sideAngle)
-        XCTAssertEqual(metrics.pose(distance: -metrics.step * 3).rotation, -CoverFlow.sideAngle)
+        XCTAssertEqual(metrics.pose(distance: -metrics.step * 3).rotation, CoverFlow.sideAngle)
         // The first side covers stand at their gaps, the third two stack spacings further.
-        XCTAssertEqual(drawn(1), metrics.firstGap)
-        XCTAssertEqual(drawn(3), metrics.firstGap + 2 * metrics.stackSpacing)
-        XCTAssertEqual(drawn(-1), -metrics.leftGap)
-        XCTAssertEqual(drawn(-3), -(metrics.leftGap + 2 * metrics.stackSpacing))
+        XCTAssertEqual(drawn(-1), -metrics.firstGap)
+        XCTAssertEqual(drawn(-3), -(metrics.firstGap + 2 * metrics.stackSpacing))
+        XCTAssertEqual(drawn(1), metrics.rightGap)
+        XCTAssertEqual(drawn(3), metrics.rightGap + 2 * metrics.stackSpacing)
     }
 
     func testCoversSlideInStepWithTheFinger() {
@@ -272,8 +275,8 @@ final class CoverFlowTests: XCTestCase {
         for i in 1...9 {
             let fraction = Double(i) / 10
             let right = metrics.step * fraction, left = -right
-            XCTAssertEqual(right + metrics.pose(distance: right).xShift, metrics.firstGap * fraction, accuracy: 1e-9)
-            XCTAssertEqual(left + metrics.pose(distance: left).xShift, -metrics.leftGap * fraction, accuracy: 1e-9)
+            XCTAssertEqual(left + metrics.pose(distance: left).xShift, -metrics.firstGap * fraction, accuracy: 1e-9)
+            XCTAssertEqual(right + metrics.pose(distance: right).xShift, metrics.rightGap * fraction, accuracy: 1e-9)
         }
     }
 
@@ -307,30 +310,30 @@ final class CoverFlowTests: XCTestCase {
         CoverFlow.Box(width: metrics.coverWidth, height: metrics.coverHeight, depth: metrics.boxDepth)
     }
 
-    private let turns: [Double] = [0, -5, -20, -35, -CoverFlow.sideAngle]
+    private let turns: [Double] = [0, 5, 20, 35, CoverFlow.sideAngle]
 
-    func testLeftStackNeverCoversTheMiddleCover() {
-        // Facing left, a left box's right side turns towards the player, and the left stack
-        // lies on top: the first one stands far enough out that its side, at the deepest box
-        // in the row, stops short of the middle cover's edge.
+    func testRightStackNeverCoversTheMiddleCover() {
+        // Facing right, a right box's spine (its left side) turns towards the player, and the
+        // right stack lies on top: the first one stands far enough out that its spine, at the
+        // deepest box in the row, stops short of the middle cover's edge.
         for metrics in rows {
             let middle = metrics.span(tallest(metrics), yaw: 0)
-            let side = metrics.span(tallest(metrics), yaw: -CoverFlow.sideAngle)
-            let pose = metrics.pose(distance: -metrics.step)
-            XCTAssertEqual(pose.rotation, -CoverFlow.sideAngle)
-            let innerEdge = -metrics.step + pose.xShift + side.right
-            XCTAssertLessThanOrEqual(innerEdge, middle.left, "for \(metrics.coverWidth)")
+            let side = metrics.span(tallest(metrics), yaw: CoverFlow.sideAngle)
+            let pose = metrics.pose(distance: metrics.step)
+            XCTAssertEqual(pose.rotation, CoverFlow.sideAngle)
+            let innerEdge = metrics.step + pose.xShift + side.left
+            XCTAssertGreaterThanOrEqual(innerEdge, middle.right, "for \(metrics.coverWidth)")
             // And not much further: the stack still reads as one row with the middle.
-            XCTAssertLessThan(metrics.leftGap, metrics.coverWidth * 0.95, "for \(metrics.coverWidth)")
+            XCTAssertLessThan(metrics.rightGap, metrics.coverWidth * 0.95, "for \(metrics.coverWidth)")
         }
     }
 
-    func testRightCoverStillShowsBesideTheMiddle() {
-        // Tucked under the middle cover, the first right box still shows a strip beside it.
+    func testLeftCoverStillShowsBesideTheMiddle() {
+        // Tucked under the middle cover, the first left box still shows a strip beside it.
         for metrics in rows {
             let middle = metrics.span(tallest(metrics), yaw: 0)
             let flat = CoverFlow.Box(width: metrics.coverWidth, height: metrics.coverHeight, depth: 0)
-            let shows = metrics.firstGap + metrics.span(flat, yaw: -CoverFlow.sideAngle).right - middle.right
+            let shows = middle.left - (-metrics.firstGap + metrics.span(flat, yaw: CoverFlow.sideAngle).left)
             XCTAssertGreaterThan(shows, metrics.coverWidth * 0.08, "for \(metrics.coverWidth)")
         }
     }
@@ -354,43 +357,43 @@ final class CoverFlowTests: XCTestCase {
     }
 
     func testABoxShowsItsFrontSideAndTop() {
-        // A whole box: turned left and seen a little from above, its front, right side and
-        // top face the player; the back, left side and bottom face away.
+        // A whole box: turned right and seen a little from above, its front, spine (left side)
+        // and top face the player; the back, the opening side and the bottom face away.
         XCTAssertLessThan(CoverFlow.pitch, 0)
         let metrics = CoverFlow.Metrics.fitting(width: 402, height: 560, deepestBox: 0.15)
         let box = tallest(metrics)
         // Turned far enough for the side to clear the eye (at 5° the box still hides it).
         for yaw in turns.dropFirst(2) {
-            for face in [CoverFlow.Face.front, .right, .top] {
+            for face in [CoverFlow.Face.front, .spine, .top] {
                 XCTAssertTrue(metrics.isFacing(face, box, yaw: yaw), "\(face) at \(yaw)")
             }
-            for face in [CoverFlow.Face.back, .left, .bottom] {
+            for face in [CoverFlow.Face.back, .opening, .bottom] {
                 XCTAssertFalse(metrics.isFacing(face, box, yaw: yaw), "\(face) at \(yaw)")
             }
         }
         // Facing the player, the side is edge-on: hidden.
-        XCTAssertFalse(metrics.isFacing(.right, box, yaw: 0))
+        XCTAssertFalse(metrics.isFacing(.spine, box, yaw: 0))
         XCTAssertTrue(metrics.isFacing(.top, box, yaw: 0))
-        XCTAssertEqual(Set(CoverFlow.shownFaces), [.front, .right, .top])
+        XCTAssertEqual(Set(CoverFlow.shownFaces), [.front, .spine, .top])
     }
 
     func testFacesMeetAtTheBoxsEdges() {
-        // The front's top right corner, the side's top front corner and the top's front right
+        // The front's top left corner, the spine's top front corner and the top's front left
         // corner are one point, wherever the box turns; so are the edges between them.
         for metrics in rows {
             let box = tallest(metrics)
             guard box.depth > 0 else { continue }
             for yaw in turns {
-                let corner = metrics.drawn(.front, box, yaw: yaw, u: box.width, v: 0)
-                let side = metrics.drawn(.right, box, yaw: yaw, u: 0, v: 0)
-                let top = metrics.drawn(.top, box, yaw: yaw, u: box.width, v: box.depth)
+                let corner = metrics.drawn(.front, box, yaw: yaw, u: 0, v: 0)
+                let side = metrics.drawn(.spine, box, yaw: yaw, u: box.depth, v: 0)
+                let top = metrics.drawn(.top, box, yaw: yaw, u: 0, v: box.depth)
                 for other in [side, top] {
                     XCTAssertEqual(other.x, corner.x, accuracy: 1e-6, "at \(yaw)")
                     XCTAssertEqual(other.y, corner.y, accuracy: 1e-6, "at \(yaw)")
                 }
-                // The side's back top corner is the top's back right corner.
-                let sideBack = metrics.drawn(.right, box, yaw: yaw, u: box.depth, v: 0)
-                let topBack = metrics.drawn(.top, box, yaw: yaw, u: box.width, v: 0)
+                // The spine's back top corner is the top's back left corner.
+                let sideBack = metrics.drawn(.spine, box, yaw: yaw, u: 0, v: 0)
+                let topBack = metrics.drawn(.top, box, yaw: yaw, u: 0, v: 0)
                 XCTAssertEqual(sideBack.x, topBack.x, accuracy: 1e-6)
                 XCTAssertEqual(sideBack.y, topBack.y, accuracy: 1e-6)
             }
@@ -453,7 +456,7 @@ final class CoverFlowTests: XCTestCase {
         for metrics in rows {
             let box = tallest(metrics)
             var reach = 0.0
-            for yaw in stride(from: -CoverFlow.sideAngle, through: 0, by: 5) {
+            for yaw in stride(from: 0, through: CoverFlow.sideAngle, by: 5) {
                 for face in CoverFlow.Face.allCases where metrics.isFacing(face, box, yaw: yaw) {
                     let size = CoverFlow.faceSize(face, box)
                     for u in [0, size.width] { for v in [0, size.height] {
@@ -484,19 +487,19 @@ final class CoverFlowTests: XCTestCase {
             let box = rounded(metrics)
             XCTAssertGreaterThan(box.radius, 0)
             func p(_ s: CoverFlow.Surface) -> CoverFlow.Panel { CoverFlow.panel(s, box) }
-            let front = p(.face(.front)), right = p(.face(.right)), top = p(.face(.top))
+            let front = p(.face(.front)), right = p(.face(.spine)), top = p(.face(.top))
             for yaw in turns {
                 func at(_ panel: CoverFlow.Panel, _ u: Double, _ v: Double) -> (x: Double, y: Double) {
                     metrics.drawn(panel, box, yaw: yaw, u: u, v: v)
                 }
                 for v in [0, front.height / 2, front.height] {
-                    var edge = at(front, front.width, v)
+                    var edge = at(front, 0, v)
                     for k in 0..<n {
-                        let facet = p(.edge(.frontRight, k))
-                        same(at(facet, 0, v), edge, "front-right \(k) at \(yaw)")
-                        edge = at(facet, facet.width, v)
+                        let facet = p(.edge(.frontSpine, k))
+                        same(at(facet, facet.width, v), edge, "front-spine \(k) at \(yaw)")
+                        edge = at(facet, 0, v)
                     }
-                    same(at(right, 0, v), edge, "into the side at \(yaw)")
+                    same(at(right, right.width, v), edge, "into the spine at \(yaw)")
                 }
                 for u in [0, front.width / 2, front.width] {
                     var edge = at(front, u, 0)
@@ -510,11 +513,11 @@ final class CoverFlowTests: XCTestCase {
                 for u in [0, right.width / 2, right.width] {
                     var edge = at(right, u, 0)
                     for k in 0..<n {
-                        let facet = p(.edge(.rightTop, k))
+                        let facet = p(.edge(.spineTop, k))
                         same(at(facet, u, facet.height), edge, "side-top \(k) at \(yaw)")
                         edge = at(facet, u, 0)
                     }
-                    same(at(top, top.width, top.height - u), edge, "onto the top's side at \(yaw)")
+                    same(at(top, 0, u), edge, "onto the top's side at \(yaw)")
                 }
             }
         }
@@ -524,7 +527,7 @@ final class CoverFlowTests: XCTestCase {
         // The corner's facets sit on the rounding's sphere and face between front, side and top.
         let metrics = CoverFlow.Metrics.fitting(width: 402, height: 560, deepestBox: 0.15)
         let box = rounded(metrics)
-        let centre = (x: box.width / 2 - box.radius, y: -box.height / 2 + box.radius, z: box.depth / 2 - box.radius)
+        let centre = (x: -box.width / 2 + box.radius, y: -box.height / 2 + box.radius, z: box.depth / 2 - box.radius)
         for i in 0..<CoverFlow.edgeFacets {
             for j in 0..<CoverFlow.edgeFacets {
                 let panel = CoverFlow.panel(.corner(i, j), box)
@@ -534,7 +537,7 @@ final class CoverFlowTests: XCTestCase {
                 XCTAssertLessThanOrEqual(distance, box.radius + 1e-9)
                 XCTAssertGreaterThan(distance, box.radius * 0.9)
                 let normal = CoverFlow.apply(panel.turn, (0, 0, 1))
-                XCTAssertGreaterThan(normal.x, 0)
+                XCTAssertLessThan(normal.x, 0)
                 XCTAssertLessThan(normal.y, 0)
                 XCTAssertGreaterThan(normal.z, 0)
             }
@@ -580,14 +583,14 @@ final class CoverFlowTests: XCTestCase {
             last = now
         }
         XCTAssertGreaterThan(light(.face(.top)), light(.face(.front)))
-        XCTAssertLessThan(CoverFlow.shade(facing: (1, 0, 0)), CoverFlow.shade(facing: (0, 0, 1)))
+        XCTAssertLessThan(CoverFlow.shade(facing: (-1, 0, 0)), CoverFlow.shade(facing: (0, 0, 1)))
         XCTAssertEqual(CoverFlow.shade(facing: (0, 0, 1)), 0, accuracy: 1e-12)
     }
 
     func testSharpBoxesHaveJustTheirFaces() {
         let box = CoverFlow.Box(width: 200, height: 280, depth: 30)
         XCTAssertEqual(CoverFlow.panels(box).count, 6)
-        XCTAssertEqual(Set(CoverFlow.drawnPanels(box).map(\.surface)), [.face(.front), .face(.right), .face(.top)])
+        XCTAssertEqual(Set(CoverFlow.drawnPanels(box).map(\.surface)), [.face(.front), .face(.spine), .face(.top)])
         let roundedBox = CoverFlow.Box(width: 200, height: 280, depth: 30, radius: 10)
         let n = CoverFlow.edgeFacets
         XCTAssertEqual(CoverFlow.panels(roundedBox).count, 6 + 3 * n + n * n)
@@ -615,9 +618,9 @@ final class CoverFlowTests: XCTestCase {
     }
 
     func testCoversKeepOneDrawingOrder() {
-        // Earlier games on top, always: no two covers swap places mid-swipe.
-        XCTAssertGreaterThan(CoverFlow.layer(index: 0), CoverFlow.layer(index: 1))
-        XCTAssertGreaterThan(CoverFlow.layer(index: 9), CoverFlow.layer(index: 10))
+        // Later games on top, always: no two covers swap places mid-swipe.
+        XCTAssertLessThan(CoverFlow.layer(index: 0), CoverFlow.layer(index: 1))
+        XCTAssertLessThan(CoverFlow.layer(index: 9), CoverFlow.layer(index: 10))
     }
 
     func testIndexForOffsetRoundsAndClamps() {

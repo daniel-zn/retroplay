@@ -139,7 +139,7 @@ struct PackageSpine: View {
     var body: some View {
         let package = RetailPackage.of(system)
         let boxArt = cover.flatMap { $0.isBoxArt ? $0.image : nil }
-        let edge = boxArt.flatMap { CoverEdgeColor.right(of: $0) }
+        let edge = boxArt.flatMap { CoverEdgeColor.left(of: $0) }
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
             // Tall enough for the system's name to read down it at the spine's width.
@@ -155,12 +155,12 @@ struct PackageSpine: View {
             let back = min(cornerRadius * 0.6, w * 0.3)
             ZStack(alignment: .top) {
                 if let boxArt, cardboard {
-                    // The cover's own art, carried round from its right-hand edge.
+                    // The cover's own art, carried round from its left-hand edge.
                     Image(uiImage: boxArt)
                         .resizable()
                         .interpolation(.medium)
                         .scaledToFill()
-                        .frame(width: w, height: h, alignment: .trailing)
+                        .frame(width: w, height: h, alignment: .leading)
                         .clipped()
                 } else {
                     base(package, edge: edge)
@@ -204,15 +204,16 @@ struct PackageSpine: View {
                            .init(color: .clear, location: 0.45),
                            .init(color: .black.opacity(0.18), location: 0.8),
                            .init(color: .black.opacity(0.42), location: 1)],
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    // The spine's front edge is on its right (it's the box's left side).
+                    startPoint: .trailing,
+                    endPoint: .leading
                 )
             }
             .clipShape(UnevenRoundedRectangle(
-                topLeadingRadius: front,
-                bottomLeadingRadius: front,
-                bottomTrailingRadius: back,
-                topTrailingRadius: back,
+                topLeadingRadius: back,
+                bottomLeadingRadius: back,
+                bottomTrailingRadius: front,
+                topTrailingRadius: front,
                 style: .continuous
             ))
         }
@@ -260,7 +261,7 @@ struct PackageTop: View {
                         .clipped()
                 } else if let color = package.spineColor {
                     color.color
-                } else if let boxArt, let edge = CoverEdgeColor.right(of: boxArt) {
+                } else if let boxArt, let edge = CoverEdgeColor.left(of: boxArt) {
                     Color(uiColor: edge)
                 } else {
                     RetroPlayTheme.systemTint(system).opacity(0.9)
@@ -305,6 +306,7 @@ enum CoverEdgeColor {
     private static let cache = NSCache<UIImage, UIColor>()
 
     private static let topCache = NSCache<UIImage, UIColor>()
+    private static let leftCache = NSCache<UIImage, UIColor>()
 
     static func right(of image: UIImage) -> UIColor? {
         if let known = cache.object(forKey: image) { return known }
@@ -314,6 +316,16 @@ enum CoverEdgeColor {
             return nil
         }
         cache.setObject(color, forKey: image)
+        return color
+    }
+
+    /// The average colour down a cover's left edge (its spine side).
+    static func left(of image: UIImage) -> UIColor? {
+        if let known = leftCache.object(forKey: image) { return known }
+        guard let cg = image.cgImage, cg.width > 4, cg.height > 0 else { return nil }
+        let strip = max(cg.width / 25, 1)
+        guard let color = average(cg, CGRect(x: 0, y: 0, width: strip, height: cg.height)) else { return nil }
+        leftCache.setObject(color, forKey: image)
         return color
     }
 

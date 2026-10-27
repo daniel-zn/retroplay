@@ -15,9 +15,11 @@ extension CoverFlow {
     public enum Face: CaseIterable, Sendable {
         case front
         case back
-        case left
-        /// The side that turns towards the player (covers face left).
-        case right
+        /// The side opposite the spine.
+        case opening
+        /// The spine side, on the box's left like a real case's: the side that turns towards
+        /// the player (covers face right).
+        case spine
         case top
         case bottom
     }
@@ -41,9 +43,9 @@ extension CoverFlow {
 
     /// The rounded edges the player sees: front to side, front to top, side to top.
     public enum Edge: CaseIterable, Sendable {
-        case frontRight
+        case frontSpine
         case frontTop
-        case rightTop
+        case spineTop
     }
 
     /// One flat piece of a box's surface: a face (trimmed where its edges are rounded), a
@@ -86,13 +88,29 @@ extension CoverFlow {
     public static func drawnPanels(_ box: Box) -> [Panel] {
         panels(box).filter { panel in
             switch panel.surface {
-            case .face(let face): return [.front, .right, .top].contains(face)
+            case .face(let face): return [.front, .spine, .top].contains(face)
             case .edge, .corner: return true
             }
         }
     }
 
+    /// A piece of the box. The pieces are laid out for a box with its spine on the right and
+    /// then mirrored left to right (the turn reflected through the mirror, so the pictures on
+    /// them still read the right way round): the spine and its rounding end up on the box's
+    /// left, where a real case's is.
     public static func panel(_ surface: Surface, _ box: Box) -> Panel {
+        let p = unmirroredPanel(surface, box)
+        let m = p.turn
+        let mirrored: Matrix = [
+            [m[0][0], -m[0][1], -m[0][2]],
+            [-m[1][0], m[1][1], m[1][2]],
+            [-m[2][0], m[2][1], m[2][2]],
+        ]
+        return Panel(surface: surface, turn: mirrored, centre: (-p.centre.x, p.centre.y, p.centre.z),
+                     width: p.width, height: p.height)
+    }
+
+    static func unmirroredPanel(_ surface: Surface, _ box: Box) -> Panel {
         let w = box.width, h = box.height, d = box.depth, r = box.radius
         let step = 90.0 / Double(edgeFacets)
         let chord = 2 * r * sin(step / 2 * .pi / 180)
@@ -104,17 +122,17 @@ extension CoverFlow {
         switch surface {
         case .face(.front):
             return Panel(surface: surface, turn: y(0), centre: (-r / 2, r / 2, d / 2), width: w - r, height: h - r)
-        case .face(.right):
+        case .face(.spine):
             return Panel(surface: surface, turn: y(90), centre: (w / 2, r / 2, -r / 2), width: d - r, height: h - r)
         case .face(.top):
             return Panel(surface: surface, turn: x(90), centre: (-r / 2, -h / 2, -r / 2), width: w - r, height: d - r)
         case .face(.back):
             return Panel(surface: surface, turn: y(180), centre: (0, 0, -d / 2), width: w, height: h)
-        case .face(.left):
+        case .face(.opening):
             return Panel(surface: surface, turn: y(-90), centre: (-w / 2, 0, 0), width: d, height: h)
         case .face(.bottom):
             return Panel(surface: surface, turn: x(-90), centre: (0, h / 2, 0), width: w, height: d)
-        case .edge(.frontRight, let k):
+        case .edge(.frontSpine, let k):
             // Round a vertical axis at the front right, from facing front to facing right.
             let a = rad((Double(k) + 0.5) * step)
             return Panel(surface: surface, turn: y((Double(k) + 0.5) * step),
@@ -126,7 +144,7 @@ extension CoverFlow {
             return Panel(surface: surface, turn: x((Double(k) + 0.5) * step),
                          centre: (-r / 2, -h / 2 + r - reach * sin(a), d / 2 - r + reach * cos(a)),
                          width: w - r, height: chord)
-        case .edge(.rightTop, let k):
+        case .edge(.spineTop, let k):
             // Round an axis running back along the side's top, from facing right to facing up.
             let degrees = (Double(k) + 0.5) * step, a = rad(degrees)
             return Panel(surface: surface, turn: multiply(z(-degrees), y(90)),
@@ -145,9 +163,9 @@ extension CoverFlow {
     }
 
     /// How much lighter (positive) or darker a piece is drawn for the way it faces, lit from
-    /// above, a little to the left and in front; the front, facing the player, is 0.
+    /// above, a little to the right and in front; the front, facing the player, is 0.
     public static func shade(facing normal: (x: Double, y: Double, z: Double)) -> Double {
-        let light: Vector = (-0.25, -0.75, 0.62)
+        let light: Vector = (0.25, -0.75, 0.62)
         let length = (light.x * light.x + light.y * light.y + light.z * light.z).squareRoot()
         let lit = (normal.x * light.x + normal.y * light.y + normal.z * light.z) / length
         return 0.16 * (lit - light.z / length)
@@ -205,7 +223,7 @@ extension CoverFlow {
         return (((m[2][1] - m[1][2]) / s, (m[0][2] - m[2][0]) / s, (m[1][0] - m[0][1]) / s), angle * 180 / .pi)
     }
 
-    /// How a box turned `yaw` degrees (negative faces left) stands: tipped back by `pitch`.
+    /// How a box turned `yaw` degrees (positive faces right) stands: tipped back by `pitch`.
     static func boxTurn(yaw: Double) -> Matrix {
         multiply(rotation(axis: (1, 0, 0), degrees: pitch), rotation(axis: (0, 1, 0), degrees: yaw))
     }
@@ -216,7 +234,7 @@ extension CoverFlow {
     public static func faceSize(_ face: Face, _ box: Box) -> (width: Double, height: Double) {
         switch face {
         case .front, .back: return (box.width, box.height)
-        case .left, .right: return (box.depth, box.height)
+        case .opening, .spine: return (box.depth, box.height)
         case .top, .bottom: return (box.width, box.depth)
         }
     }
@@ -262,7 +280,7 @@ extension CoverFlow {
         let box = Box(width: 1, height: 1.4, depth: 0.15)
         let metrics = Metrics(coverWidth: 1, coverHeight: 1.4, boxDepth: 0.15)
         return Face.allCases.filter { face in
-            stride(from: -sideAngle, through: 0, by: 1).contains { metrics.isFacing(face, box, yaw: $0) }
+            stride(from: 0, through: sideAngle, by: 1).contains { metrics.isFacing(face, box, yaw: $0) }
         }
     }
 }
@@ -345,7 +363,7 @@ extension CoverFlow.Metrics {
     public var overhang: Double {
         let box = CoverFlow.Box(width: coverWidth, height: coverHeight, depth: boxDepth)
         var reach = 0.0
-        for yaw in stride(from: -CoverFlow.sideAngle, through: 0, by: 1) {
+        for yaw in stride(from: 0, through: CoverFlow.sideAngle, by: 1) {
             for corner in CoverFlow.corners(box, yaw: yaw, eye: eye) {
                 reach = max(reach, abs(corner.y) - coverHeight / 2)
             }

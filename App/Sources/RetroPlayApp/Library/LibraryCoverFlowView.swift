@@ -445,7 +445,7 @@ private struct CoverFlowCover: View {
     private func seam(_ panel: CoverFlow.Panel) -> CGSize {
         switch panel.surface {
         case .face: return .zero
-        case .edge(.frontRight, _): return CGSize(width: 0.8, height: 0)
+        case .edge(.frontSpine, _): return CGSize(width: 0.8, height: 0)
         case .edge: return CGSize(width: 0, height: 0.8)
         case .corner: return CGSize(width: 0.8, height: 0.8)
         }
@@ -455,18 +455,18 @@ private struct CoverFlowCover: View {
     private func piece(_ panel: CoverFlow.Panel, box: CoverFlow.Box, colors: BoxColors) -> some View {
         switch panel.surface {
         case .face(.front), .face(.back):
-            // The cover, less the strip its rounded right and top edges take.
+            // The cover, less the strip its rounded spine and top edges take.
             front
                 .frame(width: CGFloat(box.width), height: CGFloat(box.height))
-                .frame(width: CGFloat(panel.width), height: CGFloat(panel.height), alignment: .bottomLeading)
+                .frame(width: CGFloat(panel.width), height: CGFloat(panel.height), alignment: .bottomTrailing)
                 .clipped()
-        case .face(.left), .face(.right):
+        case .face(.opening), .face(.spine):
             PackageSpine(system: game.systemID, title: game.displayName, cover: cover, cornerRadius: 0)
                 .opacity(missing ? 0.45 : 1)
         case .face(.top), .face(.bottom):
             PackageTop(system: game.systemID, cover: cover, cornerRadius: 0)
                 .opacity(missing ? 0.45 : 1)
-        case .edge(.frontRight, _):
+        case .edge(.frontSpine, _):
             colors.side.opacity(missing ? 0.45 : 1)
         case .edge, .corner:
             colors.top.opacity(missing ? 0.45 : 1)
@@ -508,7 +508,7 @@ private struct BoxColors {
             top = plastic.color
         } else {
             let tint = RetroPlayTheme.systemTint(system)
-            side = art.flatMap { CoverEdgeColor.right(of: $0) }.map { Color(uiColor: $0) } ?? tint
+            side = art.flatMap { CoverEdgeColor.left(of: $0) }.map { Color(uiColor: $0) } ?? tint
             top = art.flatMap { CoverEdgeColor.top(of: $0) }.map { Color(uiColor: $0) } ?? tint
         }
     }
