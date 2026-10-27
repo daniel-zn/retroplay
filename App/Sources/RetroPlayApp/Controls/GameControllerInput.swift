@@ -19,8 +19,6 @@ final class GameControllerInput {
 
     @ObservationIgnored var onState: ((PhysicalPadState) -> Void)?
     @ObservationIgnored var onMenu: (() -> Void)?
-    /// The last game controller went away (keyboards do not count).
-    @ObservationIgnored var onDisconnect: (() -> Void)?
 
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var gamepadState = PhysicalPadState.neutral
@@ -53,6 +51,19 @@ final class GameControllerInput {
         if UserDefaults.standard.bool(forKey: "RetroPlaySmokeController") {
             controllerName = "Test Controller"
         }
+        // Screenshots of a controller coming and going mid-game:
+        // `-RetroPlaySmokeControllerToggle <seconds>` connects and disconnects a pretend one.
+        let every = UserDefaults.standard.double(forKey: "RetroPlaySmokeControllerToggle")
+        if every > 0 {
+            Task { @MainActor [weak self] in
+                while let self, !self.observers.isEmpty {
+                    try? await Task.sleep(for: .seconds(every))
+                    self.controllerName = self.controllerName == nil ? "Test Controller" : nil
+                    self.gamepadState = .neutral
+                    self.publish()
+                }
+            }
+        }
         #endif
     }
 
@@ -77,16 +88,15 @@ final class GameControllerInput {
     private func refreshControllers() {
         let pads = GCController.controllers().filter { $0.extendedGamepad != nil }
         let current = GCController.current.flatMap { $0.extendedGamepad != nil ? $0 : nil } ?? pads.first
-        let hadController = hasController
         controllerName = current.map { $0.vendorName ?? "Controller" }
         for pad in pads {
             pad.extendedGamepad?.valueChangedHandler = nil
         }
         guard let current, let gamepad = current.extendedGamepad else {
+            // The game carries on: the touch controls fade back in for the player.
             gamepadState = .neutral
             homeHeld = false
             publish()
-            if hadController { onDisconnect?() }
             return
         }
         // valueChangedHandler fires for every stick and trigger change, so a held Home

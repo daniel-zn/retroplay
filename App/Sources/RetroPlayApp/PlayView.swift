@@ -109,7 +109,10 @@ public struct PlayView: View {
     private var system: SystemID { game.systemID }
 
     private var showTouchControls: Bool {
-        !controllers.hasController || touchWithController
+        ControllerHandover.showsTouchControls(
+            hasController: controllers.hasController,
+            touchWithController: touchWithController
+        )
     }
 
     /// Live foreground check for the async boot path. `scenePhase` read there comes from
@@ -131,6 +134,9 @@ public struct PlayView: View {
                 }
                 statusOverlay
             }
+            // A controller coming or going fades the touch controls in or out (and moves the
+            // picture to its new place) rather than switching at once; the game keeps running.
+            .animation(.easeInOut(duration: ControllerHandover.fade), value: showTouchControls)
             // A finger held through a rotation keeps its old-layout origin (stick, D-pad);
             // drop it so nothing stays pinned until the finger lifts.
             .onChange(of: landscape) { input.releaseAll() }
@@ -285,31 +291,43 @@ public struct PlayView: View {
         return ConsolePadPortrait.scale(for: system, in: CGSize(width: portrait.width, height: padHeight))
     }
 
-    @ViewBuilder
+    /// Portrait: one game screen, which slides between its places (centred with a controller,
+    /// at the top over the touch controls) while the controls fade in or out over it, so a
+    /// controller coming or going never cross-fades the picture.
     private func portraitLayout(size: CGSize, bottomInset: CGFloat) -> some View {
+        let aspect = CGFloat(system.screenAspect)
+        let screenHeight: CGFloat
         if !showTouchControls {
-            portraitControllerLayout(size: size, bottomInset: bottomInset)
+            screenHeight = min(size.height, size.width / aspect)
         } else if system == .nds {
-            portraitDSLayout(size: size, bottomInset: bottomInset)
+            screenHeight = min(size.width / aspect, size.height * 0.8)
         } else {
-            portraitPadLayout(size: size, bottomInset: bottomInset)
+            screenHeight = Self.portraitScreenHeight(system, in: size)
+        }
+        return ZStack(alignment: .top) {
+            screen
+                .frame(width: screenHeight * aspect, height: screenHeight)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: showTouchControls ? .top : .center)
+            Group {
+                if !showTouchControls {
+                    portraitControllerLayout(size: size, bottomInset: bottomInset)
+                } else if system == .nds {
+                    portraitDSLayout(size: size, bottomInset: bottomInset)
+                } else {
+                    portraitPadLayout(size: size, bottomInset: bottomInset)
+                }
+            }
+            .transition(.opacity)
         }
     }
 
     /// A controller is playing: just the game, centred; the in-game buttons show on a tap.
     private func portraitControllerLayout(size: CGSize, bottomInset: CGFloat) -> some View {
-        let aspect = CGFloat(system.screenAspect)
-        let screenHeight = min(size.height, size.width / aspect)
-        return ZStack {
-            screen
-                .frame(width: screenHeight * aspect, height: screenHeight)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            quickButtons()
-                .frame(height: Self.portraitBarHeight, alignment: .top)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .padding(.bottom, Self.backingBottomInset)
-                .ignoresSafeArea(edges: .bottom)
-        }
+        quickButtons()
+            .frame(height: Self.portraitBarHeight, alignment: .top)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, Self.backingBottomInset)
+            .ignoresSafeArea(edges: .bottom)
     }
 
     /// DS: both screens at full width, the controls over the lower part in clear glass, as
@@ -321,10 +339,8 @@ public struct PlayView: View {
         // The controls' own height; when the screens leave less room they overlap them.
         let room = size.height + bottomInset - screenHeight - barHeight - Self.backingBottomInset
         let padHeight = max(room, 300)
+        // The screens are drawn by `portraitLayout`; the controls lie over their lower part.
         return ZStack(alignment: .top) {
-            screen
-                .frame(width: screenHeight * aspect, height: screenHeight)
-                .frame(maxWidth: .infinity)
             VStack(spacing: 0) {
                 ConsolePadPortrait(system: system, size: CGSize(width: size.width, height: padHeight))
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
@@ -352,8 +368,9 @@ public struct PlayView: View {
         // Concentric with the screen's corners; 0 when the display's radius isn't known.
         let backingRadius = displayCorner > 0 ? displayCorner - Self.backingSideInset : 0
 
+        // The screen is drawn by `portraitLayout`; its place is kept here.
         return VStack(spacing: 6) {
-            screen
+            Color.clear
                 .frame(width: screenWidth, height: screenHeight)
                 .frame(maxWidth: .infinity)
             VStack(spacing: 0) {
@@ -983,11 +1000,6 @@ public struct PlayView: View {
             guard phase == .running, !leaving else { return }
             menuOpen.toggle()
         }
-        controllers.onDisconnect = {
-            // The player just lost their controls: stop the game until they choose.
-            guard phase == .running, !leaving else { return }
-            menuOpen = true
-        }
         controllers.start()
     }
 
@@ -1374,3 +1386,4 @@ final class MenuInputGateBox {
     func filter(_ pad: PhysicalPadState) -> PhysicalPadState { gate.filter(pad) }
     func setMenuOpen(_ open: Bool) -> PhysicalPadState { gate.setMenuOpen(open) }
 }
+
