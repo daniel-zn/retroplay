@@ -56,14 +56,29 @@ extension CoverFlow {
             return (flat - atZero) / (atOne - atZero)
         }
 
+        /// How far the middle cover stands forward, towards the eye (points): clear of the
+        /// side covers' near edges, which turn towards the player beside it.
+        public var forward: Double { metrics.coverWidth * 0.3 }
+
         /// Where the centre of a box `height` × `depth` stands for a cover `distance` points
-        /// (in layout) from the middle, and how it's turned.
+        /// (in layout) from the middle, how it's turned, and how much it's scaled.
+        ///
+        /// A cover facing the player comes `forward` towards the eye and is scaled down to
+        /// match, so it's drawn exactly where and as large as it would stand in the row, but in
+        /// front of its neighbours rather than through them. Turning away it goes back.
         public func place(distance: Double, height: Double, depth: Double)
-            -> (x: Double, y: Double, yaw: Double, dimming: Double)
+            -> (x: Double, y: Double, z: Double, scale: Double, yaw: Double, dimming: Double)
         {
             let pose = metrics.pose(distance: distance)
-            return (distance + pose.xShift,
-                    -metrics.coverHeight / 2 + height / 2 + lift(height: height, depth: depth),
+            let x = distance + pose.xShift
+            let y = -metrics.coverHeight / 2 + height / 2 + lift(height: height, depth: depth)
+            let facing = 1 - min(abs(pose.rotation) / CoverFlow.sideAngle, 1)
+            // Slid along the line to the eye: drawn the same, standing nearer.
+            let scale = (eyeDistance - forward * facing) / eyeDistance
+            return (x * scale,
+                    eyeHeight + (y - eyeHeight) * scale,
+                    eyeDistance * (1 - scale),
+                    scale,
                     pose.rotation,
                     pose.dimming)
         }

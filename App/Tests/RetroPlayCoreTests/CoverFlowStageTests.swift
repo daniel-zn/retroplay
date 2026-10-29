@@ -16,8 +16,8 @@ final class CoverFlowStageTests: XCTestCase {
         let place = stage.place(distance: distance, height: height, depth: depth)
         let turn = CoverFlow.Stage.turn(yaw: place.yaw)
         func at(_ y: Double) -> Double {
-            let p = CoverFlow.apply(turn, (0, y, depth / 2))
-            return stage.drawn((place.x + p.x, place.y + p.y, p.z)).y
+            let p = CoverFlow.apply(turn, (0, y * place.scale, depth / 2 * place.scale))
+            return stage.drawn((place.x + p.x, place.y + p.y, place.z + p.z)).y
         }
         return (at(height / 2), at(-height / 2))
     }
@@ -55,9 +55,52 @@ final class CoverFlowStageTests: XCTestCase {
                 let distance = metrics.step * fraction
                 let pose = metrics.pose(distance: distance)
                 let place = stage.place(distance: distance, height: 200, depth: 20)
-                XCTAssertEqual(place.x, distance + pose.xShift, accuracy: 1e-9)
+                // Slid towards the eye and scaled to match, it's drawn where the row puts it.
+                XCTAssertEqual(stage.drawn((place.x, 0, place.z)).x, distance + pose.xShift, accuracy: 1e-9)
                 XCTAssertEqual(place.yaw, pose.rotation, accuracy: 1e-9)
                 XCTAssertEqual(place.dimming, pose.dimming, accuracy: 1e-9)
+            }
+        }
+    }
+
+    func testTheMiddleCoverStandsClearInFrontOfTheLeftStack() {
+        // The first left cover faces right, its near (spine) edge turned towards the player
+        // beside the middle cover: the middle box stands far enough forward that its back is
+        // in front of that cover's front face all along the middle cover's width.
+        for stage in stages {
+            let metrics = stage.metrics
+            let width = metrics.coverWidth, depth = metrics.boxDepth, height = metrics.coverHeight
+            let middle = stage.place(distance: 0, height: height, depth: depth)
+            let left = stage.place(distance: -metrics.step, height: height, depth: depth)
+            XCTAssertGreaterThan(middle.z, 0)
+            XCTAssertEqual(left.z, 0, accuracy: 1e-9)
+            // The left cover's front face, as a line across the floor (x, z).
+            let turn = CoverFlow.Stage.turn(yaw: left.yaw)
+            let a = CoverFlow.apply(turn, (-width / 2, 0, depth / 2))
+            let b = CoverFlow.apply(turn, (width / 2, 0, depth / 2))
+            let back = middle.z - depth / 2 * middle.scale
+            for i in 0...10 {
+                let x = middle.x - width / 2 * middle.scale + Double(i) / 10 * width * middle.scale
+                let t = (x - (left.x + a.x)) / (b.x - a.x)
+                guard t >= 0, t <= 1 else { continue }
+                let face = left.z + a.z + t * (b.z - a.z)
+                XCTAssertGreaterThan(back, face, "at x \(x) for \(width)")
+            }
+        }
+    }
+
+    func testStandingForwardDoesNotChangeHowTheMiddleCoverIsDrawn() {
+        for stage in stages {
+            let flat = CoverFlow.Stage(metrics: stage.metrics)
+            let place = stage.place(distance: 0, height: 200, depth: 20)
+            // Its corners, nearer and smaller, land where they would standing in the row.
+            for (x, y) in [(-100.0, -100.0), (100, 100), (0, 50)] {
+                let near = stage.drawn((place.x + x * place.scale,
+                                        place.y + y * place.scale, place.z))
+                let unscaledY = (place.y - flat.eyeHeight) / place.scale + flat.eyeHeight
+                let row = flat.drawn((place.x / place.scale + x, unscaledY + y, 0))
+                XCTAssertEqual(near.x, row.x, accuracy: 1e-6)
+                XCTAssertEqual(near.y, row.y, accuracy: 1e-6)
             }
         }
     }

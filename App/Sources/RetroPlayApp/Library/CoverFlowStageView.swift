@@ -116,7 +116,8 @@ final class CoverFlowScene {
             boxes[game.id] = box
             let place = stage.place(distance: Double(index) * metrics.step - offset,
                                     height: box.size.height, depth: box.size.depth)
-            box.entity.position = [Float(place.x) * u, Float(place.y) * u, 0]
+            box.entity.position = [Float(place.x) * u, Float(place.y) * u, Float(place.z) * u]
+            box.entity.scale = SIMD3(repeating: Float(place.scale))
             box.entity.orientation = simd_quatf(angle: Float(CoverFlow.pitch * .pi / 180), axis: [1, 0, 0])
                 * simd_quatf(angle: Float(place.yaw * .pi / 180), axis: [0, 1, 0])
             if needsTint {
