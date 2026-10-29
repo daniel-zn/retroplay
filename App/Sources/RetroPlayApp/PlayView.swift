@@ -512,7 +512,15 @@ public struct PlayView: View {
 
     private var screen: some View {
         ZStack {
-            if let core {
+            if phase == .loading {
+                // Starting up: a large spinner in the middle of the game's own screen.
+                Color.black
+                ProgressView()
+                    .controlSize(.large)
+                    .scaleEffect(1.5)
+                    .tint(.white)
+                    .accessibilityLabel("Starting \(game.displayName)")
+            } else if let core {
                 if PhonePlaybackPresentation.resolve(
                     hasActiveGame: true,
                     hasExternalDisplay: casting.isExternalDisplayConnected
@@ -626,25 +634,22 @@ public struct PlayView: View {
     private var statusOverlay: some View {
         switch phase {
         case .loading:
-            VStack(spacing: 12) {
-                ProgressView()
-                    .tint(.white)
-                Text("Starting \(game.displayName)…")
-                    .font(RetroPlayFont.caption)
-                    .foregroundStyle(.white.opacity(0.8))
-                // A slow or stuck load must not trap the player here.
-                Button {
-                    Task { await leave(autoSave: false) }
-                } label: {
-                    Text("Cancel")
-                        .font(RetroPlayFont.subheadline)
-                        .padding(.horizontal, 6)
-                }
-                .glassButton()
-                .tint(.white)
-                .disabled(didLeave)
-                .padding(.top, 4)
+            // The spinner sits on the game screen; a slow or stuck load must not trap the
+            // player, so a close button waits in the corner.
+            Button {
+                Task { await leave(autoSave: false) }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 44, height: 44)
             }
+            .glassButton()
+            .tint(.white)
+            .disabled(didLeave)
+            .accessibilityLabel("Cancel")
+            .accessibilityIdentifier("play.cancelLoading")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(16)
         case .running:
             if !sawFirstFrame && slowStartHint {
                 Text("Still waiting for the first frame…")

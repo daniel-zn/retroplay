@@ -37,6 +37,7 @@ struct LibraryCoverFlowView<Header: View>: View {
     @State private var captionHeight: CGFloat = 0
     /// Where the row is right now, for the snapping to know where a swipe was let go.
     @State private var tracker = CoverFlowScrollTracker()
+    @State private var scene = CoverFlowScene()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private struct ListKey: Equatable {
@@ -68,9 +69,10 @@ struct LibraryCoverFlowView<Header: View>: View {
             let overhang = CGFloat(CoverFlow.Metrics.fitting(
                 width: outer.size.width, height: room, tallestAspect: tallestAspect, deepestBox: deepest
             ).overhang)
+            // Landscape grows the covers upwards: the room above takes no overhang allowance.
             let metrics = CoverFlow.Metrics.fitting(
                 width: outer.size.width,
-                height: room - overhang * 2,
+                height: room - overhang * (landscape ? 1 : 2),
                 tallestAspect: tallestAspect,
                 deepestBox: deepest
             )
@@ -81,7 +83,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                     if !games.isEmpty {
                         Spacer(minLength: 0)
                         carousel(metrics: metrics, width: outer.size.width)
-                            .padding(.top, (landscape ? 4 : 8) + overhang)
+                            .padding(.top, landscape ? 4 : 8 + overhang)
                             .padding(.bottom, (landscape ? 6 : 12) + overhang)
                         caption
                             .padding(.horizontal, 24)
@@ -140,13 +142,23 @@ struct LibraryCoverFlowView<Header: View>: View {
             metrics.step * 40
         ).rounded(.up)
         let rowWidth = reach * 2 + metrics.step
-        // The scroll view's coordinate space starts at its content margin, so the middle
-        // of the viewport is half a step in.
-        let middle = metrics.step / 2
+        // The boxes are drawn by the 3D scene behind the (invisible) row of buttons. Its view
+        // is centred on the eye, level with the slot's top, and tall enough to reach past the
+        // slot's floor by the boxes' overhang.
+        let stageHeight = (metrics.coverHeight + metrics.overhang + 24) * 2
+        let input = CoverFlowScene.Input(
+            games: games,
+            stage: CoverFlow.Stage(metrics: metrics),
+            size: CGSize(width: width, height: stageHeight),
+            missing: missingGameIDs,
+            liveIndex: liveIndex,
+            dark: colorScheme == .dark,
+            artRevision: games.reduce(0) { $0 &+ (artworkProvider($1)?.isBoxArt == true ? 1 : 0) }
+        )
         return ScrollView(.horizontal) {
             LazyHStack(spacing: 0) {
                 ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
-                    coverButton(game, index: index, metrics: metrics, middle: middle)
+                    coverButton(game, index: index, metrics: metrics)
                         .frame(width: metrics.step, height: metrics.coverHeight)
                         // One fixed order (earlier games on top), so covers never swap
                         // places mid-swipe.
@@ -179,14 +191,23 @@ struct LibraryCoverFlowView<Header: View>: View {
         }
         .frame(width: rowWidth, height: metrics.coverHeight)
         .frame(width: width)
+        .background(alignment: .top) {
+            CoverFlowStageView(scene: scene, height: stageHeight)
+                .frame(width: width)
+                .offset(y: -stageHeight / 2)
+        }
+        .onChange(of: input, initial: true) { _, input in
+            scene.offset = { [tracker] in tracker.offset }
+            scene.artwork = artworkProvider
+            scene.input = input
+        }
         .sensoryFeedback(.selection, trigger: liveIndex)
     }
 
     private func coverButton(
         _ game: LibraryGame,
         index: Int,
-        metrics: CoverFlow.Metrics,
-        middle: CGFloat
+        metrics: CoverFlow.Metrics
     ) -> some View {
         let missing = missingGameIDs.contains(game.id)
         return Button {
@@ -200,7 +221,6 @@ struct LibraryCoverFlowView<Header: View>: View {
                 game: game,
                 cover: artworkProvider(game),
                 missing: missing,
-                row: CoverFlowRow(metrics: metrics, middle: middle),
                 tapArea: metrics.restSpan(offset: index - liveIndex)
             )
                 .frame(width: metrics.coverWidth, height: metrics.coverHeight)
@@ -373,22 +393,13 @@ struct LibraryCoverFlowView<Header: View>: View {
 
 /// One cover in its square slot, standing on the bottom edge in its own shape.
 @available(iOS 18.0, *)
-/// Where a cover stands in the carousel: the row's sizes and the middle of the viewport (in
-/// the scroll view's coordinates), so each face can work out its pose as the row scrolls.
-private struct CoverFlowRow {
-    let metrics: CoverFlow.Metrics
-    let middle: CGFloat
-}
-
 private struct CoverFlowCover: View {
     let game: LibraryGame
     let cover: CoverArt?
     let missing: Bool
-    /// In the carousel: drawn as a 3D box at the row's one width, turned by where it stands
-    /// (nil: a flat cover fitted to its frame).
-    var row: CoverFlowRow?
-    /// Where the cover is drawn at rest, left and right of its place in the row: taps land
-    /// there, so a tap on the middle cover can't fall to a neighbour stacked over its slot.
+    /// In the row: where the cover is drawn at rest, left and right of its place in the row.
+    /// Taps land there, so a tap on the middle cover can't fall to a neighbour stacked over
+    /// its slot (nil: a flat cover, for the long-press preview).
     var tapArea: (left: Double, right: Double)?
     var shadow = true
 
@@ -402,78 +413,23 @@ private struct CoverFlowCover: View {
     }
 
     var body: some View {
-        let size = row.map { $0.metrics.coverSize(aspect: Double(aspect)) }
-        let depth = row.map { ($0.metrics.coverWidth * CoverFlow.boxDepth(game.systemID)).rounded() } ?? 0
-        let package = RetailPackage.of(game.systemID)
-        Color.clear
-            .overlay(alignment: .bottom) {
-                if let row, let size, depth > 0 {
-                    let box = CoverFlow.Box(width: size.width, height: size.height, depth: depth,
-                                            radius: depth * package.edgeRounding)
-                    let colors = BoxColors(system: game.systemID, package: package, cover: cover)
-                    // The whole box: every piece of it centred on the box's centre and turned
-                    // into place round it through one eye (the hidden ones fade out).
-                    // Every piece is drawn in the same square canvas (centred on the box), so the
-                    // 3D turn treats them all alike whatever their own size.
-                    let canvas = CGFloat(max(box.width, box.height))
-                    ZStack {
-                        ForEach(CoverFlow.drawnPanels(box), id: \.surface) { panel in
-                            piece(panel, box: box, colors: colors)
-                                .frame(width: CGFloat(panel.width) + seam(panel).width,
-                                       height: CGFloat(panel.height) + seam(panel).height)
-                                .frame(width: canvas, height: canvas)
-                                .modifier(CoverPanelEffect(row: row, panel: panel, box: box))
-                        }
-                    }
-                    .frame(width: CGFloat(box.width), height: CGFloat(box.height))
-                    .shadow(
-                        color: .black.opacity(shadow ? (colorScheme == .dark ? 0.55 : 0.25) : 0),
-                        radius: 14,
-                        y: 8
-                    )
-                } else {
+        if tapArea != nil {
+            // In the row the box is drawn by the 3D scene behind; this is just where a tap
+            // on it lands.
+            Color.clear
+                .contentShape(TapArea(span: tapArea))
+                .accessibilityHidden(true)
+        } else {
+            Color.clear
+                .overlay(alignment: .bottom) {
                     front
-                        .frame(maxWidth: size.map { CGFloat($0.width) }, maxHeight: size.map { CGFloat($0.height) })
                         .shadow(
                             color: .black.opacity(shadow ? (colorScheme == .dark ? 0.55 : 0.25) : 0),
                             radius: 14,
                             y: 8
                         )
                 }
-            }
-            .contentShape(TapArea(span: tapArea))
-            .accessibilityHidden(true)
-    }
-
-    /// A rounded edge's facets overlap a hair so no seam shows between them.
-    private func seam(_ panel: CoverFlow.Panel) -> CGSize {
-        switch panel.surface {
-        case .face: return .zero
-        case .edge(.frontSpine, _): return CGSize(width: 0.8, height: 0)
-        case .edge: return CGSize(width: 0, height: 0.8)
-        case .corner: return CGSize(width: 0.8, height: 0.8)
-        }
-    }
-
-    @ViewBuilder
-    private func piece(_ panel: CoverFlow.Panel, box: CoverFlow.Box, colors: BoxColors) -> some View {
-        switch panel.surface {
-        case .face(.front), .face(.back):
-            // The cover, less the strip its rounded spine and top edges take.
-            front
-                .frame(width: CGFloat(box.width), height: CGFloat(box.height))
-                .frame(width: CGFloat(panel.width), height: CGFloat(panel.height), alignment: .bottomTrailing)
-                .clipped()
-        case .face(.opening), .face(.spine):
-            PackageSpine(system: game.systemID, title: game.displayName, cover: cover, cornerRadius: 0)
-                .opacity(missing ? 0.45 : 1)
-        case .face(.top), .face(.bottom):
-            PackageTop(system: game.systemID, cover: cover, cornerRadius: 0)
-                .opacity(missing ? 0.45 : 1)
-        case .edge(.frontSpine, _):
-            colors.side.opacity(missing ? 0.45 : 1)
-        case .edge, .corner:
-            colors.top.opacity(missing ? 0.45 : 1)
+                .accessibilityHidden(true)
         }
     }
 
@@ -508,64 +464,6 @@ private struct TapArea: Shape {
                            width: max(span.right - span.left, 1), height: rect.height))
     }
 }
-
-/// The colours round a box's rounded edges: a case's plastic, or on a cardboard box the
-/// colour of its cover's edge (the art printed round it).
-private struct BoxColors {
-    let side: Color
-    let top: Color
-
-    @MainActor
-    init(system: SystemID, package: RetailPackage, cover: CoverArt?) {
-        let art = cover.flatMap { $0.isBoxArt ? $0.image : nil }
-        if let plastic = package.plastic {
-            side = plastic.color
-            top = plastic.color
-        } else {
-            let tint = RetroPlayTheme.systemTint(system)
-            side = art.flatMap { CoverEdgeColor.left(of: $0) }.map { Color(uiColor: $0) } ?? tint
-            top = art.flatMap { CoverEdgeColor.top(of: $0) }.map { Color(uiColor: $0) } ?? tint
-        }
-    }
-}
-
-/// Turns one piece of a cover's box into place for where the cover stands in the row: every
-/// piece turns about the same point through the same eye, so they meet; pieces turned away
-/// from the player are hidden, and each is lit by the way it faces.
-private struct CoverPanelEffect: ViewModifier {
-    let row: CoverFlowRow
-    let panel: CoverFlow.Panel
-    let box: CoverFlow.Box
-
-    func body(content: Content) -> some View {
-        content.visualEffect { content, proxy in
-            let frame = proxy.frame(in: .scrollView(axis: .horizontal))
-            let pose = row.metrics.pose(distance: Double(frame.midX - row.middle))
-            let turn = row.metrics.panelTurn(panel, box, yaw: pose.rotation)
-            let facing = row.metrics.isFacing(panel, box, yaw: pose.rotation)
-            let light = CoverFlow.shade(facing: row.metrics.normal(panel, yaw: pose.rotation))
-            // The anchor's height, as a share of the canvas the piece is drawn in.
-            let height = max(Double(proxy.size.height), 0.001)
-            let anchorY = 0.5 + (turn.anchorY - 0.5) * panel.height / height
-            return content
-                .offset(x: turn.shift.x, y: turn.shift.y)
-                .rotation3DEffect(
-                    .degrees(turn.degrees),
-                    axis: (x: turn.axis.x, y: turn.axis.y, z: turn.axis.z),
-                    anchor: UnitPoint(x: 0.5, y: anchorY),
-                    anchorZ: turn.anchorZ,
-                    perspective: row.metrics.facePerspective(
-                        width: Double(proxy.size.width),
-                        height: Double(proxy.size.height)
-                    )
-                )
-                .opacity(facing ? 1 : 0)
-                .brightness(light - pose.dimming)
-                .offset(x: pose.xShift, y: row.metrics.lift(box))
-        }
-    }
-}
-
 
 /// The row's live position, read by the snapping when a swipe is let go (a reference, so the
 /// scroll behaviour sees the latest value without the view redrawing for it).
