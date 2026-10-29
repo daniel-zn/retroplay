@@ -13,6 +13,17 @@ struct CoverFlowStageView: View {
     let height: CGFloat
 
     var body: some View {
+        GeometryReader { geo in
+            stage
+                // The camera is set from the size the scene is really drawn at.
+                .onChange(of: geo.size, initial: true) { _, size in scene.viewSize = size }
+        }
+        .frame(height: height)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var stage: some View {
         RealityView { content in
             content.camera = .virtual
             content.add(scene.root)
@@ -22,9 +33,6 @@ struct CoverFlowStageView: View {
         } update: { _ in
             scene.frame()
         }
-        .frame(height: height)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 }
 
@@ -63,6 +71,14 @@ final class CoverFlowScene {
         }
     }
 
+    /// The size the scene's view is really drawn at (its camera is fitted to it).
+    var viewSize: CGSize = .zero {
+        didSet {
+            guard viewSize != oldValue else { return }
+            placeCamera()
+        }
+    }
+
     /// The scroll position (content offset from the first cover centred).
     var offset: () -> Double = { 0 }
     var artwork: (LibraryGame) -> CoverArt? = { _ in nil }
@@ -81,7 +97,9 @@ final class CoverFlowScene {
         let u = Self.unit
         camera.position = [0, Float(stage.eyeHeight) * u, Float(stage.eyeDistance) * u]
         var lens = camera.components[PerspectiveCameraComponent.self] ?? PerspectiveCameraComponent()
-        lens.fieldOfViewInDegrees = Float(stage.fieldOfView(height: Double(input.size.height)))
+        let height = viewSize.height > 0 ? viewSize.height : input.size.height
+        lens.fieldOfViewInDegrees = Float(stage.fieldOfView(height: Double(height)))
+        lens.fieldOfViewOrientation = .vertical
         lens.far = Float(stage.eyeDistance * 4) * u
         camera.components.set(lens)
         // The view is centred on the eye, which is level with the slot's top.

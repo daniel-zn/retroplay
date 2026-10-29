@@ -312,19 +312,64 @@ final class CoverFlowTests: XCTestCase {
 
     private let turns: [Double] = [0, 5, 20, 35, CoverFlow.sideAngle]
 
-    func testRightStackNeverCoversTheMiddleCover() {
-        // Facing right, a right box's spine (its left side) turns towards the player, and the
-        // right stack lies on top: the first one stands far enough out that its spine, at the
-        // deepest box in the row, stops short of the middle cover's edge.
+    func testRightStackAllButTouchesTheMiddleCover() {
+        // Facing right, the first right box's spine turns towards the player beside the middle
+        // cover: as the one camera draws them, row by row down the screen, it stops just short
+        // of the middle cover's edge, a sliver apart, never over it.
         for metrics in rows {
-            let middle = metrics.span(tallest(metrics), yaw: 0)
-            let side = metrics.span(tallest(metrics), yaw: CoverFlow.sideAngle)
-            let pose = metrics.pose(distance: metrics.step)
-            XCTAssertEqual(pose.rotation, CoverFlow.sideAngle)
-            let innerEdge = metrics.step + pose.xShift + side.left
-            XCTAssertGreaterThanOrEqual(innerEdge, middle.right, "for \(metrics.coverWidth)")
-            // And not much further: the stack still reads as one row with the middle.
-            XCTAssertLessThan(metrics.rightGap, metrics.coverWidth * 0.95, "for \(metrics.coverWidth)")
+            let stage = CoverFlow.Stage(metrics: metrics)
+            let box = tallest(metrics)
+            func drawn(distance: Double) -> [(x: Double, y: Double)] {
+                let place = stage.place(distance: distance, height: box.height, depth: box.depth)
+                let turn = CoverFlow.Stage.turn(yaw: place.yaw)
+                var points: [(x: Double, y: Double)] = []
+                for x in [-box.width / 2, box.width / 2] {
+                    for y in [-box.height / 2, box.height / 2] {
+                        for z in [-box.depth / 2, box.depth / 2] {
+                            let q = CoverFlow.apply(turn, (x * place.scale, y * place.scale, z * place.scale))
+                            let point = stage.drawn((place.x + q.x, place.y + q.y, place.z + q.z))
+                            points.append(point)
+                        }
+                    }
+                }
+                return points
+            }
+            let gap = CoverFlow.closest(drawn(distance: 0), drawn(distance: metrics.step))
+            XCTAssertGreaterThanOrEqual(gap, -0.5, "for \(metrics.coverWidth)")
+            XCTAssertLessThan(gap, metrics.coverWidth * 0.015, "for \(metrics.coverWidth)")
+        }
+    }
+
+    func testClosestMeasuresRowByRow() {
+        // Two slanted shapes whose nearest corners sit at different heights: the gap is
+        // measured along each row, not corner to corner.
+        let left: [(x: Double, y: Double)] = [(0, 0), (10, 0), (12, 10), (0, 10)]
+        let right: [(x: Double, y: Double)] = [(14, 0), (30, 0), (30, 10), (12.5, 10)]
+        XCTAssertEqual(CoverFlow.closest(left, right), 0.5, accuracy: 0.01)
+        XCTAssertEqual(CoverFlow.closest(left, [(20, 20), (30, 20), (30, 30)]), .infinity)
+        XCTAssertLessThan(CoverFlow.closest(left, [(5, 0), (30, 0), (30, 10), (5, 10)]), 0)
+    }
+
+    func testRightNeighbourStandsClearOfTheMiddleBox() {
+        // Close as it is, the right neighbour's front face passes in front of the middle box's
+        // right edge rather than through it.
+        for metrics in rows {
+            let stage = CoverFlow.Stage(metrics: metrics)
+            let width = metrics.coverWidth, depth = max(metrics.boxDepth, 1), height = metrics.coverHeight
+            let middle = stage.place(distance: 0, height: height, depth: depth)
+            let right = stage.place(distance: metrics.step, height: height, depth: depth)
+            let turn = CoverFlow.Stage.turn(yaw: right.yaw)
+            let a = CoverFlow.apply(turn, (-width / 2, 0, depth / 2))
+            let b = CoverFlow.apply(turn, (width / 2, 0, depth / 2))
+            let edge = middle.x + width / 2 * middle.scale
+            let t = (edge - (right.x + a.x)) / (b.x - a.x)
+            if t < 0 {
+                // Its nearest edge is wholly to the right of the middle box: nothing to meet.
+                XCTAssertGreaterThan(right.x + a.x, edge, "for \(width)")
+            } else {
+                let face = right.z + a.z + min(t, 1) * (b.z - a.z)
+                XCTAssertGreaterThan(face, middle.z + depth / 2 * middle.scale, "for \(width)")
+            }
         }
     }
 

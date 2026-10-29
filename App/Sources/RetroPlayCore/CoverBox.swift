@@ -124,14 +124,23 @@ extension CoverFlow.Metrics {
 
     /// Where a cover `offset` places from the middle is drawn when the row is at rest, left
     /// and right of its own place in the row: the area a tap on it should land in (a cover's
-    /// layout slot is narrower than the cover and doesn't move with it).
+    /// layout slot is narrower than the cover and doesn't move with it). The right stack lies
+    /// over the middle cover and all but touches it, its spine leaning in at the top where the
+    /// middle cover's edge leans out at the bottom: a right cover's area stops at the middle
+    /// cover's, so the whole middle cover plays it.
     public func restSpan(offset: Int) -> (left: Double, right: Double) {
+        let stage = CoverFlow.Stage(metrics: self)
+        func drawn(_ offset: Int) -> (left: Double, right: Double) {
+            let distance = Double(offset) * step
+            let xs = stage.drawnXs(distance: distance, width: coverWidth, height: coverHeight, depth: boxDepth)
+            return ((xs.min() ?? 0) - distance, (xs.max() ?? 0) - distance)
+        }
+        let span = drawn(offset)
+        guard offset > 0 else { return span }
         let distance = Double(offset) * step
-        let pose = pose(distance: distance)
-        let box = CoverFlow.Box(width: coverWidth, height: coverHeight, depth: boxDepth)
-        let drawn = span(box, yaw: pose.rotation)
-        return (pose.xShift + drawn.left, pose.xShift + drawn.right)
+        return (max(span.left, drawn(0).right - distance), span.right)
     }
+
 
     /// How far past the slot's top and bottom the tallest box reaches as it turns (tipped back
     /// and in perspective): room to leave above and below the row so covers clear the caption.

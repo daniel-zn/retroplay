@@ -83,6 +83,23 @@ extension CoverFlow {
                     pose.dimming)
         }
 
+        /// Where a box `width` × `height` × `depth`'s corners are drawn across the view (x, from
+        /// the slot's middle) for a cover `distance` points from the middle.
+        public func drawnXs(distance: Double, width: Double, height: Double, depth: Double) -> [Double] {
+            let place = place(distance: distance, height: height, depth: depth)
+            let turn = Self.turn(yaw: place.yaw)
+            var xs: [Double] = []
+            for x in [-width / 2, width / 2] {
+                for y in [-height / 2, height / 2] {
+                    for z in [-depth / 2, depth / 2] {
+                        let q = CoverFlow.apply(turn, (x * place.scale, y * place.scale, z * place.scale))
+                        xs.append(drawn((place.x + q.x, place.y + q.y, place.z + q.z)).x)
+                    }
+                }
+            }
+            return xs
+        }
+
         /// The covers worth drawing at scroll `offset` (from the first cover centred) in a view
         /// `width` points wide: every one whose box can reach into it.
         public func window(offset: Double, count: Int, width: Double) -> Range<Int> {

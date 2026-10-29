@@ -19,8 +19,8 @@ public enum CoverFlow {
         public let firstGap: Double
         /// How far the first cover on the right stands from the middle one's centre. Every
         /// side cover faces right (its spine, on its left, turns towards the player), so on
-        /// the right the edge nearer the middle comes forward and the stack lies on top; it
-        /// stands far enough out that it never covers the middle cover, at the widest box.
+        /// the right the edge nearer the middle comes forward: it stands just far enough out
+        /// that its spine all but touches the middle cover, at the widest and deepest box.
         public let rightGap: Double
         /// How far apart the covers past the first stand in each side stack.
         public let stackSpacing: Double
@@ -40,14 +40,48 @@ public enum CoverFlow {
             eye = max(coverWidth, coverHeight) / CoverFlow.perspective
             // The first left cover's right edge (its side, turned towards the player) stops
             // just short of the middle cover's left edge, with a little air.
-            let box = Box(width: coverWidth, height: coverHeight, depth: boxDepth)
-            let middle = CoverFlow.span(box, yaw: 0, eye: eye)
-            let side = CoverFlow.span(box, yaw: CoverFlow.sideAngle, eye: eye)
-            rightGap = (middle.right - side.left + coverWidth * 0.01).rounded()
+            rightGap = Self.snugRightGap(width: coverWidth, height: coverHeight, depth: boxDepth, eye: eye)
         }
 
         public init(coverSide: Double) {
             self.init(coverWidth: coverSide, coverHeight: coverSide)
+        }
+
+        /// Where the first right cover stands so its spine, turned towards the player, all but
+        /// touches the middle cover as the one camera draws them (`Stage`: the eye level with
+        /// the slot's top, `eye` in front, both boxes tipped back by `pitch`). Measured row by
+        /// row across the screen: the middle cover's edge leans out at the bottom and the spine's
+        /// at the top, so their nearest corners stand at different heights.
+        static func snugRightGap(width: Double, height: Double, depth: Double, eye: Double) -> Double {
+            let middle = drawnCorners(width: width, height: height, depth: depth, eye: eye, yaw: 0, at: 0)
+            let air = width * CoverFlow.stackAir
+            var low = 0.0, high = width * 2
+            for _ in 0..<50 {
+                let gap = (low + high) / 2
+                let right = drawnCorners(width: width, height: height, depth: depth, eye: eye,
+                                         yaw: CoverFlow.sideAngle, at: gap)
+                if CoverFlow.closest(middle, right) < air { low = gap } else { high = gap }
+            }
+            return high.rounded(.up)
+        }
+
+        /// Where a box's corners are drawn (y up, from the slot's middle) standing `at` across
+        /// the row, turned `yaw`, the eye level with the slot's top.
+        static func drawnCorners(width: Double, height: Double, depth: Double, eye: Double,
+                                 yaw: Double, at centre: Double) -> [(x: Double, y: Double)] {
+            let turn = Stage.turn(yaw: yaw)
+            let level = height / 2
+            var drawn: [(x: Double, y: Double)] = []
+            for x in [-width / 2, width / 2] {
+                for y in [-height / 2, height / 2] {
+                    for z in [-depth / 2, depth / 2] {
+                        let q = CoverFlow.apply(turn, (x, y, z))
+                        let k = eye / (eye - q.z)
+                        drawn.append(((centre + q.x) * k, level + (q.y - level) * k))
+                    }
+                }
+            }
+            return drawn
         }
 
         /// Every cover is drawn this one width (scaled whole, never stretched; heights vary
@@ -176,8 +210,47 @@ public enum CoverFlow {
         public let dimming: Double
     }
 
+    /// The sliver left between the middle cover and the first right one (share of a cover; the
+    /// boxes' rounded edges add a little more).
+    public static let stackAir: Double = 0.002
+
     /// How far the side covers turn away.
     public static let sideAngle: Double = 55
+
+    /// How far right of the `left` shape the `right` one starts, at the row of the screen
+    /// where they come nearest (negative where they overlap). Each shape is the outline round
+    /// its drawn corners (a box's drawing is convex).
+    public static func closest(_ left: [(x: Double, y: Double)], _ right: [(x: Double, y: Double)]) -> Double {
+        let top = min(left.map(\.y).max() ?? 0, right.map(\.y).max() ?? 0)
+        let bottom = max(left.map(\.y).min() ?? 0, right.map(\.y).min() ?? 0)
+        guard top > bottom else { return .infinity }
+        var nearest = Double.infinity
+        for step in 0...32 {
+            let y = bottom + (top - bottom) * Double(step) / 32
+            if let a = across(left, atY: y), let b = across(right, atY: y) {
+                nearest = min(nearest, b.min - a.max)
+            }
+        }
+        return nearest
+    }
+
+    /// How far across a convex outline round `points` reaches along the screen's row `y`.
+    static func across(_ points: [(x: Double, y: Double)], atY y: Double) -> (min: Double, max: Double)? {
+        var low = Double.infinity, high = -Double.infinity
+        for i in points.indices {
+            for j in points.indices where j > i {
+                let a = points[i], b = points[j]
+                if a.y == b.y {
+                    guard a.y == y else { continue }
+                    low = min(low, a.x, b.x); high = max(high, a.x, b.x)
+                } else if (a.y - y) * (b.y - y) <= 0 {
+                    let x = a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x)
+                    low = min(low, x); high = max(high, x)
+                }
+            }
+        }
+        return low <= high ? (low, high) : nil
+    }
 
     /// How strongly the covers are drawn in perspective: the eye stands the cover's larger
     /// side over this in front of it.
