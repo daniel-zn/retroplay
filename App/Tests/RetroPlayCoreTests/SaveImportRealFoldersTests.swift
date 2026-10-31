@@ -67,23 +67,6 @@ final class SaveImportRealFoldersTests: XCTestCase {
         XCTAssertEqual(try savedataNames(), ["UCUS98731_GameData0", "ULUS10387Ben101", "ULUS10560System"])
     }
 
-    func testReimportGivesAnUppercasedEarlierImportItsOwnName() throws {
-        // What an earlier build installed: the name upper-cased.
-        let old = paths.pspSavedataDirectory.appendingPathComponent("ULUS10560SYSTEM", isDirectory: true)
-        try fm.createDirectory(at: old, withIntermediateDirectories: true)
-        try Data("OLD".utf8).write(to: old.appendingPathComponent("PARAM.SFO"))
-        try pspSave("ULUS10560System", fill: 9)
-
-        let batch = plan([psp("FF4", "ULUS10560")])
-        XCTAssertEqual(batch.replacements.count, 1)
-        let outcome = LibrarySaveImporter().commit(batch, replaceExisting: true, paths: paths)
-
-        XCTAssertEqual(outcome.imported.count, 1, "\(outcome.failed)")
-        XCTAssertEqual(try savedataNames(), ["ULUS10560System"])
-        let param = paths.pspSavedataDirectory.appendingPathComponent("ULUS10560System/PARAM.SFO")
-        XCTAssertEqual(try Data(contentsOf: param), Data(repeating: 9, count: 3))
-    }
-
     func testAllLowerCaseCopyGetsTheUpperCaseNameBack() throws {
         try pspSave("ucus98737data00")
         let outcome = LibrarySaveImporter().commit(plan([psp("God of War", "UCUS98737")]), replaceExisting: true, paths: paths)
@@ -102,13 +85,14 @@ final class SaveImportRealFoldersTests: XCTestCase {
         try write("Wii U/Breath of the Wild/2024-07-20/80000001/option.sav", count: 1_024)
         try write("Wii U/Breath of the Wild/2024-07-20/80000001/4/game_data.sav", count: 4_096)
         try write("PSVita/LittleBigPlanet Vita/2026-10-30/PCSA00017/sce_sys/param.sfo", count: 3)
+        try write("PSVita/Dungeon Hunter/PCSE00383/sce_sys/param.sfo", count: 3)
         try write("PSVita/Dungeon Hunter/PCSE00383/save.sav", count: 4_096)
         let gba = LibraryGame(displayName: "Zelda", systemID: .gba, relativePath: "Zelda.gba")
 
         let batch = plan([gba])
 
-        // Counted in one line of the summary, not listed: one per Wii U account folder, Vita
-        // save, and file inside a Vita title folder.
+        // Counted in one line of the summary, not listed: one per Wii U account folder and
+        // Vita save (a title folder with sce_sys).
         XCTAssertTrue(batch.items.isEmpty)
         XCTAssertEqual(batch.skipped, [])
         XCTAssertEqual(batch.otherSystemSaves, 3)

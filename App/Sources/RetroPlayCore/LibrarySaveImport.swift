@@ -196,57 +196,44 @@ public final class SaveImportSessions {
 
 public enum SaveFolderScanner {
     private static let archiveExtensions: Set<String> = ["zip", "7z", "rar", "tar", "gz", "tgz"]
-    private static let resourceKeys: [URLResourceKey] = [
-        .isDirectoryKey, .isPackageKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey,
-    ]
     private static let linkReason = "Links aren't imported; pick the file or folder itself."
     static let otherSystemReason = "Not a save for a system RetroPlay plays."
 
-    /// Walks the picked files and folders. Doesn't read file contents (sizes and names only),
-    /// so it stays quick on big trees; the planner reads what it needs.
-    ///
-    /// Folders are walked breadth-first, each listed (one level) inside its own short
-    /// coordinated read, as Apple recommends for File Provider locations (iCloud Drive, an SMB
-    /// share): a provider fills each folder when it's asked for it, which one claim on the
-    /// picked folder doesn't do. Cancelling the task stops a read still waiting.
+    /// Walks the picked files and folders with `FolderWalk` (each folder listed in its own
+    /// coordinated read, within the entry budget). Doesn't read file contents (names and sizes
+    /// only); the planner reads what it needs.
     public static func scan(
         _ urls: [URL],
         limits: SaveScanLimits = SaveScanLimits(),
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        cancellation: ImportCancellation = ImportCancellation()
     ) -> SaveScanResult {
         var result = SaveScanResult()
-        var entries = 0
+        var budget = FolderWalk.Budget(entries: limits.maxEntries)
         for root in urls {
-            guard !result.truncated, !result.cancelled else { break }
-            if Task.isCancelled {
-                result.cancelled = true
-                break
-            }
             // Picked items count against the limits like anything found inside a folder.
-            if entries >= limits.maxEntries || result.candidates.count >= limits.maxCandidates {
+            guard budget.take() else {
                 result.truncated = true
                 break
             }
-            let values: URLResourceValues
             do {
-                values = try CoordinatedRead.run(root) { try $0.resourceValues(forKeys: Set(resourceKeys)) }
+                let values = try CoordinatedRead.run(root, cancellation) { try $0.resourceValues(forKeys: FolderWalk.keys) }
+                if values.isSymbolicLink == true {
+                    result.skipped.append(SkippedSave(name: root.lastPathComponent, reason: linkReason))
+                } else if values.isDirectory == true {
+                    try walk(root, limits: limits, budget: &budget, result: &result, fileManager: fileManager, cancellation: cancellation)
+                } else {
+                    try classifyFile(root, values: values, displayPath: root.lastPathComponent, folders: [], limits: limits, result: &result)
+                }
             } catch is CancellationError {
                 result.cancelled = true
                 break
+            } catch is FolderWalk.Truncated {
+                result.truncated = true
+                break
             } catch {
                 // Not known to be a file or a folder: say so rather than guess.
-                entries += 1
                 result.skipped.append(readError(root.lastPathComponent, error))
-                continue
-            }
-            if values.isSymbolicLink == true {
-                entries += 1
-                result.skipped.append(SkippedSave(name: root.lastPathComponent, reason: linkReason))
-            } else if values.isDirectory == true {
-                walk(root, limits: limits, entries: &entries, result: &result, fileManager: fileManager)
-            } else {
-                entries += 1
-                classifyFile(root, values: values, displayPath: root.lastPathComponent, folders: [], limits: limits, result: &result)
             }
         }
         return result
@@ -256,89 +243,62 @@ public enum SaveFolderScanner {
         SkippedSave(name: name, reason: "Couldn't read it: \(error?.localizedDescription ?? "its contents can't be looked at").")
     }
 
-    private struct Folder {
-        let url: URL
-        /// Names from the picked folder (included) down to this one.
-        let path: [String]
-    }
-
     private static func walk(
         _ root: URL,
         limits: SaveScanLimits,
-        entries: inout Int,
+        budget: inout FolderWalk.Budget,
         result: inout SaveScanResult,
-        fileManager: FileManager
-    ) {
-        var queue = [Folder(url: root, path: [root.lastPathComponent])]
-        var next = 0
-        while next < queue.count {
-            let folder = queue[next]
-            next += 1
-            if Task.isCancelled {
-                result.cancelled = true
-                return
-            }
-            let displayPath = folder.path.joined(separator: "/")
-            // This folder only, under its own claim; the claim ends before anything is done
-            // with the listing.
-            let children: [(url: URL, values: URLResourceValues?)]
-            do {
-                children = try CoordinatedRead.run(folder.url) { url in
-                    try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: resourceKeys, options: [])
-                        .map { ($0, try? $0.resourceValues(forKeys: Set(resourceKeys))) }
-                        .sorted { $0.0.lastPathComponent < $1.0.lastPathComponent }
-                }
-            } catch is CancellationError {
-                result.cancelled = true
-                return
-            } catch {
+        fileManager: FileManager,
+        cancellation: ImportCancellation
+    ) throws {
+        let complete = try FolderWalk.run(
+            root,
+            maxDepth: limits.maxDepth,
+            budget: &budget,
+            fileManager: fileManager,
+            cancellation: cancellation,
+            unreadable: { folder, error in
                 // Not downloaded, no permission: reported, and the walk goes on with the rest.
-                result.skipped.append(readError(displayPath, error))
-                continue
+                result.skipped.append(readError(folder.path.joined(separator: "/"), error))
             }
-            // Names it can list but nothing it can look at (no search permission): one error.
-            if !children.isEmpty, children.allSatisfy({ $0.values == nil }) {
-                result.skipped.append(readError(displayPath, nil))
-                continue
+        ) { folder, children in
+            let displayPath = folder.path.joined(separator: "/")
+            switch folderDecision(folder, children: children) {
+            case .pspSave(let modified):
+                guard result.candidates.count < limits.maxCandidates else { throw FolderWalk.Truncated() }
+                result.candidates.append(SaveImportCandidate(
+                    url: folder.url,
+                    displayPath: displayPath,
+                    kind: .pspFolder(name: folder.url.lastPathComponent),
+                    folderHints: [.psp],
+                    modified: modified
+                ))
+                return []
+            case .skip(let reason):
+                result.skipped.append(SkippedSave(name: displayPath, reason: reason))
+                return []
+            case .otherSystem:
+                result.otherSystemSaves += 1
+                return []
+            case nil:
+                break
             }
-            if let decision = folderDecision(folder, children: children) {
-                switch decision {
-                case .pspSave(let modified):
-                    result.candidates.append(SaveImportCandidate(
-                        url: folder.url,
-                        displayPath: displayPath,
-                        kind: .pspFolder(name: folder.url.lastPathComponent),
-                        folderHints: [.psp],
-                        modified: modified
-                    ))
-                case .skip(let reason):
-                    result.skipped.append(SkippedSave(name: displayPath, reason: reason))
-                case .otherSystem:
-                    result.otherSystemSaves += 1
-                }
-                continue
-            }
+            var subfolders: [FolderWalk.Child] = []
             for child in children {
-                entries += 1
-                if entries > limits.maxEntries || result.candidates.count >= limits.maxCandidates {
-                    result.truncated = true
-                    return
-                }
-                let name = child.url.lastPathComponent
-                let childPath = folder.path + [name]
+                let childPath = (folder.path + [child.name]).joined(separator: "/")
                 // A link could point anywhere (outside the pick, or nowhere once copied).
-                if child.values?.isSymbolicLink == true {
-                    if !name.hasPrefix(".") {
-                        result.skipped.append(SkippedSave(name: childPath.joined(separator: "/"), reason: linkReason))
+                if child.values.isSymbolicLink == true {
+                    if !child.name.hasPrefix(".") {
+                        result.skipped.append(SkippedSave(name: childPath, reason: linkReason))
                     }
                     continue
                 }
-                let isDirectory = child.values?.isDirectory == true
-                if name.hasPrefix(".") {
+                let isDirectory = child.values.isDirectory == true
+                if child.name.hasPrefix(".") {
                     // Hidden folders are passed over; iCloud placeholders (".Name.sav.icloud")
                     // are worth naming.
-                    if !isDirectory, name.hasSuffix(".icloud") {
-                        let real = String(name.dropFirst().dropLast(".icloud".count))
+                    if !isDirectory, child.name.hasSuffix(".icloud") {
+                        let real = String(child.name.dropFirst().dropLast(".icloud".count))
                         if SaveImportContentTypes.isBatteryExtension((real as NSString).pathExtension) {
                             result.skipped.append(SkippedSave(
                                 name: (folder.path + [real]).joined(separator: "/"),
@@ -349,24 +309,14 @@ public enum SaveFolderScanner {
                     continue
                 }
                 if isDirectory {
-                    guard child.values?.isPackage != true else { continue }
-                    if childPath.count - 1 >= limits.maxDepth {
-                        result.truncated = true
-                    } else {
-                        queue.append(Folder(url: child.url, path: childPath))
-                    }
+                    if child.values.isPackage != true { subfolders.append(child) }
                     continue
                 }
-                classifyFile(
-                    child.url,
-                    values: child.values,
-                    displayPath: childPath.joined(separator: "/"),
-                    folders: folder.path,
-                    limits: limits,
-                    result: &result
-                )
+                try classifyFile(child.url, values: child.values, displayPath: childPath, folders: folder.path, limits: limits, result: &result)
             }
+            return subfolders
         }
+        if !complete { result.truncated = true }
     }
 
     private enum FolderDecision {
@@ -376,8 +326,8 @@ public enum SaveFolderScanner {
         case otherSystem
     }
 
-    /// Vita title IDs (PCSA00017) and Wii U account folders (80000001): only these names,
-    /// with what's around them, say a folder isn't RetroPlay's. Names like "PC" don't.
+    /// Vita title IDs (PCSA00017, with their sce_sys folder) and Wii U account folders
+    /// (80000001): only these say a folder isn't RetroPlay's. Names like "PC" don't.
     private static let vitaTitleID = try! NSRegularExpression(pattern: #"^PCS[A-Z][0-9]{5}$"#)
     private static let wiiUAccount = try! NSRegularExpression(pattern: #"^800000[0-9a-f]{2}$"#)
 
@@ -387,20 +337,17 @@ public enum SaveFolderScanner {
 
     /// What a folder is, from its own listing: a PSP save slot (a product ID and save name,
     /// in any case, with a PARAM.SFO), a folder to skip whole (a PSP-looking slot without
-    /// PARAM.SFO, a PARAM.SFO under a name that isn't a save's, a Vita save with sce_sys, a
-    /// Wii U account folder), or nil to look inside.
-    private static func folderDecision(_ folder: Folder, children: [(url: URL, values: URLResourceValues?)]) -> FolderDecision? {
+    /// PARAM.SFO, a PARAM.SFO under a name that isn't a save's), another system's save (a
+    /// Vita title folder with sce_sys, a Wii U account folder), or nil to look inside.
+    private static func folderDecision(_ folder: FolderWalk.Folder, children: [FolderWalk.Child]) -> FolderDecision? {
         let name = folder.url.lastPathComponent
-        let param = children.first { $0.url.lastPathComponent.uppercased() == "PARAM.SFO" && $0.values?.isDirectory != true }
-        let names = Set(children.map { $0.url.lastPathComponent.lowercased() })
-        if matches(vitaTitleID, name), names.contains("sce_sys") {
+        let param = children.first { $0.name.uppercased() == "PARAM.SFO" && $0.values.isDirectory != true }
+        if matches(vitaTitleID, name), children.contains(where: { $0.name.lowercased() == "sce_sys" }) {
             return .otherSystem
         }
-        if matches(wiiUAccount, name) {
-            return .otherSystem
-        }
+        if matches(wiiUAccount, name) { return .otherSystem }
         if SaveGameImporter.isValidPSPSaveFolderName(name.uppercased()) {
-            if let param { return .pspSave(modified: param.values?.contentModificationDate) }
+            if let param { return .pspSave(modified: param.values.contentModificationDate) }
             if name == name.uppercased() {
                 return .skip(SaveGameImportError.missingPSPMetadata.localizedDescription)
             }
@@ -419,7 +366,7 @@ public enum SaveFolderScanner {
         folders: [String],
         limits: SaveScanLimits,
         result: inout SaveScanResult
-    ) {
+    ) throws {
         let ext = url.pathExtension.lowercased()
         // "Game.state.auto": the extension alone says "auto".
         if SaveImportContentTypes.isSaveStateExtension(ext) {
@@ -437,20 +384,12 @@ public enum SaveFolderScanner {
             result.ignoredFiles += 1
             return
         }
-        // Inside a Vita title or Wii U account folder: not a cartridge save, whatever its name.
-        if folders.contains(where: { matches(vitaTitleID, $0) || matches(wiiUAccount, $0) }) {
-            result.otherSystemSaves += 1
-            return
-        }
         let size = values?.fileSize ?? 0
         guard size <= limits.maxFileBytes else {
             result.skipped.append(SkippedSave(name: displayPath, reason: "Too large to be a save."))
             return
         }
-        guard result.candidates.count < limits.maxCandidates else {
-            result.truncated = true
-            return
-        }
+        guard result.candidates.count < limits.maxCandidates else { throw FolderWalk.Truncated() }
         result.candidates.append(SaveImportCandidate(
             url: url,
             displayPath: displayPath,
@@ -697,10 +636,8 @@ public struct LibrarySaveImporter: Sendable {
             ))
         }
         do {
-            let importer = self.importer
-            let plan = try CoordinatedRead.run(candidate.url) {
-                try importer.planPSPFolderImport(from: $0, for: game, paths: paths, fileManager: fileManager)
-            }
+            // The check walks the slot folder by folder, each in its own coordinated read.
+            let plan = try importer.planPSPFolderImport(from: candidate.url, for: game, paths: paths, fileManager: fileManager)
             return .success(SaveImportItem(
                 game: game,
                 sourceURL: candidate.url,
@@ -721,13 +658,15 @@ public struct LibrarySaveImporter: Sendable {
         _ batch: SaveImportBatch,
         replaceExisting: Bool,
         paths: SavePaths = SavePaths(),
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        cancellation: ImportCancellation = ImportCancellation()
     ) -> SaveImportOutcome {
         var outcome = SaveImportOutcome()
         for item in batch.items {
             // Cancelled: the saves not yet started stay as they are; one already installing
             // has finished by the time this loop looks again.
-            if Task.isCancelled {
+            if Task.isCancelled { cancellation.cancel() }
+            if cancellation.isCancelled {
                 outcome.failed.append(SkippedSave(name: item.sourceName, reason: "Cancelled."))
                 continue
             }
@@ -761,7 +700,8 @@ public struct LibrarySaveImporter: Sendable {
                         for id in item.gameIDs {
                             try FreshBoot.mark(id, paths: paths, fileManager: fileManager)
                         }
-                    }
+                    },
+                    cancellation: cancellation
                 )
                 outcome.imported.append(item)
             } catch {
@@ -944,53 +884,195 @@ public enum FreshBoot {
     }
 }
 
-// MARK: - Coordinated reads
+// MARK: - Coordinated reads and the folder walk
 
-/// A coordinated read of one item, the way File Provider locations expect to be read. Kept
-/// short (one folder listing, one file), and cancellable: cancelling the calling task stops a
-/// read still waiting for its provider instead of blocking until the provider answers.
-enum CoordinatedRead {
-    private final class Pending<T>: @unchecked Sendable {
-        let lock = NSLock()
-        let body: (URL) throws -> T
-        var result: Result<T, Error>?
-        var abandoned = false
-        init(_ body: @escaping (URL) throws -> T) { self.body = body }
+/// Stops an import's file work: set by Stop (and when the task running it is cancelled), and
+/// checked by every listing and copy loop and by a coordinated read still waiting.
+public final class ImportCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    public init() {}
+
+    public func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
     }
 
-    static func run<T>(_ url: URL, _ body: @escaping (URL) throws -> T) throws -> T {
-        let pending = Pending(body)
+    public var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    /// Throws once cancelled; a cancelled calling task counts too.
+    func check() throws {
+        if Task.isCancelled { cancel() }
+        if isCancelled { throw CancellationError() }
+    }
+}
+
+/// One coordinated read of one item, the way File Provider locations expect: kept short (one
+/// folder listing, one file copy). The caller's thread waits; if the import is cancelled
+/// meanwhile (or the waiting task is), the coordinator is cancelled and the wait ends at
+/// once. `body` checks the same flag in its loops; no lock is held while it does I/O.
+enum CoordinatedRead {
+    private final class Outcome<T>: @unchecked Sendable {
+        let lock = NSLock()
+        var value: Result<T, Error>?
+    }
+
+    static func run<T>(_ url: URL, _ cancellation: ImportCancellation = ImportCancellation(), _ body: @escaping (URL) throws -> T) throws -> T {
+        try cancellation.check()
+        let outcome = Outcome<T>()
         let coordinator = NSFileCoordinator(filePresenter: nil)
         let intent = NSFileAccessIntent.readingIntent(with: url, options: [])
         let done = DispatchSemaphore(value: 0)
-        let queue = OperationQueue()
-        coordinator.coordinate(with: [intent], queue: queue) { [intent] error in
-            pending.lock.lock()
-            defer {
-                pending.lock.unlock()
-                done.signal()
-            }
-            guard !pending.abandoned else { return }
+        let box = UncheckedBox(body)
+        coordinator.coordinate(with: [intent], queue: OperationQueue()) { [intent] error in
+            let value: Result<T, Error>
             if let error {
-                pending.result = .failure(error)
+                value = .failure(error)
+            } else if cancellation.isCancelled {
+                value = .failure(CancellationError())
             } else {
-                pending.result = Result { try pending.body(intent.url) }
+                value = Result { try box.value(intent.url) }
             }
+            outcome.lock.lock()
+            outcome.value = value
+            outcome.lock.unlock()
+            done.signal()
         }
         while done.wait(timeout: .now() + .milliseconds(50)) == .timedOut {
-            guard Task.isCancelled else { continue }
-            coordinator.cancel()
-            pending.lock.lock()
-            pending.abandoned = true
-            let finished = pending.result
-            pending.lock.unlock()
-            if let finished { return try finished.get() }
-            throw CancellationError()
+            if Task.isCancelled { cancellation.cancel() }
+            if cancellation.isCancelled {
+                coordinator.cancel()
+                throw CancellationError()
+            }
         }
-        pending.lock.lock()
-        defer { pending.lock.unlock() }
-        guard let result = pending.result else { throw CocoaError(.fileReadUnknown) }
-        return try result.get()
+        outcome.lock.lock()
+        defer { outcome.lock.unlock() }
+        return try outcome.value!.get()
+    }
+}
+
+private final class UncheckedBox<T>: @unchecked Sendable {
+    let value: T
+    init(_ value: T) { self.value = value }
+}
+
+/// The one folder walk the save import uses, for picked folders and PSP save slots alike:
+/// breadth-first, each folder listed one level deep inside its own coordinated read (so a
+/// provider fills it when it's asked), entry by entry, so the listing stops at the budget.
+enum FolderWalk {
+    static let keys: Set<URLResourceKey> = [
+        .isDirectoryKey, .isRegularFileKey, .isPackageKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey,
+    ]
+
+    struct Folder {
+        let url: URL
+        /// Names from the walked folder (included) down to this one.
+        let path: [String]
+    }
+
+    struct Child {
+        let url: URL
+        let name: String
+        let values: URLResourceValues
+    }
+
+    /// Thrown by a visitor to stop the walk at a limit it keeps (candidates).
+    struct Truncated: Error {}
+
+    /// Entries left to look at, shared by everything one import walks.
+    struct Budget {
+        var entries: Int
+        mutating func take() -> Bool {
+            guard entries > 0 else { return false }
+            entries -= 1
+            return true
+        }
+    }
+
+    /// Walks `root`. `visit` gets each folder with its children and returns the subfolders to
+    /// go into. A folder that can't be listed goes to `unreadable` (which may throw to stop).
+    /// Returns false if the budget ran out or a folder sat deeper than `maxDepth`.
+    static func run(
+        _ root: URL,
+        maxDepth: Int,
+        budget: inout Budget,
+        fileManager: FileManager,
+        cancellation: ImportCancellation,
+        unreadable: (Folder, Error?) throws -> Void,
+        visit: (Folder, [Child]) throws -> [Child]
+    ) throws -> Bool {
+        var complete = true
+        var queue = [Folder(url: root, path: [root.lastPathComponent])]
+        var next = 0
+        while next < queue.count {
+            let folder = queue[next]
+            next += 1
+            try cancellation.check()
+            let listing: (children: [Child], exhausted: Bool, error: Error?)
+            do {
+                listing = try list(folder.url, budget: budget.entries, fileManager: fileManager, cancellation: cancellation)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                try unreadable(folder, error)
+                continue
+            }
+            if let error = listing.error {
+                try unreadable(folder, error)
+                continue
+            }
+            budget.entries -= listing.children.count
+            if listing.exhausted { complete = false }
+            for sub in try visit(folder, listing.children) {
+                if folder.path.count >= maxDepth {
+                    complete = false
+                } else {
+                    queue.append(Folder(url: sub.url, path: folder.path + [sub.name]))
+                }
+            }
+            if listing.exhausted { return false }
+        }
+        return complete
+    }
+
+    /// One folder's children, at most `budget` of them (`exhausted` when there were more),
+    /// read inside one coordinated read of that folder.
+    private static func list(
+        _ url: URL,
+        budget: Int,
+        fileManager: FileManager,
+        cancellation: ImportCancellation
+    ) throws -> (children: [Child], exhausted: Bool, error: Error?) {
+        try CoordinatedRead.run(url, cancellation) { url in
+            var failure: Error?
+            guard let entries = fileManager.enumerator(
+                at: url,
+                includingPropertiesForKeys: Array(keys),
+                options: [.skipsSubdirectoryDescendants],
+                errorHandler: { _, error in
+                    failure = error
+                    return false
+                }
+            ) else { return ([], false, CocoaError(.fileReadUnknown)) }
+            var children: [Child] = []
+            while let next = entries.nextObject() as? URL {
+                try cancellation.check()
+                guard children.count < budget else { return (children, true, nil) }
+                // Listed but not looked at (no search permission): the folder can't be read.
+                guard let values = try? next.resourceValues(forKeys: keys) else {
+                    return ([], false, failure ?? CocoaError(.fileReadNoPermission))
+                }
+                children.append(Child(url: next, name: next.lastPathComponent, values: values))
+            }
+            if let failure { return ([], false, failure) }
+            return (children.sorted { $0.name < $1.name }, false, nil)
+        }
     }
 }
 

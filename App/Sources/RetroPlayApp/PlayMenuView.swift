@@ -187,6 +187,7 @@ struct PlayMenuView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(MenuTileButtonStyle(foreground: .red))
+                .disabled(busy)
                 .frame(minHeight: MenuTileButtonStyle.height)
                 .controllerFocusRing(focus == .quit)
             }
@@ -353,6 +354,7 @@ extension PlayMenuView {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(MenuTileButtonStyle())
+                    .disabled(busy)
                     .accessibilityLabel(PlaySavesMenuContent.importTitle)
                     .controllerFocusRing(focus == .importSave)
                 }

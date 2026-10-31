@@ -56,6 +56,9 @@ public struct PlayView: View {
     @State private var menuOpen = false
     @State private var fastForward = false
     @State private var busy = false
+    /// A battery save is being imported (game stopped, file being written): Import, Reset
+    /// and Quit wait, so no core boots with the old save and flushes it over the new one.
+    @State private var importingSave = false
     @State private var toast: Toast?
     @State private var sawFirstFrame = false
     @State private var slowStartHint = false
@@ -703,7 +706,7 @@ public struct PlayView: View {
                 systemName: system.displayName,
                 supportsSaveState: core?.supportsSaveState ?? false,
                 saveEntries: saveEntries,
-                busy: busy || leaving,
+                busy: busy || leaving || importingSave,
                 leaving: leaving,
                 hasController: controllers.hasController,
                 controllerName: controllers.controllerName,
@@ -716,8 +719,8 @@ public struct PlayView: View {
                 onResume: { menuOpen = false },
                 onSave: { Task { await quickSave() } },
                 onLoadCommand: { submitLoadCommand($0) },
-                onImportSave: { showSaveImporter = true },
-                onQuit: { Task { await leave(autoSave: true) } }
+                onImportSave: { if !importingSave { showSaveImporter = true } },
+                onQuit: { if !importingSave { Task { await leave(autoSave: true) } } }
             )
             .padding(20)
         }
@@ -814,6 +817,7 @@ public struct PlayView: View {
 
     /// Reset (Saves menu): states are already deleted; boot again without auto-resume.
     private func restartFromScratch() async {
+        guard !importingSave else { return }
         menuOpen = false
         await reboot(autoResume: false)
     }
@@ -868,7 +872,10 @@ public struct PlayView: View {
     }
 
     private func performSaveImport(_ pending: PendingSaveImport, overwrite: Bool) async {
+        guard !importingSave else { return }
+        importingSave = true
         defer {
+            importingSave = false
             if pending.securityScoped { pending.url.stopAccessingSecurityScopedResource() }
         }
         guard await BatterySaveReload.waitForSaveIdle(isSaveBusy: { busy }) else {
@@ -913,7 +920,8 @@ public struct PlayView: View {
         } catch {
             saveImportError = error.localizedDescription
         }
-        if reload {
+        // Rechecked: the player may have left while the save was written.
+        if reload, !didLeave {
             menuOpen = false
             // Imported: boot fresh so the new battery save is what the game reads (a save
             // state would carry the old one). Failed: pick up from the save just written.

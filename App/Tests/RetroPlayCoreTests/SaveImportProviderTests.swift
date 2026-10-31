@@ -143,24 +143,7 @@ final class SaveImportProviderTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: exact.appendingPathComponent("PARAM.SFO")), Data(repeating: 9, count: 3))
     }
 
-    // MARK: 3. No rename unless the install succeeds
-
-    func testFailedSwapLeavesTheOldSlotUnderItsOldName() throws {
-        try useCaseSensitiveRoot()
-        let old = paths.pspSavedataDirectory.appendingPathComponent("ULUS10560SYSTEM")
-        try fm.createDirectory(at: old, withIntermediateDirectories: true)
-        try Data("OLD".utf8).write(to: old.appendingPathComponent("PARAM.SFO"))
-        let source = try slot("Pick/ULUS10560System")
-        let item = try XCTUnwrap(batch(source).items.first)
-
-        XCTAssertThrowsError(try SaveGameImporter().commitImport(
-            plan: item.plan, from: source, overwrite: true,
-            swap: { _, _ in throw CocoaError(.fileWriteUnknown) }
-        ))
-
-        XCTAssertEqual(try Data(contentsOf: old.appendingPathComponent("PARAM.SFO")), Data("OLD".utf8))
-        XCTAssertFalse(fm.fileExists(atPath: item.plan.destinationURL.path))
-    }
+    // MARK: 3. Installed under the game's spelling (a failed install: SaveImportWalkTests)
 
     func testReimportUnderTheGamesSpellingReplacesTheUppercaseSlot() throws {
         try useCaseSensitiveRoot()

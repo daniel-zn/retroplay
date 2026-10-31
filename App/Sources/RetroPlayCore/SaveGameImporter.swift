@@ -205,7 +205,8 @@ public struct SaveGameImporter: Sendable {
         overwrite: Bool,
         fileManager: FileManager = .default,
         beforeInstall: () throws -> Void = {},
-        swap: (URL, URL) throws -> Void = SaveGameImporter.swapDirectory
+        swap: (URL, URL) throws -> Void = SaveGameImporter.swapDirectory,
+        cancellation: ImportCancellation = ImportCancellation()
     ) throws {
         if plan.replacesExisting, !overwrite {
             throw SaveGameImportError.destinationExists(plan.destinationURL)
@@ -226,13 +227,13 @@ public struct SaveGameImporter: Sendable {
                 .appendingPathComponent("\(Self.stagingPrefix)\(UUID().uuidString)-\(plan.destinationURL.lastPathComponent)")
 
             do {
-                // Coordinated, so a file in iCloud Drive or on a share is downloaded first.
-                try CoordinatedRead.run(sourceURL) { source in
-                    if isDirectory {
-                        // Within the PSP caps as it copies: a folder that grew since the plan stops early.
-                        try Self.copyPSPFolder(from: source, to: stagingURL, fileManager: fileManager)
-                    } else {
-                        // A file that changed since the plan (grown, emptied, now a link) isn't copied.
+                if isDirectory {
+                    // Folder by folder and file by file, each coordinated, within the PSP caps.
+                    try Self.walkPSPSlot(sourceURL, copyingTo: stagingURL, fileManager: fileManager, cancellation: cancellation)
+                } else {
+                    // Coordinated, so a file in iCloud Drive or on a share is downloaded first; a
+                    // file that changed since the plan (grown, emptied, now a link) isn't copied.
+                    try CoordinatedRead.run(sourceURL, cancellation) { source in
                         if let check = plan.check {
                             try Self.validateStaged(source, check: check, fileManager: fileManager)
                         }
@@ -253,8 +254,14 @@ public struct SaveGameImporter: Sendable {
                     try Self.validateStaged(stagingURL, check: check, fileManager: fileManager)
                 }
                 try beforeInstall()
-                if isDirectory, let existing = Self.existingPSPSlot(for: plan.destinationURL, fileManager: fileManager) {
-                    try Self.installPSPSlot(stagingURL, over: existing, as: plan.destinationURL, swap: swap, fileManager: fileManager)
+                if isDirectory, !fileManager.fileExists(atPath: plan.destinationURL.path),
+                   let other = Self.existingPSPSlot(for: plan.destinationURL, fileManager: fileManager) {
+                    // A case-sensitive file system with the slot under another spelling (an
+                    // earlier build upper-cased names): the new slot goes in under the game's
+                    // spelling in one step; only then is the old spelling removed. Nothing in
+                    // between can leave the old save lost.
+                    try fileManager.moveItem(at: stagingURL, to: plan.destinationURL)
+                    try? fileManager.removeItem(at: other)
                 } else if fileManager.fileExists(atPath: plan.destinationURL.path) {
                     if isDirectory {
                         try swap(plan.destinationURL, stagingURL)
@@ -318,103 +325,72 @@ public struct SaveGameImporter: Sendable {
         }
     }
 
-    /// PARAM.SFO's URL in a save folder, whatever its case.
-    /// Looks at no more than `pspFolderMaxEntries` children: an oversized folder isn't listed
-    /// whole just to find it.
-    public static func paramSFO(in folder: URL, fileManager: FileManager = .default) -> URL? {
-        let exact = folder.appendingPathComponent("PARAM.SFO")
-        if fileManager.fileExists(atPath: exact.path) { return exact }
-        guard let children = fileManager.enumerator(
-            at: folder,
-            includingPropertiesForKeys: nil,
-            options: [.skipsSubdirectoryDescendants]
-        ) else { return nil }
-        var seen = 0
-        while seen < pspFolderMaxEntries, let next = children.nextObject() as? URL {
-            seen += 1
-            if next.lastPathComponent.uppercased() == "PARAM.SFO" { return next }
-        }
-        return nil
-    }
-
     /// A PSP save folder holds plain files and folders only (no links that would point outside
     /// it once copied), at most `pspFolderMaxEntries` of them, `pspFolderMaxDepth` deep and
-    /// `pspFolderMaxBytes` in all.
-    public static func validatePSPFolderContents(_ folder: URL, fileManager: FileManager = .default) throws {
-        if (try? folder.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
-            throw pspLinkError
-        }
-        // PARAM.SFO is found during the bounded walk, not by listing the folder first.
-        var hasParam = false
-        try walkPSPFolder(folder, fileManager: fileManager) { _, relative, isDirectory in
-            if !isDirectory, relative.count == 1, relative[0].uppercased() == "PARAM.SFO" { hasParam = true }
-        }
-        guard hasParam else { throw SaveGameImportError.missingPSPMetadata }
-    }
-
-    static func copyPSPFolder(from source: URL, to destination: URL, fileManager: FileManager) throws {
-        try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
-        try walkPSPFolder(source, fileManager: fileManager) { url, relative, isDirectory in
-            let target = relative.reduce(destination) { $0.appendingPathComponent($1) }
-            if isDirectory {
-                try fileManager.createDirectory(at: target, withIntermediateDirectories: true)
-            } else {
-                try fileManager.copyItem(at: url, to: target)
-            }
-        }
+    /// `pspFolderMaxBytes` in all, with a PARAM.SFO at the top.
+    public static func validatePSPFolderContents(
+        _ folder: URL,
+        fileManager: FileManager = .default,
+        cancellation: ImportCancellation = ImportCancellation()
+    ) throws {
+        try walkPSPSlot(folder, copyingTo: nil, fileManager: fileManager, cancellation: cancellation)
     }
 
     private static let pspLinkError = SaveGameImportError.unsupportedFormat("Save folders with links in them aren't imported.")
 
-    /// Visits every entry (parents before children), throwing as soon as a cap is passed, a
-    /// part of the folder can't be read (a copy missing a subfolder must not be installed), or
-    /// the task is cancelled.
-    private static func walkPSPFolder(
-        _ folder: URL,
+    /// Checks a PSP slot with the same walk the library scan uses (each folder listed in its
+    /// own coordinated read, each file copied in its own), copying it to `target` when given.
+    /// Anything it can't read, or a limit passed, stops it with an error: a slot is copied
+    /// whole or not at all.
+    static func walkPSPSlot(
+        _ slot: URL,
+        copyingTo target: URL?,
         fileManager: FileManager,
-        visit: (URL, [String], Bool) throws -> Void
+        cancellation: ImportCancellation
     ) throws {
-        let keys: Set<URLResourceKey> = [.isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey, .fileSizeKey]
         let tooBig = SaveGameImportError.unsupportedFormat("Too big to be a PSP save folder.")
-        let unreadable = UnreadableEntry()
-        guard let walker = fileManager.enumerator(
-            at: folder,
-            includingPropertiesForKeys: Array(keys),
-            errorHandler: { url, _ in
-                unreadable.url = url
-                return false
-            }
-        ) else {
-            throw SaveGameImportError.copyFailed("The folder couldn't be read.")
-        }
-        let rootCount = folder.standardizedFileURL.pathComponents.count
-        var entries = 0
+        if (try? slot.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true { throw pspLinkError }
+        if let target { try fileManager.createDirectory(at: target, withIntermediateDirectories: true) }
+        var budget = FolderWalk.Budget(entries: pspFolderMaxEntries)
         var bytes = 0
-        func checkReadable() throws {
-            if let url = unreadable.url {
-                throw SaveGameImportError.copyFailed("\(url.lastPathComponent) couldn't be read.")
+        var hasParam = false
+        let complete = try FolderWalk.run(
+            slot,
+            maxDepth: pspFolderMaxDepth,
+            budget: &budget,
+            fileManager: fileManager,
+            cancellation: cancellation,
+            unreadable: { folder, error in
+                throw SaveGameImportError.copyFailed(
+                    "\(folder.path.joined(separator: "/")) couldn't be read\(error.map { ": \($0.localizedDescription)" } ?? ".")"
+                )
             }
-        }
-        while let next = walker.nextObject() {
-            try checkReadable()
-            try Task.checkCancellation()
-            guard let url = next as? URL else { continue }
-            let values = try url.resourceValues(forKeys: keys)
-            if values.isSymbolicLink == true { throw pspLinkError }
-            let isDirectory = values.isDirectory == true
-            guard isDirectory || values.isRegularFile == true else { throw pspLinkError }
-            entries += 1
-            bytes += isDirectory ? 0 : values.fileSize ?? 0
-            if entries > pspFolderMaxEntries || bytes > pspFolderMaxBytes || walker.level > pspFolderMaxDepth {
-                throw tooBig
+        ) { folder, children in
+            let here = target.map { folder.path.dropFirst().reduce($0) { $0.appendingPathComponent($1) } }
+            var subfolders: [FolderWalk.Child] = []
+            for child in children {
+                try cancellation.check()
+                if child.values.isSymbolicLink == true { throw pspLinkError }
+                if child.values.isDirectory == true {
+                    if let here {
+                        try fileManager.createDirectory(at: here.appendingPathComponent(child.name), withIntermediateDirectories: true)
+                    }
+                    subfolders.append(child)
+                    continue
+                }
+                guard child.values.isRegularFile == true else { throw pspLinkError }
+                bytes += child.values.fileSize ?? 0
+                guard bytes <= pspFolderMaxBytes else { throw tooBig }
+                if folder.path.count == 1, child.name.uppercased() == "PARAM.SFO" { hasParam = true }
+                if let here {
+                    let destination = here.appendingPathComponent(child.name)
+                    try CoordinatedRead.run(child.url, cancellation) { try fileManager.copyItem(at: $0, to: destination) }
+                }
             }
-            try visit(url, Array(url.standardizedFileURL.pathComponents.dropFirst(rootCount)), isDirectory)
+            return subfolders
         }
-        try checkReadable()
-    }
-
-    private final class UnreadableEntry: @unchecked Sendable {
-        var url: URL?
+        guard complete else { throw tooBig }
+        guard hasParam else { throw SaveGameImportError.missingPSPMetadata }
     }
 
     // MARK: - PSP SAVEDATA folder
@@ -435,15 +411,6 @@ public struct SaveGameImporter: Sendable {
         if folderName.uppercased() == "SAVEDATA" {
             throw SaveGameImportError.unsupportedFormat(
                 "Pick a game folder inside SAVEDATA (for example ULUS12345), not the SAVEDATA directory itself."
-            )
-        }
-
-        guard Self.paramSFO(in: folderURL, fileManager: fileManager) != nil else {
-            if Self.isValidPSPSaveFolderName(folderName) {
-                throw SaveGameImportError.missingPSPMetadata
-            }
-            throw SaveGameImportError.unsupportedFormat(
-                "Folder is missing PARAM.SFO. Import a PSP SAVEDATA slot folder from RetroArch (saves/PPSSPP/PSP/SAVEDATA/<ID>/)."
             )
         }
 
@@ -483,32 +450,6 @@ public struct SaveGameImporter: Sendable {
         let names = (try? fileManager.contentsOfDirectory(atPath: parent.path)) ?? []
         if names.contains(destination.lastPathComponent) { return destination }
         return names.first { $0.uppercased() == wanted }.map { parent.appendingPathComponent($0, isDirectory: true) }
-    }
-
-    /// Puts the staged slot in place of `existing`, under the game's spelling `destination`.
-    /// The swap is the install; only once it has succeeded is a differently spelled slot (from
-    /// an earlier build that upper-cased names) renamed to the game's spelling, and if that
-    /// rename fails the swap is undone, so a failed import leaves the old slot as it was.
-    static func installPSPSlot(
-        _ staging: URL,
-        over existing: URL,
-        as destination: URL,
-        swap: (URL, URL) throws -> Void,
-        fileManager: FileManager
-    ) throws {
-        try swap(existing, staging)
-        if existing.lastPathComponent != destination.lastPathComponent {
-            let renamed = existing.withUnsafeFileSystemRepresentation { from in
-                destination.withUnsafeFileSystemRepresentation { to in rename(from!, to!) }
-            }
-            if renamed != 0 {
-                let reason = String(cString: strerror(errno))
-                try? swap(existing, staging)
-                throw SaveGameImportError.copyFailed(reason)
-            }
-        }
-        // The swap left the old slot at the staging path.
-        try? fileManager.removeItem(at: staging)
     }
 
     // MARK: - Validation helpers

@@ -23,6 +23,8 @@ public struct RetroPlayRootView: View {
     @State private var saveImportID: UUID?
     /// The running scan, so "Finding saves" can stop it.
     @State private var saveScanTask: Task<Void, Never>?
+    /// Stop sets it: the scan's listings and coordinated reads end at their next check.
+    @State private var saveScanCancellation: ImportCancellation?
     @State private var showSettings = false
     @State private var playGame: LibraryGame?
     @State private var navigator = ControllerNavigator()
@@ -810,8 +812,10 @@ public struct RetroPlayRootView: View {
             let access = SecurityScopedAccess(urls)
             let games = store.games
             saveImportID = id
+            let cancellation = ImportCancellation()
+            saveScanCancellation = cancellation
             saveScanTask = Task {
-                let batch = await Self.findSaves(in: urls, games: games)
+                let batch = await Self.findSaves(in: urls, games: games, cancellation: cancellation)
                 // A stale or cancelled session (ended meanwhile) changes nothing.
                 guard saveImports.scanFinished(id) else {
                     access.stop()
@@ -841,12 +845,18 @@ public struct RetroPlayRootView: View {
     }
 
     /// Off the main actor, and a child of the scan task, so cancelling that stops the walk.
-    private nonisolated static func findSaves(in urls: [URL], games: [LibraryGame]) async -> SaveImportBatch {
-        LibrarySaveImporter().plan(SaveFolderScanner.scan(urls), games: games)
+    private nonisolated static func findSaves(
+        in urls: [URL],
+        games: [LibraryGame],
+        cancellation: ImportCancellation
+    ) async -> SaveImportBatch {
+        LibrarySaveImporter().plan(SaveFolderScanner.scan(urls, cancellation: cancellation), games: games)
     }
 
     /// Ends the scan's session at once (games can start again); the walk stops at its next entry.
     private func cancelSaveScan() {
+        saveScanCancellation?.cancel()
+        saveScanCancellation = nil
         saveScanTask?.cancel()
         saveScanTask = nil
         if let id = saveImportID {

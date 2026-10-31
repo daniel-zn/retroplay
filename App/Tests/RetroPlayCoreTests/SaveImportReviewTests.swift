@@ -245,7 +245,6 @@ final class SaveImportReviewTests: XCTestCase {
         let recording = ListingFileManager()
 
         XCTAssertThrowsError(try SaveGameImporter.validatePSPFolderContents(slot, fileManager: recording))
-        XCTAssertNil(SaveGameImporter.paramSFO(in: slot, fileManager: recording))
 
         XCTAssertLessThanOrEqual(recording.largestListing, SaveGameImporter.pspFolderMaxEntries)
     }
