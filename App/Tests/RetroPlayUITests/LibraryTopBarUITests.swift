@@ -23,7 +23,11 @@ final class LibraryTopBarUITests: XCTestCase {
             for (id, button) in zip(ids, buttons) {
                 XCTAssertTrue(button.waitForExistence(timeout: 30), "\(size): no \(id)")
             }
-            sleep(1)
+            // Laid out and touchable (the bar settles after launch), not a fixed wait.
+            let settled = buttons.map {
+                XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: $0)
+            }
+            XCTAssertEqual(XCTWaiter().wait(for: settled, timeout: 10), .completed, "\(size): buttons not hittable")
             let frames = buttons.map { $0.frame }
             // Icon centres no more than 48 pt apart (a toolbar group, or icons built as labels,
             // put 55-66 pt between them), each at least 44 pt wide to touch.

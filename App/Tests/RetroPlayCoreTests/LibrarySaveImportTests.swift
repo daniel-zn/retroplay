@@ -354,37 +354,49 @@ final class LibrarySaveImportTests: XCTestCase {
         XCTAssertTrue(replace.failed.isEmpty)
     }
 
-    func testCommitMarksImportedGamesToBootFreshOnce() throws {
+    func testImportedGamesBootFreshUntilANewerQuickSave() throws {
         let zelda = game("Zelda.gba", .gba)
         let mario = game("Mario.gba", .gba)
+        // A quick save from before the import: it holds the old save in memory.
+        let quick = SaveStateStore.quickSaveDirectory(system: .gba, gameID: zelda.id, paths: paths)
+        try fm.createDirectory(at: quick, withIntermediateDirectories: true)
+        let old = try SaveStateStore.quickSaveURL(system: .gba, gameID: zelda.id, paths: paths)
+        try Data([1]).write(to: old)
+        try fm.setAttributes([.modificationDate: Date().addingTimeInterval(-60)], ofItemAtPath: old.path)
         try file("Zelda.sav", size: 8_192)
 
         _ = LibrarySaveImporter().commit(plan(games: [zelda, mario]), replaceExisting: false, paths: paths, fileManager: fm)
 
-        XCTAssertTrue(FreshBoot.consume(zelda.id, paths: paths, fileManager: fm))
-        XCTAssertFalse(FreshBoot.consume(zelda.id, paths: paths, fileManager: fm))
-        XCTAssertFalse(FreshBoot.consume(mario.id, paths: paths, fileManager: fm))
+        // Still fresh on a second launch: the first fresh session may have died before saving.
+        XCTAssertTrue(FreshBoot.isPending(zelda.id, system: .gba, paths: paths, fileManager: fm))
+        XCTAssertTrue(FreshBoot.isPending(zelda.id, system: .gba, paths: paths, fileManager: fm))
+        XCTAssertFalse(FreshBoot.isPending(mario.id, system: .gba, paths: paths, fileManager: fm))
+        // Leaving the fresh session writes a newer quick save: resuming is safe again.
+        try Data([2]).write(to: old)
+        try fm.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: old.path)
+        XCTAssertFalse(FreshBoot.isPending(zelda.id, system: .gba, paths: paths, fileManager: fm))
+        XCTAssertFalse(fm.fileExists(atPath: paths.freshBootMarkerURL(for: zelda.id).path))
     }
 
-    func testFailedWriteLeavesTheOldSaveWholeAndTheRestImported() throws {
-        let zelda = game("Zelda.gba", .gba)
-        let mario = game("Mario.gba", .gba)
-        let zeldaDest = paths.sramURL(forRelativeROMPath: zelda.relativePath)
-        try Data(repeating: 1, count: 8_192).write(to: zeldaDest)
-        let source = try file("Zelda.sav", size: 8_192, fill: 2)
-        try file("Mario.sav", size: 8_192, fill: 3)
-        let batch = plan(games: [zelda, mario])
-        // The file goes away between the summary and the commit.
-        try fm.removeItem(at: source)
+    func testEveryCopyOfAPSPGameBootsFresh() throws {
+        let iso = game("God of War.iso", .psp, pspID: "UCUS98737")
+        let cso = game("God of War.cso", .psp, pspID: "UCUS98737")
+        try pspSave("SAVEDATA/UCUS98737DATA00")
 
-        let outcome = LibrarySaveImporter().commit(batch, replaceExisting: true, paths: paths, fileManager: fm)
+        let outcome = LibrarySaveImporter().commit(plan(games: [iso, cso]), replaceExisting: false, paths: paths, fileManager: fm)
 
-        XCTAssertEqual(outcome.imported.map(\.game.id), [mario.id])
-        XCTAssertEqual(outcome.failed.count, 1)
-        XCTAssertEqual(try Data(contentsOf: zeldaDest), Data(repeating: 1, count: 8_192))
-        let leftovers = try fm.contentsOfDirectory(atPath: paths.savesDirectory.path).filter { $0.hasPrefix(".import") }
-        XCTAssertEqual(leftovers, [])
-        XCTAssertFalse(FreshBoot.consume(zelda.id, paths: paths, fileManager: fm))
+        XCTAssertEqual(outcome.imported.count, 1)
+        XCTAssertTrue(FreshBoot.isPending(iso.id, system: .psp, paths: paths, fileManager: fm))
+        XCTAssertTrue(FreshBoot.isPending(cso.id, system: .psp, paths: paths, fileManager: fm))
+    }
+
+    func testNoGameStartsWhileSavesAreBeingImported() {
+        XCTAssertTrue(SaveImportPhase.idle.allowsLaunchingGames)
+        for phase in [SaveImportPhase.scanning, .reviewing, .committing] {
+            XCTAssertFalse(phase.allowsLaunchingGames, "\(phase)")
+        }
+        XCTAssertFalse(SaveImportPhase.mayWrite(gameOpen: true))
+        XCTAssertTrue(SaveImportPhase.mayWrite(gameOpen: false))
     }
 
     func testCommitReplacesPSPSlotFolder() throws {
@@ -421,22 +433,34 @@ final class LibrarySaveImportTests: XCTestCase {
         }
     }
 
-    func testSaveFormatTableIsTheOneSourceOfDestinations() {
-        for system in SystemID.allCases {
-            let game = game("Game.\(system.fileExtensions.sorted().first!)", system)
-            XCTAssertEqual(SaveFormat.of(system).destination(for: game, paths: paths), paths.batterySaveURL(for: game), "\(system)")
-            if SaveFormat.of(system).layout == .batteryFile {
-                XCTAssertFalse(SaveFormat.of(system).extensions.isEmpty, "\(system)")
-            }
+    func testSaveDestinations() {
+        let saves = paths.savesDirectory.path
+        let expected: [(SystemID, String, String)] = [
+            (.gba, "Pocket/Zelda.gba", "\(saves)/Pocket/Zelda.sav"),
+            (.nds, "Kirby.nds", "\(saves)/Kirby.sav"),
+            (.n64, "Mario.z64", "\(saves)/n64/Mario.srm"),
+            (.psp, "God of War.iso", "\(saves)/psp-memstick/PSP/SAVEDATA"),
+            (.nes, "Zelda.nes", "\(saves)/Zelda.sav"),
+            (.snes, "Chrono Trigger.sfc", "\(saves)/Chrono Trigger.sav"),
+            (.genesis, "Sonic.md", "\(saves)/Sonic.sav"),
+            (.atari7800, "Asteroids.a78", "\(saves)/Asteroids.sav"),
+            (.ps1, "FF7/FF7.cue", "\(saves)/FF7/FF7.sav"),
+        ]
+        XCTAssertEqual(Set(expected.map(\.0)), Set(SystemID.allCases))
+        for (system, rom, path) in expected {
+            let game = LibraryGame(displayName: "x", systemID: system, relativePath: rom)
+            XCTAssertEqual(SaveFormat.of(system).destination(for: game, paths: paths).path, path, "\(system)")
+            XCTAssertEqual(paths.batterySaveURL(for: game).path, path, "\(system)")
         }
         XCTAssertTrue(SaveImportContentTypes.isBatteryExtension("mcd"))
         XCTAssertEqual(SaveFormat.n64CombinedSRMSize, 296_960)
     }
 
-    func testInGameImportUsesTheSameRules() throws {
+    func testInGameImportKeepsItsWiderRulesButTheScanDoesNot() throws {
+        // Picked for this game in-game: taken, as before. Found in a folder: not a 128 KiB card.
         let card = try file("FF7.mcr", size: 8_192)
-        XCTAssertThrowsError(try SaveGameImporter().planImport(from: card, for: game("FF7.cue", .ps1), paths: paths, fileManager: fm)) {
-            XCTAssertEqual($0 as? SaveGameImportError, .invalidSize(system: .ps1, bytes: 8_192))
-        }
+        let ff7 = game("FF7.cue", .ps1)
+        XCTAssertNoThrow(try SaveGameImporter().planImport(from: card, for: ff7, paths: paths, fileManager: fm))
+        XCTAssertTrue(plan(games: [ff7]).items.isEmpty)
     }
 }

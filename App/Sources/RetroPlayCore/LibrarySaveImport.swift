@@ -69,14 +69,18 @@ public struct SaveImportItem: Sendable, Equatable, Identifiable {
     public let sourceURL: URL
     public let sourceName: String
     public let plan: SaveGameImportPlan
+    /// Every library entry that reads this save: the game, or for PSP each copy of the title
+    /// (an ISO and a CSO share the memory stick folder).
+    public let gameIDs: [UUID]
     public var id: String { plan.destinationURL.path }
     public var replacesExisting: Bool { plan.replacesExisting }
 
-    public init(game: LibraryGame, sourceURL: URL, sourceName: String, plan: SaveGameImportPlan) {
+    public init(game: LibraryGame, sourceURL: URL, sourceName: String, plan: SaveGameImportPlan, gameIDs: [UUID]? = nil) {
         self.game = game
         self.sourceURL = sourceURL
         self.sourceName = sourceName
         self.plan = plan
+        self.gameIDs = gameIDs ?? [game.id]
     }
 }
 
@@ -106,13 +110,27 @@ public struct SaveImportOutcome: Sendable, Equatable {
     public var failed: [SkippedSave] = []
 }
 
+/// Where a library save import is. Games can't start until it's idle again (a running core
+/// would write its old save over the imported one), and nothing is written while a game is open.
+public enum SaveImportPhase: Sendable, Equatable {
+    case idle
+    case scanning
+    case reviewing
+    case committing
+
+    public var allowsLaunchingGames: Bool { self == .idle }
+
+    public static func mayWrite(gameOpen: Bool) -> Bool { !gameOpen }
+}
+
 // MARK: - Scanner
 
 public enum SaveFolderScanner {
     private static let archiveExtensions: Set<String> = ["zip", "7z", "rar", "tar", "gz", "tgz"]
     private static let resourceKeys: [URLResourceKey] = [
-        .isDirectoryKey, .isPackageKey, .fileSizeKey, .contentModificationDateKey,
+        .isDirectoryKey, .isPackageKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey,
     ]
+    private static let linkReason = "Links aren't imported; pick the file or folder itself."
 
     /// Walks the picked files and folders. Doesn't read file contents (sizes and names only),
     /// so it stays quick on big trees; the planner reads what it needs.
@@ -125,8 +143,16 @@ public enum SaveFolderScanner {
         var entries = 0
         for root in urls {
             guard !result.truncated else { break }
+            // Picked items count against the limits like anything found inside a folder.
+            if entries >= limits.maxEntries || result.candidates.count >= limits.maxCandidates {
+                result.truncated = true
+                break
+            }
             let values = try? root.resourceValues(forKeys: Set(resourceKeys))
-            if values?.isDirectory == true {
+            if values?.isSymbolicLink == true {
+                entries += 1
+                result.skipped.append(SkippedSave(name: root.lastPathComponent, reason: linkReason))
+            } else if values?.isDirectory == true {
                 walk(root, limits: limits, entries: &entries, result: &result, fileManager: fileManager)
             } else {
                 entries += 1
@@ -147,7 +173,7 @@ public enum SaveFolderScanner {
         // The picked folder may itself be a PSP save (SAVEDATA/ULUS10041DATA00).
         if let kind = pspFolderKind(root, fileManager: fileManager) {
             entries += 1
-            addPSPFolder(root, kind: kind, displayPath: rootName, result: &result, limits: limits)
+            addPSPFolder(root, kind: kind, displayPath: rootName, result: &result)
             return
         }
         guard let walker = fileManager.enumerator(
@@ -173,6 +199,14 @@ public enum SaveFolderScanner {
             let values = try? url.resourceValues(forKeys: Set(resourceKeys))
             let isDirectory = values?.isDirectory == true
 
+            // A link could point anywhere (outside the pick, or nowhere once copied).
+            if values?.isSymbolicLink == true {
+                if !name.hasPrefix(".") {
+                    result.skipped.append(SkippedSave(name: displayPath, reason: linkReason))
+                }
+                continue
+            }
+
             if name.hasPrefix(".") {
                 if isDirectory {
                     walker.skipDescendants()
@@ -190,7 +224,7 @@ public enum SaveFolderScanner {
 
             if isDirectory {
                 if let kind = pspFolderKind(url, fileManager: fileManager) {
-                    addPSPFolder(url, kind: kind, displayPath: displayPath, result: &result, limits: limits)
+                    addPSPFolder(url, kind: kind, displayPath: displayPath, result: &result)
                     walker.skipDescendants()
                 } else if walker.level >= limits.maxDepth {
                     walker.skipDescendants()
@@ -209,24 +243,26 @@ public enum SaveFolderScanner {
         case missingParam
     }
 
-    /// A PSP SAVEDATA slot: a product-ID folder name with a PARAM.SFO inside. A folder named
-    /// like one without PARAM.SFO is reported rather than ignored.
+    /// A PSP SAVEDATA slot: a product-ID folder name (in any case: copies through other file
+    /// systems can come back lower-cased) with a PARAM.SFO inside. An upper-case folder named
+    /// like one without PARAM.SFO is reported rather than ignored. Its contents are checked
+    /// (bounded) when it's planned, not walked here.
     private static func pspFolderKind(_ url: URL, fileManager: FileManager) -> PSPFolderKind? {
         let name = url.lastPathComponent
-        guard name == name.uppercased(), SaveGameImporter.isValidPSPSaveFolderName(name) else { return nil }
-        return fileManager.fileExists(atPath: url.appendingPathComponent("PARAM.SFO").path) ? .save : .missingParam
+        guard SaveGameImporter.isValidPSPSaveFolderName(name.uppercased()) else { return nil }
+        if SaveGameImporter.paramSFO(in: url, fileManager: fileManager) != nil { return .save }
+        return name == name.uppercased() ? .missingParam : nil
     }
 
     private static func addPSPFolder(
         _ url: URL,
         kind: PSPFolderKind,
         displayPath: String,
-        result: inout SaveScanResult,
-        limits: SaveScanLimits
+        result: inout SaveScanResult
     ) {
         switch kind {
         case .save:
-            let modified = try? url.appendingPathComponent("PARAM.SFO")
+            let modified = try? SaveGameImporter.paramSFO(in: url)?
                 .resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
             result.candidates.append(SaveImportCandidate(
                 url: url,
@@ -377,6 +413,19 @@ public struct LibrarySaveImporter: Sendable {
     ) -> Result<SaveImportItem, SkippedSave> {
         let name = candidate.displayPath
         let base = (candidate.url.lastPathComponent as NSString).deletingPathExtension
+        if TitleIndex.memoryCardExtensions.contains(ext), base.range(of: #"_2$"#, options: .regularExpression) != nil {
+            return .failure(SkippedSave(
+                name: name,
+                reason: "This is memory card 2. RetroPlay uses card 1 only; import the _1 card."
+            ))
+        }
+        // Systems the save's folder (saves/melonDS/) or name (Zelda.gba.sav) says it's for. A
+        // match on any other system is refused, even when it's the only one.
+        var hinted = candidate.folderHints
+        let inner = (base as NSString).pathExtension.lowercased()
+        if !inner.isEmpty {
+            hinted.formUnion(SystemID.allCases.filter { $0.fileExtensions.contains(inner) })
+        }
         var firstRejection: String?
         for tier in TitleIndex.Tier.allCases {
             let matches = index.games(named: base, tier: tier, saveExtension: ext)
@@ -389,9 +438,16 @@ public struct LibrarySaveImporter: Sendable {
                 continue
             }
             var choices = fitting
-            if choices.count > 1 {
-                let hinted = choices.filter { candidate.folderHints.contains($0.systemID) || Self.romExtensionHint(base, fits: $0.systemID) }
-                if !hinted.isEmpty { choices = hinted }
+            if !hinted.isEmpty {
+                choices = fitting.filter { hinted.contains($0.systemID) }
+                guard !choices.isEmpty else {
+                    let saysFor = hinted.map(Self.shortSystem).sorted().joined(separator: "/")
+                    let names = fitting.prefix(3).map { "\($0.displayName) (\(Self.shortSystem($0.systemID)))" }
+                    return .failure(SkippedSave(
+                        name: name,
+                        reason: "Its folder or name says \(saysFor), but it matches \(names.joined(separator: ", ")). Not imported."
+                    ))
+                }
             }
             guard choices.count == 1, let game = choices.first else {
                 let names = choices.prefix(4).map { "\($0.displayName) (\(Self.shortSystem($0.systemID)))" }
@@ -412,7 +468,12 @@ public struct LibrarySaveImporter: Sendable {
                 return .failure(SkippedSave(name: name, reason: error.localizedDescription))
             }
             let dest = SaveFormat.of(game.systemID).destination(for: game, paths: paths)
-            let plan = importer.plan(dest: dest, source: candidate.url.lastPathComponent, fileManager: fileManager)
+            let plan = importer.plan(
+                dest: dest,
+                source: candidate.url.lastPathComponent,
+                fileManager: fileManager,
+                check: .batteryFile(system: game.systemID, extension: ext, lenient: false)
+            )
             return .success(SaveImportItem(game: game, sourceURL: candidate.url, sourceName: name, plan: plan))
         }
         return .failure(SkippedSave(
@@ -437,8 +498,10 @@ public struct LibrarySaveImporter: Sendable {
         paths: SavePaths,
         fileManager: FileManager
     ) -> Result<SaveImportItem, SkippedSave> {
-        // Every copy of a game shares the memory stick, so the first owner stands for all.
-        guard let game = games.first(where: { SaveGameImporter.pspSaveFolder(name, belongsTo: $0.pspProductID!) }) else {
+        // Every copy of a game shares the memory stick folder: the first owner names the row,
+        // and all of them boot fresh.
+        let owners = games.filter { SaveGameImporter.pspSaveFolder(name, belongsTo: $0.pspProductID!) }
+        guard let game = owners.first else {
             let id = PSPSavedataInventory.leadingProductID(of: name.uppercased())
             return .failure(SkippedSave(
                 name: candidate.displayPath,
@@ -447,15 +510,22 @@ public struct LibrarySaveImporter: Sendable {
         }
         do {
             let plan = try importer.planPSPFolderImport(from: candidate.url, for: game, paths: paths, fileManager: fileManager)
-            return .success(SaveImportItem(game: game, sourceURL: candidate.url, sourceName: candidate.displayPath, plan: plan))
+            return .success(SaveImportItem(
+                game: game,
+                sourceURL: candidate.url,
+                sourceName: candidate.displayPath,
+                plan: plan,
+                gameIDs: owners.map(\.id)
+            ))
         } catch {
             return .failure(SkippedSave(name: candidate.displayPath, reason: error.localizedDescription))
         }
     }
 
-    /// Writes each save on its own (staged copy, then an atomic replace), so a failure leaves
-    /// that game's old save whole and doesn't stop the others. Games that got a save boot fresh
-    /// next time (see `SavePaths.freshBootMarkerURL`).
+    /// Writes each save on its own (staged copy, checked again, then an atomic replace), so a
+    /// failure leaves that game's old save whole and doesn't stop the others. Every game that
+    /// reads the save is marked to boot fresh first (`FreshBoot`); if that fails, its save
+    /// isn't touched. The caller makes sure no game is running.
     public func commit(
         _ batch: SaveImportBatch,
         replaceExisting: Bool,
@@ -474,11 +544,14 @@ public struct LibrarySaveImporter: Sendable {
                 sourceDescription: item.plan.sourceDescription,
                 destinationURL: item.plan.destinationURL,
                 replacesExisting: exists,
-                warning: item.plan.warning
+                warning: item.plan.warning,
+                check: item.plan.check
             )
             do {
+                for id in item.gameIDs {
+                    try FreshBoot.mark(id, paths: paths, fileManager: fileManager)
+                }
                 try importer.commitImport(plan: plan, from: item.sourceURL, overwrite: replaceExisting, fileManager: fileManager)
-                FreshBoot.mark(item.game.id, paths: paths, fileManager: fileManager)
                 outcome.imported.append(item)
             } catch {
                 outcome.failed.append(SkippedSave(name: item.sourceName, reason: error.localizedDescription))
@@ -499,12 +572,6 @@ public struct LibrarySaveImporter: Sendable {
         var isDir: ObjCBool = false
         guard fileManager.fileExists(atPath: b.path, isDirectory: &isDir), !isDir.boolValue else { return false }
         return fileManager.contentsEqual(atPath: a.path, andPath: b.path)
-    }
-
-    /// "Zelda.gba.sav": the ROM extension left in the save name says which system it's for.
-    static func romExtensionHint(_ base: String, fits system: SystemID) -> Bool {
-        let inner = (base as NSString).pathExtension.lowercased()
-        return !inner.isEmpty && system.fileExtensions.contains(inner)
     }
 
     static func shortSystem(_ system: SystemID) -> String {
@@ -537,6 +604,8 @@ struct TitleIndex {
         case title
     }
 
+    static let memoryCardExtensions: Set<String> = ["mcd", "mcr"]
+
     private var exact: [String: [LibraryGame]] = [:]
     private var folded: [String: [LibraryGame]] = [:]
     private var titles: [String: [LibraryGame]] = [:]
@@ -558,9 +627,10 @@ struct TitleIndex {
         if !inner.isEmpty, SystemID.allCases.contains(where: { $0.fileExtensions.contains(inner) }) {
             bases.append((saveBase as NSString).deletingPathExtension)
         }
-        // DuckStation names per-game memory cards "<title>_1.mcd" (card slot 1).
-        if ["mcd", "mcr"].contains(saveExtension), let range = saveBase.range(of: #"_[12]$"#, options: .regularExpression) {
-            bases.append(String(saveBase[..<range.lowerBound]))
+        // DuckStation names per-game memory cards "<title>_1.mcd" (card 1). Only the bare
+        // title is tried: "Crash_1" must not fall through to a game called "Crash 1".
+        if Self.memoryCardExtensions.contains(saveExtension), let range = saveBase.range(of: #"_1$"#, options: .regularExpression) {
+            bases = [String(saveBase[..<range.lowerBound])]
         }
         var seen = Set<UUID>()
         var found: [LibraryGame] = []
@@ -602,20 +672,38 @@ struct TitleIndex {
 
 /// A game whose save was replaced from the library must not auto-resume its quick save: the
 /// state carries the old save in memory, and the core would write it back on exit. The marker
-/// makes the next launch boot fresh, as the in-game import does by rebooting.
+/// makes launches boot fresh until a quick save newer than the import exists (the one written
+/// when that fresh session is left); a session that dies before then still boots fresh again.
 public enum FreshBoot {
-    public static func mark(_ gameID: UUID, paths: SavePaths, fileManager: FileManager = .default) {
+    public static func mark(_ gameID: UUID, paths: SavePaths, fileManager: FileManager = .default) throws {
         let url = paths.freshBootMarkerURL(for: gameID)
-        try? fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        fileManager.createFile(atPath: url.path, contents: Data())
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Written anew so its date is the import's.
+        try Data().write(to: url, options: .atomic)
     }
 
-    /// True once after `mark`: the caller boots without resuming.
-    public static func consume(_ gameID: UUID, paths: SavePaths, fileManager: FileManager = .default) -> Bool {
+    /// True while the game should boot without resuming. Clears the marker once a quick save
+    /// newer than it exists.
+    public static func isPending(
+        _ gameID: UUID,
+        system: SystemID,
+        paths: SavePaths,
+        fileManager: FileManager = .default
+    ) -> Bool {
         let url = paths.freshBootMarkerURL(for: gameID)
-        guard fileManager.fileExists(atPath: url.path) else { return false }
-        try? fileManager.removeItem(at: url)
+        guard let marked = (try? fileManager.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date else {
+            return false
+        }
+        let newest = SaveStateStore.newestEntry(system: system, gameID: gameID, paths: paths, fileManager: fileManager)
+        if let saved = newest?.modifiedAt, saved > marked {
+            try? fileManager.removeItem(at: url)
+            return false
+        }
         return true
+    }
+
+    public static func clear(_ gameID: UUID, paths: SavePaths, fileManager: FileManager = .default) {
+        try? fileManager.removeItem(at: paths.freshBootMarkerURL(for: gameID))
     }
 }
 

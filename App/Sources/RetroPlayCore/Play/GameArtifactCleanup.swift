@@ -116,7 +116,7 @@ public enum GameArtifactCleanup: Sendable {
             gameID: game.id,
             paths: paths
         )
-        _ = FreshBoot.consume(game.id, paths: paths, fileManager: fileManager)
+        FreshBoot.clear(game.id, paths: paths, fileManager: fileManager)
         attempt("quick saves") {
             try removeItemIfPresent(quickDir, fileManager: fileManager)
         }

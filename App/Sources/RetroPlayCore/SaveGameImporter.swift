@@ -48,17 +48,27 @@ public struct SaveGameImportPlan: Sendable, Equatable {
     public let destinationURL: URL
     public let replacesExisting: Bool
     public let warning: String?
+    /// What the copy must still be once staged, checked again right before it replaces
+    /// anything (the source may have changed since the plan).
+    public let check: StagedCheck?
+
+    public enum StagedCheck: Sendable, Equatable {
+        case batteryFile(system: SystemID, extension: String, lenient: Bool)
+        case pspFolder
+    }
 
     public init(
         sourceDescription: String,
         destinationURL: URL,
         replacesExisting: Bool,
-        warning: String? = nil
+        warning: String? = nil,
+        check: StagedCheck? = nil
     ) {
         self.sourceDescription = sourceDescription
         self.destinationURL = destinationURL
         self.replacesExisting = replacesExisting
         self.warning = warning
+        self.check = check
     }
 }
 
@@ -66,6 +76,10 @@ public struct SaveGameImportPlan: Sendable, Equatable {
 /// Quick-states under `States/` are intentionally out of scope.
 public struct SaveGameImporter: Sendable {
     public init() {}
+
+    /// Bounds on a PSP save folder's contents (real ones hold a handful of files, a few MiB).
+    public static let pspFolderMaxFiles = 256
+    public static let pspFolderMaxBytes = 128 << 20
 
     private static let pspProductIDPattern = try! NSRegularExpression(
         pattern: #"^(UC|UL|NP|EP|EB|HB|NPUH|NPEG|NPHH)[A-Z0-9]{4,8}(\d{2})?$"#,
@@ -133,19 +147,27 @@ public struct SaveGameImporter: Sendable {
         let data = try withReadableSource(sourceURL, fileManager: fileManager) {
             try Data(contentsOf: sourceURL, options: [.mappedIfSafe])
         }
-        try Self.validateBatteryFile(extension: ext, size: data.count, header: data.prefix(8), system: game.systemID)
+        // The player picked this file for this game: take what the import always took.
+        try Self.validateBatteryFile(extension: ext, size: data.count, header: data.prefix(8), system: game.systemID, lenient: true)
         let dest = SaveFormat.of(game.systemID).destination(for: game, paths: paths)
-        return plan(dest: dest, source: sourceURL.lastPathComponent, fileManager: fileManager)
+        return plan(
+            dest: dest,
+            source: sourceURL.lastPathComponent,
+            fileManager: fileManager,
+            check: .batteryFile(system: game.systemID, extension: ext, lenient: true)
+        )
     }
 
     /// Checks a battery file against its system's `SaveFormat`: the extension, the size, and
     /// that it isn't a RetroArch rzip-compressed save. `header` is at least the file's first
-    /// five bytes (or all of it when shorter).
+    /// five bytes (or all of it when shorter). `lenient`: the in-game import's wider rules
+    /// (`SaveFormat.lenientExtensions`), for a file the player picked for one game.
     public static func validateBatteryFile(
         extension rawExt: String,
         size: Int,
         header: Data,
-        system: SystemID
+        system: SystemID,
+        lenient: Bool = false
     ) throws {
         let ext = rawExt.lowercased()
         if SaveImportContentTypes.isSaveStateExtension(ext) {
@@ -163,10 +185,10 @@ public struct SaveGameImporter: Sendable {
         if let reason = format.unusableExtensions[ext] {
             throw SaveGameImportError.unsupportedFormat(reason)
         }
-        guard format.extensions.contains(ext) else {
+        guard (lenient ? format.lenientExtensions : format.extensions).contains(ext) else {
             throw SaveGameImportError.unsupportedFormat(".\(ext) is not a \(system.displayName) save.")
         }
-        guard format.acceptsSize(size) else {
+        guard lenient ? format.acceptsLeniently(extension: ext, size: size) : format.acceptsSize(size) else {
             throw SaveGameImportError.invalidSize(system: system, bytes: size)
         }
     }
@@ -190,9 +212,10 @@ public struct SaveGameImporter: Sendable {
                 withIntermediateDirectories: true
             )
 
-            let stagingURL = plan.destinationURL
-                .deletingLastPathComponent()
-                .appendingPathComponent(".import-\(UUID().uuidString)-\(plan.destinationURL.lastPathComponent)")
+            let parent = plan.destinationURL.deletingLastPathComponent()
+            Self.removeLeftoverStaging(in: parent, fileManager: fileManager)
+            let stagingURL = parent
+                .appendingPathComponent("\(Self.stagingPrefix)\(UUID().uuidString)-\(plan.destinationURL.lastPathComponent)")
 
             do {
                 if isDirectory {
@@ -205,24 +228,104 @@ public struct SaveGameImporter: Sendable {
                 throw SaveGameImportError.copyFailed(error.localizedDescription)
             }
 
-            if fileManager.fileExists(atPath: plan.destinationURL.path) {
-                if isDirectory {
-                    try atomicReplaceDirectory(
-                        at: plan.destinationURL,
-                        with: stagingURL,
-                        fileManager: fileManager
-                    )
-                } else {
-                    _ = try fileManager.replaceItemAt(
-                        plan.destinationURL,
-                        withItemAt: stagingURL,
-                        backupItemName: ".import-backup-\(UUID().uuidString)",
-                        options: []
-                    )
+            do {
+                // The bytes about to be installed, not the ones the plan saw.
+                if let check = plan.check {
+                    try Self.validateStaged(stagingURL, check: check, fileManager: fileManager)
                 }
-            } else {
-                try fileManager.moveItem(at: stagingURL, to: plan.destinationURL)
+                if fileManager.fileExists(atPath: plan.destinationURL.path) {
+                    if isDirectory {
+                        try Self.swapDirectory(at: plan.destinationURL, with: stagingURL)
+                        // The swap put the old folder at the staging path.
+                        try? fileManager.removeItem(at: stagingURL)
+                    } else {
+                        _ = try fileManager.replaceItemAt(
+                            plan.destinationURL,
+                            withItemAt: stagingURL,
+                            backupItemName: "\(Self.stagingPrefix)backup-\(UUID().uuidString)",
+                            options: []
+                        )
+                    }
+                } else {
+                    try fileManager.moveItem(at: stagingURL, to: plan.destinationURL)
+                }
+            } catch {
+                try? fileManager.removeItem(at: stagingURL)
+                throw error
             }
+        }
+    }
+
+    static let stagingPrefix = ".import-"
+
+    /// Staged copies and swapped-out folders an interrupted import left behind. The real save
+    /// next to them is whole either way (the swap and the replace are atomic).
+    static func removeLeftoverStaging(in directory: URL, fileManager: FileManager) {
+        guard let names = try? fileManager.contentsOfDirectory(atPath: directory.path) else { return }
+        for name in names where name.hasPrefix(stagingPrefix) {
+            try? fileManager.removeItem(at: directory.appendingPathComponent(name))
+        }
+    }
+
+    /// Exchanges two folders in one step, so the destination is never missing, even if the app
+    /// dies mid-import.
+    static func swapDirectory(at destination: URL, with staging: URL) throws {
+        let result = staging.withUnsafeFileSystemRepresentation { from in
+            destination.withUnsafeFileSystemRepresentation { to in
+                renamex_np(from!, to!, UInt32(RENAME_SWAP))
+            }
+        }
+        guard result == 0 else {
+            throw SaveGameImportError.copyFailed(String(cString: strerror(errno)))
+        }
+    }
+
+    static func validateStaged(_ url: URL, check: SaveGameImportPlan.StagedCheck, fileManager: FileManager) throws {
+        switch check {
+        case .batteryFile(let system, let ext, let lenient):
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+            guard values.isSymbolicLink != true, values.isRegularFile == true else {
+                throw SaveGameImportError.unsupportedFormat("Links and special files aren't imported; pick the save itself.")
+            }
+            let header = try LibrarySaveImporter.readHeader(url)
+            try validateBatteryFile(extension: ext, size: values.fileSize ?? 0, header: header, system: system, lenient: lenient)
+        case .pspFolder:
+            try validatePSPFolderContents(url, fileManager: fileManager)
+        }
+    }
+
+    /// PARAM.SFO's URL in a save folder, whatever its case.
+    public static func paramSFO(in folder: URL, fileManager: FileManager = .default) -> URL? {
+        let exact = folder.appendingPathComponent("PARAM.SFO")
+        if fileManager.fileExists(atPath: exact.path) { return exact }
+        let names = (try? fileManager.contentsOfDirectory(atPath: folder.path)) ?? []
+        return names.first { $0.uppercased() == "PARAM.SFO" }.map { folder.appendingPathComponent($0) }
+    }
+
+    /// A PSP save folder holds plain files only (no links that would point outside it once
+    /// copied) and stays within `pspFolderMaxFiles` / `pspFolderMaxBytes`.
+    public static func validatePSPFolderContents(_ folder: URL, fileManager: FileManager = .default) throws {
+        let keys: Set<URLResourceKey> = [.isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey, .fileSizeKey]
+        let tooBig = SaveGameImportError.unsupportedFormat("Too big to be a PSP save folder.")
+        let link = SaveGameImportError.unsupportedFormat("Save folders with links in them aren't imported.")
+        if (try? folder.resourceValues(forKeys: keys))?.isSymbolicLink == true { throw link }
+        guard paramSFO(in: folder, fileManager: fileManager) != nil else {
+            throw SaveGameImportError.missingPSPMetadata
+        }
+        guard let walker = fileManager.enumerator(at: folder, includingPropertiesForKeys: Array(keys)) else {
+            throw SaveGameImportError.copyFailed("The folder couldn't be read.")
+        }
+        var files = 0
+        var bytes = 0
+        while let next = walker.nextObject() {
+            guard let url = next as? URL else { continue }
+            let values = try url.resourceValues(forKeys: keys)
+            if values.isSymbolicLink == true { throw link }
+            if values.isDirectory == true { continue }
+            guard values.isRegularFile == true else { throw link }
+            files += 1
+            bytes += values.fileSize ?? 0
+            if files > pspFolderMaxFiles || bytes > pspFolderMaxBytes { throw tooBig }
         }
     }
 
@@ -246,8 +349,7 @@ public struct SaveGameImporter: Sendable {
             )
         }
 
-        let paramURL = folderURL.appendingPathComponent("PARAM.SFO")
-        guard fileManager.fileExists(atPath: paramURL.path) else {
+        guard Self.paramSFO(in: folderURL, fileManager: fileManager) != nil else {
             if Self.isValidPSPSaveFolderName(folderName) {
                 throw SaveGameImportError.missingPSPMetadata
             }
@@ -264,8 +366,10 @@ public struct SaveGameImporter: Sendable {
             throw SaveGameImportError.pspTitleMismatch(expected: expectedID, imported: folderName)
         }
 
+        try Self.validatePSPFolderContents(folderURL, fileManager: fileManager)
+
         let dest = paths.pspSavedataDirectory.appendingPathComponent(folderName, isDirectory: true)
-        return plan(dest: dest, source: folderName, fileManager: fileManager)
+        return plan(dest: dest, source: folderName, fileManager: fileManager, check: .pspFolder)
     }
 
     // MARK: - Validation helpers
@@ -310,13 +414,15 @@ public struct SaveGameImporter: Sendable {
         dest: URL,
         source: String,
         fileManager: FileManager,
-        warning: String? = nil
+        warning: String? = nil,
+        check: SaveGameImportPlan.StagedCheck? = nil
     ) -> SaveGameImportPlan {
         SaveGameImportPlan(
             sourceDescription: source,
             destinationURL: dest,
             replacesExisting: fileManager.fileExists(atPath: dest.path),
-            warning: warning
+            warning: warning,
+            check: check
         )
     }
 
@@ -333,24 +439,6 @@ public struct SaveGameImporter: Sendable {
             throw SaveGameImportError.securityScopedAccessFailed
         }
         return try body()
-    }
-
-    private func atomicReplaceDirectory(
-        at destination: URL,
-        with stagingURL: URL,
-        fileManager: FileManager
-    ) throws {
-        let backupURL = destination
-            .deletingLastPathComponent()
-            .appendingPathComponent(".import-backup-\(UUID().uuidString)-\(destination.lastPathComponent)")
-        try fileManager.moveItem(at: destination, to: backupURL)
-        do {
-            try fileManager.moveItem(at: stagingURL, to: destination)
-        } catch {
-            try? fileManager.moveItem(at: backupURL, to: destination)
-            throw error
-        }
-        try? fileManager.removeItem(at: backupURL)
     }
 
     private func copyDirectory(

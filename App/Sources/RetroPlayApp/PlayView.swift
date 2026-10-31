@@ -1033,7 +1033,7 @@ public struct PlayView: View {
 
         // Saves imported from the library since the last session: boot fresh, as an in-game
         // import does, since the quick save would bring the old save back.
-        let freshAfterImport = autoResume && FreshBoot.consume(game.id, paths: SavePaths())
+        let freshAfterImport = autoResume && FreshBoot.isPending(game.id, system: system, paths: SavePaths())
         let autoResume = autoResume && !freshAfterImport
 
         // Re-entering a game continues from the save written when it was last left.

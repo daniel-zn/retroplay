@@ -17,8 +17,8 @@ public struct RetroPlayRootView: View {
     /// A saves pick, scanned and matched, waiting for the player to confirm.
     @State private var saveImport: SaveImportSession?
     @State private var saveImportAccess: SecurityScopedAccess?
-    @State private var savesScanning = false
-    @State private var savesCommitting = false
+    /// No game may start while saves are being found, reviewed or written.
+    @State private var saveImportPhase = SaveImportPhase.idle
     @State private var showSettings = false
     @State private var playGame: LibraryGame?
     @State private var navigator = ControllerNavigator()
@@ -172,6 +172,7 @@ public struct RetroPlayRootView: View {
             }
             // `-RetroPlaySmokeSaveImport YES`: the save import summary with sample rows.
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSaveImport") {
+                saveImportPhase = .reviewing
                 saveImport = SaveImportSession(batch: .smokeSample)
             }
             // `-RetroPlaySmokeLandscape YES`: the library in landscape too.
@@ -270,8 +271,9 @@ public struct RetroPlayRootView: View {
         .sheet(item: $saveImport, onDismiss: {
             saveImportAccess?.stop()
             saveImportAccess = nil
+            saveImportPhase = .idle
         }) { session in
-            SaveImportSheet(batch: session.batch, committing: savesCommitting) { replace in
+            SaveImportSheet(batch: session.batch, committing: saveImportPhase == .committing) { replace in
                 commitSaveImport(session, replaceExisting: replace)
             }
             .presentationDragIndicator(.visible)
@@ -454,7 +456,7 @@ public struct RetroPlayRootView: View {
                     .accessibilityAddTraits(.isHeader)
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
-                    if savesScanning {
+                    if saveImportPhase == .scanning {
                         HStack(spacing: 6) {
                             ProgressView()
                                 .controlSize(.small)
@@ -678,6 +680,8 @@ public struct RetroPlayRootView: View {
 
     /// Starts a game unless its ROM was removed in Files; then offers to delete the row.
     private func play(_ game: LibraryGame, fromSearch: Bool = false) {
+        // A game's core would write its old save over the one being imported.
+        guard saveImportPhase.allowsLaunchingGames else { return }
         store.refreshMissingGames()
         if store.missingGameIDs.contains(game.id) {
             missingGame = game
@@ -761,6 +765,8 @@ public struct RetroPlayRootView: View {
         }
     }
 
+    private var isGameOpen: Bool { playGame != nil || searchPlayGame != nil }
+
     private func openImporter(_ kind: ImportKind) {
         importKind = kind
         showImporter = true
@@ -776,18 +782,23 @@ public struct RetroPlayRootView: View {
             // Held until the sheet closes: files inside a picked folder read under its access.
             let access = SecurityScopedAccess(urls)
             let games = store.games
-            savesScanning = true
+            saveImportPhase = .scanning
             Task {
                 let batch = await Task.detached(priority: .userInitiated) {
                     LibrarySaveImporter().plan(SaveFolderScanner.scan(urls), games: games)
                 }.value
-                savesScanning = false
-                if batch.items.isEmpty, batch.skipped.isEmpty {
+                if !SaveImportPhase.mayWrite(gameOpen: isGameOpen) {
+                    saveImportPhase = .idle
+                    access.stop()
+                    presentImportResult(.error("Close the game, then import the saves again."))
+                } else if batch.items.isEmpty, batch.skipped.isEmpty {
+                    saveImportPhase = .idle
                     access.stop()
                     presentImportResult(.error(
                         "No saves in the selection. Pick battery saves (.sav, .srm), memory cards (.mcr, .mcd), PSP SAVEDATA folders, or a folder that holds them."
                     ))
                 } else {
+                    saveImportPhase = .reviewing
                     saveImportAccess = access
                     saveImport = SaveImportSession(batch: batch)
                 }
@@ -796,14 +807,20 @@ public struct RetroPlayRootView: View {
     }
 
     private func commitSaveImport(_ session: SaveImportSession, replaceExisting: Bool) {
-        guard !savesCommitting else { return }
-        savesCommitting = true
+        guard saveImportPhase == .reviewing else { return }
+        // Checked again right before writing: nothing may have started a game meanwhile.
+        guard SaveImportPhase.mayWrite(gameOpen: isGameOpen) else {
+            saveImport = nil
+            presentImportResult(.error("Close the game, then import the saves again."))
+            return
+        }
+        saveImportPhase = .committing
         let batch = session.batch
         Task {
             let outcome = await Task.detached(priority: .userInitiated) {
                 LibrarySaveImporter().commit(batch, replaceExisting: replaceExisting)
             }.value
-            savesCommitting = false
+            saveImportPhase = .idle
             saveImport = nil
             presentImportResult(Self.saveImportResult(outcome))
         }
