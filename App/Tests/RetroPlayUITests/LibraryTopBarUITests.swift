@@ -112,4 +112,19 @@ final class LibraryTopBarUITests: XCTestCase {
             app.terminate()
         }
     }
+
+    /// A folder whose save sits three folders down is walked through the app's own import path
+    /// (security scope, coordinated read, scan off the main actor): its summary lists the save.
+    @MainActor
+    func testPickedFolderWithANestedSaveIsWalked() {
+        let app = launch(["-RetroPlaySmokeSaveFolder", "YES"])
+        let summary = app.staticTexts["saveImport.summary"].firstMatch
+        XCTAssertTrue(summary.waitForExistence(timeout: 30), "no summary: the walk found nothing")
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "SmokeSaves/A/B/C/Zelda.sav"))
+            .firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "the nested save isn't listed")
+        attach(app, "save-import-nested-folder")
+        app.terminate()
+    }
 }

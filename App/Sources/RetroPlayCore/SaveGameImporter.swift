@@ -226,15 +226,18 @@ public struct SaveGameImporter: Sendable {
                 .appendingPathComponent("\(Self.stagingPrefix)\(UUID().uuidString)-\(plan.destinationURL.lastPathComponent)")
 
             do {
-                if isDirectory {
-                    // Within the PSP caps as it copies: a folder that grew since the plan stops early.
-                    try Self.copyPSPFolder(from: sourceURL, to: stagingURL, fileManager: fileManager)
-                } else {
-                    // A file that changed since the plan (grown, emptied, now a link) isn't copied.
-                    if let check = plan.check {
-                        try Self.validateStaged(sourceURL, check: check, fileManager: fileManager)
+                // Coordinated, so a file in iCloud Drive or on a share is downloaded first.
+                try LibraryStore.coordinatedRead(of: sourceURL) { source in
+                    if isDirectory {
+                        // Within the PSP caps as it copies: a folder that grew since the plan stops early.
+                        try Self.copyPSPFolder(from: source, to: stagingURL, fileManager: fileManager)
+                    } else {
+                        // A file that changed since the plan (grown, emptied, now a link) isn't copied.
+                        if let check = plan.check {
+                            try Self.validateStaged(source, check: check, fileManager: fileManager)
+                        }
+                        try fileManager.copyItem(at: source, to: stagingURL)
                     }
-                    try fileManager.copyItem(at: sourceURL, to: stagingURL)
                 }
             } catch let error as SaveGameImportError {
                 try? fileManager.removeItem(at: stagingURL)

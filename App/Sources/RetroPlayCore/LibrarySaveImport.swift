@@ -210,18 +210,56 @@ public enum SaveFolderScanner {
                 result.truncated = true
                 break
             }
-            let values = try? root.resourceValues(forKeys: Set(resourceKeys))
-            if values?.isSymbolicLink == true {
+            // A coordinated read, as Files expects for a picked folder: it makes a File
+            // Provider (iCloud Drive, an SMB share) bring the folder down before it's walked.
+            var coordinationError: NSError?
+            var coordinated = false
+            NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: root, options: [], error: &coordinationError) { url in
+                coordinated = true
+                scanRoot(url, limits: limits, entries: &entries, result: &result, fileManager: fileManager)
+            }
+            if !coordinated {
                 entries += 1
-                result.skipped.append(SkippedSave(name: root.lastPathComponent, reason: linkReason))
-            } else if values?.isDirectory == true {
-                walk(root, limits: limits, entries: &entries, result: &result, fileManager: fileManager)
-            } else {
-                entries += 1
-                classifyFile(root, values: values, displayPath: root.lastPathComponent, hintPath: [], limits: limits, result: &result)
+                result.skipped.append(readError(root.lastPathComponent, coordinationError))
             }
         }
         return result
+    }
+
+    private static func scanRoot(
+        _ root: URL,
+        limits: SaveScanLimits,
+        entries: inout Int,
+        result: inout SaveScanResult,
+        fileManager: FileManager
+    ) {
+        let values: URLResourceValues
+        do {
+            values = try root.resourceValues(forKeys: Set(resourceKeys))
+        } catch {
+            // Not known to be a file or a folder: say so rather than guess.
+            entries += 1
+            result.skipped.append(readError(root.lastPathComponent, error))
+            return
+        }
+        if values.isSymbolicLink == true {
+            entries += 1
+            result.skipped.append(SkippedSave(name: root.lastPathComponent, reason: linkReason))
+        } else if values.isDirectory == true {
+            walk(root, limits: limits, entries: &entries, result: &result, fileManager: fileManager)
+        } else {
+            entries += 1
+            classifyFile(root, values: values, displayPath: root.lastPathComponent, hintPath: [], limits: limits, result: &result)
+        }
+    }
+
+    static func readError(_ name: String, _ error: Error?) -> SkippedSave {
+        SkippedSave(name: name, reason: "Couldn't read it: \(error?.localizedDescription ?? "unknown error").")
+    }
+
+    /// Enumeration errors, kept to report (the enumerator's handler can't write to the result).
+    private final class ReadErrors: @unchecked Sendable {
+        var errors: [(URL, Error)] = []
     }
 
     private static func walk(
@@ -243,16 +281,31 @@ public enum SaveFolderScanner {
             result.skipped.append(SkippedSave(name: rootName, reason: reason))
             return
         }
+        // A folder that can't be read (not downloaded, no permission) is reported, and the
+        // walk goes on with the rest.
+        let readErrors = ReadErrors()
         guard let walker = fileManager.enumerator(
             at: root,
             includingPropertiesForKeys: resourceKeys,
             // Hidden files are skipped by hand: iCloud placeholders (".Name.sav.icloud") are
             // worth naming.
             options: [.skipsPackageDescendants],
-            errorHandler: { _, _ in true }
-        ) else { return }
+            errorHandler: { url, error in
+                readErrors.errors.append((url, error))
+                return true
+            }
+        ) else {
+            result.skipped.append(readError(rootName, nil))
+            return
+        }
 
         let rootComponents = root.standardizedFileURL.pathComponents
+        defer {
+            for (url, error) in readErrors.errors {
+                let relative = url.standardizedFileURL.pathComponents.dropFirst(rootComponents.count)
+                result.skipped.append(readError(([rootName] + relative).joined(separator: "/"), error))
+            }
+        }
         while let next = walker.nextObject() {
             if Task.isCancelled {
                 result.cancelled = true
@@ -559,9 +612,9 @@ public struct LibrarySaveImporter: Sendable {
             }
             let header: Data
             do {
-                header = try Self.readHeader(candidate.url)
+                header = try LibraryStore.coordinatedRead(of: candidate.url) { try Self.readHeader($0) }
             } catch {
-                return .failure(SkippedSave(name: name, reason: "Couldn't be read. Make sure it's downloaded."))
+                return .failure(SaveFolderScanner.readError(name, error))
             }
             do {
                 try SaveGameImporter.validateBatteryFile(extension: ext, size: size, header: header, system: game.systemID)
@@ -621,7 +674,9 @@ public struct LibrarySaveImporter: Sendable {
             ))
         }
         do {
-            let plan = try importer.planPSPFolderImport(from: candidate.url, for: game, paths: paths, fileManager: fileManager)
+            let plan = try LibraryStore.coordinatedRead(of: candidate.url) {
+                try importer.planPSPFolderImport(from: $0, for: game, paths: paths, fileManager: fileManager)
+            }
             return .success(SaveImportItem(
                 game: game,
                 sourceURL: candidate.url,
@@ -708,7 +763,7 @@ public struct LibrarySaveImporter: Sendable {
     static func sameContents(_ a: URL, _ b: URL, fileManager: FileManager) -> Bool {
         var isDir: ObjCBool = false
         guard fileManager.fileExists(atPath: b.path, isDirectory: &isDir), !isDir.boolValue else { return false }
-        return fileManager.contentsEqual(atPath: a.path, andPath: b.path)
+        return (try? LibraryStore.coordinatedRead(of: a) { fileManager.contentsEqual(atPath: $0.path, andPath: b.path) }) ?? false
     }
 
     static func systemList(_ systems: Set<SystemID>) -> String {

@@ -174,6 +174,15 @@ public struct RetroPlayRootView: View {
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSettings") {
                 showSettings = true
             }
+            // `-RetroPlaySmokeSaveFolder YES`: import a folder with a save three folders down
+            // (SmokeSaves/A/B/C/Zelda.sav), through the same path as a picked folder.
+            if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSaveFolder") {
+                let folder = FileManager.default.temporaryDirectory.appendingPathComponent("SmokeSaves", isDirectory: true)
+                let save = folder.appendingPathComponent("A/B/C/Zelda.sav")
+                try? FileManager.default.createDirectory(at: save.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? Data(count: 8_192).write(to: save)
+                handleSaveImport(.success([folder]))
+            }
             // `-RetroPlaySmokeSaveImport YES`: the save import summary with sample rows.
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSaveImport") {
                 if let id = saveImports.beginScan(), saveImports.scanFinished(id) {
