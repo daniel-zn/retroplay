@@ -193,8 +193,14 @@ final class SaveImportWalkTests: XCTestCase {
         for base in candidates where fm.fileExists(atPath: base.path) {
             let probe = base.appendingPathComponent("rp-case-\(UUID().uuidString)", isDirectory: true)
             guard (try? fm.createDirectory(at: probe, withIntermediateDirectories: true)) != nil else { continue }
-            try Data().write(to: probe.appendingPathComponent("a"))
-            if !fm.fileExists(atPath: probe.appendingPathComponent("A").path) {
+            // Two folders that differ only in case must really be two: a lookup alone can say
+            // "no A" on a volume that then refuses to make one (seen in the Simulator).
+            let pair = probe.appendingPathComponent("case-probe", isDirectory: true)
+            let made = (try? fm.createDirectory(at: pair.appendingPathComponent("a"), withIntermediateDirectories: true)) != nil
+                && (try? fm.createDirectory(at: pair.appendingPathComponent("A"), withIntermediateDirectories: false)) != nil
+            let distinct = made && (try? fm.contentsOfDirectory(atPath: pair.path))?.count == 2
+            try? fm.removeItem(at: pair)
+            if distinct {
                 caseRoot = probe
                 root = probe
                 paths = SavePaths(documentsURL: probe.appendingPathComponent("Documents"))
