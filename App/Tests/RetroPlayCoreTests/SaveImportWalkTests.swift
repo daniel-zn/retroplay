@@ -95,9 +95,13 @@ final class SaveImportWalkTests: XCTestCase {
         for index in 0..<300 {
             try write("Pick/F\(index).sav", count: 1)
         }
-        let counting = ListingFileManager()
-        let scan = SaveFolderScanner.scan([root.appendingPathComponent("Pick")], limits: SaveScanLimits(maxEntries: 5), fileManager: counting)
+        let counting = ListingCounter()
+        counting.install()
+        defer { counting.uninstall() }
+        let scan = SaveFolderScanner.scan([root.appendingPathComponent("Pick")], limits: SaveScanLimits(maxEntries: 5))
         XCTAssertTrue(scan.truncated)
+        XCTAssertEqual(counting.listings, 1)
+        XCTAssertGreaterThan(counting.largest, 0)
         XCTAssertLessThanOrEqual(counting.largest, 6)
         XCTAssertLessThanOrEqual(scan.ignoredFiles + scan.candidates.count + scan.skipped.count, 5)
     }
@@ -108,9 +112,12 @@ final class SaveImportWalkTests: XCTestCase {
             try fm.createDirectory(at: url, withIntermediateDirectories: true)
             return url
         }
-        let counting = ListingFileManager()
-        let scan = SaveFolderScanner.scan(roots, limits: SaveScanLimits(maxEntries: 1), fileManager: counting)
-        XCTAssertLessThanOrEqual(counting.listings, 1)
+        let counting = ListingCounter()
+        counting.install()
+        defer { counting.uninstall() }
+        let scan = SaveFolderScanner.scan(roots, limits: SaveScanLimits(maxEntries: 1))
+        // The first root is listed (it's empty); the budget stops the other nineteen.
+        XCTAssertEqual(counting.listings, 1)
         XCTAssertTrue(scan.truncated)
     }
 
@@ -149,6 +156,32 @@ final class SaveImportWalkTests: XCTestCase {
         XCTAssertEqual(scan.otherSystemSaves, 0)
     }
 
+    // MARK: In-game import
+
+    /// Import while playing, then the app ends before a new quick save: the next launch must
+    /// boot fresh, not resume the quick save holding the old save.
+    @MainActor
+    func testInGameImportKeepsTheNextLaunchFromResumingTheOldQuickSave() async throws {
+        let zelda = LibraryGame(displayName: "Zelda", systemID: .gba, relativePath: "Zelda.gba")
+        let quick = try SaveStateStore.quickSaveURL(system: .gba, gameID: zelda.id, paths: paths)
+        try Data([1]).write(to: quick)
+        try fm.setAttributes([.modificationDate: Date().addingTimeInterval(-60)], ofItemAtPath: quick.path)
+        let source = try write("Zelda.sav")
+
+        // What PlayView does: plan for this game, then install.
+        let plan = try SaveGameImporter().planImport(from: source, for: zelda, paths: paths)
+        try LibrarySaveImporter.install(plan, from: source, overwrite: true, gameIDs: [zelda.id], paths: paths)
+
+        XCTAssertTrue(FreshBoot.isPending(zelda.id, system: .gba, paths: paths))
+        let core = ResumeRecordingCore()
+        let status = await AutoResumeLoader.apply(
+            core: core, system: .gba, gameID: zelda.id, paths: paths,
+            notBefore: FreshBoot.importDate(zelda.id, paths: paths)
+        )
+        XCTAssertNotEqual(status, .loaded)
+        XCTAssertNil(core.loaded)
+    }
+
     // MARK: Helpers
 
     private func useCaseSensitiveRoot() throws {
@@ -180,20 +213,35 @@ private final class FailingMoveFileManager: FileManager, @unchecked Sendable {
     }
 }
 
-private final class ListingFileManager: FileManager, @unchecked Sendable {
-    private(set) var largest = 0
-    private(set) var listings = 0
+private final class ResumeRecordingCore: TestEmulatorCore, @unchecked Sendable {
+    let systemID = SystemID.gba
+    let coreName = "ResumeRecordingCore"
+    let supportsSaveState = true
+    let supportsFastForward = false
+    private(set) var loaded: URL?
 
-    override func contentsOfDirectory(
-        at url: URL,
-        includingPropertiesForKeys keys: [URLResourceKey]?,
-        options: FileManager.DirectoryEnumerationOptions = []
-    ) throws -> [URL] {
-        let all = try super.contentsOfDirectory(at: url, includingPropertiesForKeys: keys, options: options)
-        largest = max(largest, all.count)
-        listings += 1
-        return all
+    func start() {}
+    func pause() {}
+    func resume() {}
+    func stop() {}
+    func saveState(to url: URL) async throws {}
+    func setFastForward(_ enabled: Bool) {}
+    func loadState(from url: URL) async throws { loaded = url }
+}
+
+/// Counts FolderWalk's folder listings and how many entries each one pulled, while installed.
+private final class ListingCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var counts: [Int] = []
+
+    var listings: Int { lock.withLock { counts.count } }
+    var largest: Int { lock.withLock { counts.max() ?? 0 } }
+
+    func install() {
+        FolderWalk.listed = { [self] _, pulled in lock.withLock { counts.append(pulled) } }
     }
+
+    func uninstall() { FolderWalk.listed = nil }
 }
 
 /// A provider that only fills its folder when a coordinated read asks for it.

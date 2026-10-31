@@ -843,19 +843,30 @@ public struct PlayView: View {
         case .failure(let error):
             saveImportError = error.localizedDescription
         case .success(let urls):
-            guard let url = urls.first else { return }
+            guard let url = urls.first, !importingSave else { return }
             let scoped = url.startAccessingSecurityScopedResource()
-            do {
-                let plan = try saveImporter.planImport(from: url, for: game)
-                let pending = PendingSaveImport(url: url, plan: plan, securityScoped: scoped)
-                if plan.replacesExisting {
-                    pendingImport = pending
-                } else {
-                    commitSaveImport(pending, overwrite: false)
+            let importer = saveImporter
+            let game = game
+            // Planning reads the file (and walks a PSP folder in coordinated reads), so it runs
+            // off the main actor; Import, Reset and Quit wait meanwhile.
+            importingSave = true
+            Task {
+                let planned = await Task.detached(priority: .userInitiated) {
+                    Result { try importer.planImport(from: url, for: game) }
+                }.value
+                importingSave = false
+                switch planned {
+                case .success(let plan):
+                    let pending = PendingSaveImport(url: url, plan: plan, securityScoped: scoped)
+                    if plan.replacesExisting {
+                        pendingImport = pending
+                    } else {
+                        commitSaveImport(pending, overwrite: false)
+                    }
+                case .failure(let error):
+                    if scoped { url.stopAccessingSecurityScopedResource() }
+                    saveImportError = error.localizedDescription
                 }
-            } catch {
-                if scoped { url.stopAccessingSecurityScopedResource() }
-                saveImportError = error.localizedDescription
             }
         }
     }
@@ -909,11 +920,13 @@ public struct PlayView: View {
             // Off the main actor: a coordinated read of a file in iCloud Drive or on a share
             // can wait. The source's security scope stays open until this function returns
             // (the defer above), and the game is already stopped.
-            let importer = saveImporter
+            // Marked to boot fresh as part of the install, as the library import does: if the
+            // app ends before a new quick save, the next launch mustn't resume the old one.
             let plan = pending.plan
             let source = pending.url
+            let gameID = game.id
             try await Task.detached(priority: .userInitiated) {
-                try importer.commitImport(plan: plan, from: source, overwrite: overwrite)
+                try LibrarySaveImporter.install(plan, from: source, overwrite: overwrite, gameIDs: [gameID])
             }.value
             imported = true
             showToast(pending.plan.warning ?? "Imported \(pending.plan.sourceDescription)")

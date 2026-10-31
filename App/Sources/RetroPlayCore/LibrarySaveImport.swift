@@ -685,35 +685,56 @@ public struct LibrarySaveImporter: Sendable {
                 warning: item.plan.warning,
                 check: item.plan.check
             )
-            // Markers go in once the staged copy has passed its checks, right before it's
-            // installed; if anything fails from there, each game's previous marker comes back.
-            let previous = Dictionary(uniqueKeysWithValues: item.gameIDs.map { ($0, FreshBoot.marker($0, paths: paths)) })
-            var marked = false
             do {
-                try importer.commitImport(
-                    plan: plan,
-                    from: item.sourceURL,
-                    overwrite: replaceExisting,
-                    fileManager: fileManager,
-                    beforeInstall: {
-                        marked = true
-                        for id in item.gameIDs {
-                            try FreshBoot.mark(id, paths: paths, fileManager: fileManager)
-                        }
-                    },
-                    cancellation: cancellation
+                try Self.install(
+                    plan, from: item.sourceURL, overwrite: replaceExisting, gameIDs: item.gameIDs,
+                    paths: paths, fileManager: fileManager, cancellation: cancellation
                 )
                 outcome.imported.append(item)
             } catch {
-                if marked {
-                    for (id, data) in previous {
-                        FreshBoot.restore(data, for: id, paths: paths, fileManager: fileManager)
-                    }
-                }
                 outcome.failed.append(SkippedSave(name: item.sourceName, reason: error.localizedDescription))
             }
         }
         return outcome
+    }
+
+    /// Writes one save (`SaveGameImporter.commitImport`) and marks the games that read it to
+    /// boot fresh (`FreshBoot`). The marks go in once the staged copy has passed its checks,
+    /// right before the install; if anything fails from there, each game's previous mark comes
+    /// back. The library import and the in-game import both write saves through this.
+    public static func install(
+        _ plan: SaveGameImportPlan,
+        from source: URL,
+        overwrite: Bool,
+        gameIDs: [UUID],
+        paths: SavePaths = SavePaths(),
+        fileManager: FileManager = .default,
+        cancellation: ImportCancellation = ImportCancellation()
+    ) throws {
+        let previous = Dictionary(uniqueKeysWithValues: gameIDs.map { ($0, FreshBoot.marker($0, paths: paths)) })
+        var marked = false
+        do {
+            try SaveGameImporter().commitImport(
+                plan: plan,
+                from: source,
+                overwrite: overwrite,
+                fileManager: fileManager,
+                beforeInstall: {
+                    marked = true
+                    for id in gameIDs {
+                        try FreshBoot.mark(id, paths: paths, fileManager: fileManager)
+                    }
+                },
+                cancellation: cancellation
+            )
+        } catch {
+            if marked {
+                for (id, data) in previous {
+                    FreshBoot.restore(data, for: id, paths: paths, fileManager: fileManager)
+                }
+            }
+            throw error
+        }
     }
 
     // MARK: Helpers
@@ -915,8 +936,9 @@ public final class ImportCancellation: @unchecked Sendable {
 
 /// One coordinated read of one item, the way File Provider locations expect: kept short (one
 /// folder listing, one file copy). The caller's thread waits; if the import is cancelled
-/// meanwhile (or the waiting task is), the coordinator is cancelled and the wait ends at
-/// once. `body` checks the same flag in its loops; no lock is held while it does I/O.
+/// meanwhile (or the waiting task is), the coordinator is cancelled and the read returns once
+/// its accessor has ended (`body` checks the same flag in its loops, so that's soon). No lock
+/// is held while it does I/O.
 enum CoordinatedRead {
     private final class Outcome<T>: @unchecked Sendable {
         let lock = NSLock()
@@ -948,6 +970,10 @@ enum CoordinatedRead {
             if Task.isCancelled { cancellation.cancel() }
             if cancellation.isCancelled {
                 coordinator.cancel()
+                // Wait (on this background thread, not Stop's) for an accessor already running
+                // to see the flag and end, so the caller doesn't remove staging or give up the
+                // security scope under it. Bounded, in case the coordinator never calls back.
+                _ = done.wait(timeout: .now() + .seconds(5))
                 throw CancellationError()
             }
         }
@@ -984,6 +1010,10 @@ enum FolderWalk {
 
     /// Thrown by a visitor to stop the walk at a limit it keeps (candidates).
     struct Truncated: Error {}
+
+    /// Tests: told after each folder listing how many entries it pulled (the budget's peek
+    /// included). Not set in the app.
+    nonisolated(unsafe) static var listed: (@Sendable (URL, Int) -> Void)?
 
     /// Entries left to look at, shared by everything one import walks.
     struct Budget {
@@ -1061,7 +1091,10 @@ enum FolderWalk {
                 }
             ) else { return ([], false, CocoaError(.fileReadUnknown)) }
             var children: [Child] = []
+            var pulled = 0
+            defer { listed?(url, pulled) }
             while let next = entries.nextObject() as? URL {
+                pulled += 1
                 try cancellation.check()
                 guard children.count < budget else { return (children, true, nil) }
                 // Listed but not looked at (no search permission): the folder can't be read.
