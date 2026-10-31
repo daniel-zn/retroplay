@@ -211,6 +211,74 @@ final class SaveImportReviewTests: XCTestCase {
         XCTAssertEqual(batch.items.map(\.game.id), [ds.id], "\(batch.skipped)")
     }
 
+    // MARK: Third review: unreadable parts, bounded metadata lookup, cancellation
+
+    func testUnreadablePSPSubfolderDoesNotInstallAPartialSave() throws {
+        let target = game("God of War.iso", .psp, "UCUS98737")
+        try write("Pick/UCUS98737DATA00/PARAM.SFO", count: 3)
+        let data = try write("Pick/UCUS98737DATA00/DATA/PROGRESS.BIN", count: 16)
+        let slot = data.deletingLastPathComponent().deletingLastPathComponent()
+        let batch = plan(slot, [target])
+        XCTAssertEqual(batch.items.count, 1)
+        let dest = paths.pspSavedataDirectory.appendingPathComponent("UCUS98737DATA00")
+        try fm.createDirectory(at: dest.appendingPathComponent("DATA"), withIntermediateDirectories: true)
+        try Data("OLD".utf8).write(to: dest.appendingPathComponent("PARAM.SFO"))
+        let progress = dest.appendingPathComponent("DATA/PROGRESS.BIN")
+        try Data("OLD PROGRESS".utf8).write(to: progress)
+        // The subfolder can no longer be read when the import runs.
+        let blocked = data.deletingLastPathComponent()
+        try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: blocked.path)
+        defer { try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: blocked.path) }
+
+        let outcome = LibrarySaveImporter().commit(batch, replaceExisting: true, paths: paths)
+
+        XCTAssertTrue(outcome.imported.isEmpty, "the unreadable subfolder was left out silently")
+        XCTAssertEqual(try? Data(contentsOf: progress), Data("OLD PROGRESS".utf8))
+    }
+
+    func testFindingPARAMSFOStaysWithinTheEntryBudget() throws {
+        let slot = root.appendingPathComponent("UCUS98737DATA00")
+        try write("UCUS98737DATA00/README.TXT", count: 3)
+        for index in 0..<300 {
+            try write("UCUS98737DATA00/F\(index).BIN", count: 1)
+        }
+        let recording = ListingFileManager()
+
+        XCTAssertThrowsError(try SaveGameImporter.validatePSPFolderContents(slot, fileManager: recording))
+        XCTAssertNil(SaveGameImporter.paramSFO(in: slot, fileManager: recording))
+
+        XCTAssertLessThanOrEqual(recording.largestListing, SaveGameImporter.pspFolderMaxEntries)
+    }
+
+    func testCancelledScanFindsNothing() async throws {
+        try write("Pick/Zelda.sav")
+        let pick = root.appendingPathComponent("Pick")
+        let scan = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return SaveFolderScanner.scan([pick])
+        }.value
+        XCTAssertTrue(scan.candidates.isEmpty)
+    }
+
+    func testCancelledPlanAndCommitWriteNothing() async throws {
+        let zelda = game("Zelda.gba", .gba)
+        let source = try write("Zelda.sav")
+        let batch = plan(source, [zelda])
+        XCTAssertEqual(batch.items.count, 1)
+        let paths = self.paths!
+        let games = [zelda]
+
+        let (replanned, outcome) = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            let replanned = LibrarySaveImporter().plan(SaveFolderScanner.scan([source]), games: games, paths: paths)
+            return (replanned, LibrarySaveImporter().commit(batch, replaceExisting: true, paths: paths))
+        }.value
+
+        XCTAssertTrue(replanned.items.isEmpty)
+        XCTAssertTrue(outcome.imported.isEmpty)
+        XCTAssertFalse(fm.fileExists(atPath: paths.sramURL(forRelativeROMPath: zelda.relativePath).path))
+    }
+
     // MARK: PSP swap failure
 
     func testFailedSwapLeavesTheOldSlotAndNoLeftovers() throws {
@@ -232,6 +300,16 @@ final class SaveImportReviewTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: existing.appendingPathComponent("PARAM.SFO")), Data("OLD".utf8))
         let left = try fm.contentsOfDirectory(atPath: paths.pspSavedataDirectory.path).filter { $0.hasPrefix(".import") }
         XCTAssertEqual(left, [])
+    }
+}
+
+private final class ListingFileManager: FileManager, @unchecked Sendable {
+    private(set) var largestListing = 0
+
+    override func contentsOfDirectory(atPath path: String) throws -> [String] {
+        let names = try super.contentsOfDirectory(atPath: path)
+        largestListing = max(largestListing, names.count)
+        return names
     }
 }
 

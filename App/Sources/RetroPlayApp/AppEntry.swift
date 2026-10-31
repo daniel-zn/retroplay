@@ -21,6 +21,8 @@ public struct RetroPlayRootView: View {
     @State private var saveImports = SaveImportSessions()
     /// The session `saveImport` belongs to, for when its sheet closes.
     @State private var saveImportID: UUID?
+    /// The running scan, so "Finding saves" can stop it.
+    @State private var saveScanTask: Task<Void, Never>?
     @State private var showSettings = false
     @State private var playGame: LibraryGame?
     @State private var navigator = ControllerNavigator()
@@ -462,17 +464,25 @@ public struct RetroPlayRootView: View {
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
                     if saveImports.phase == .scanning {
-                        HStack(spacing: 6) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Finding saves")
-                                .font(RetroPlayFont.caption2)
+                        // A big folder can take a while, and games can't start meanwhile.
+                        Menu {
+                            Button("Stop Finding Saves", systemImage: "xmark", role: .destructive) {
+                                cancelSaveScan()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Finding saves")
+                                    .font(RetroPlayFont.caption2)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .retroPlayGlassChrome()
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .retroPlayGlassChrome()
-                        .accessibilityElement(children: .combine)
                         .accessibilityLabel("Finding saves")
+                        .accessibilityHint("Opens a menu to stop")
+                        .accessibilityIdentifier("library.findingSaves")
                     } else if store.importsInProgress > 0 {
                         HStack(spacing: 6) {
                             ProgressView()
@@ -790,31 +800,47 @@ public struct RetroPlayRootView: View {
             // Held until the sheet closes: files inside a picked folder read under its access.
             let access = SecurityScopedAccess(urls)
             let games = store.games
-            Task {
-                let batch = await Task.detached(priority: .userInitiated) {
-                    LibrarySaveImporter().plan(SaveFolderScanner.scan(urls), games: games)
-                }.value
-                // A stale session (ended meanwhile) changes nothing.
+            saveImportID = id
+            saveScanTask = Task {
+                let batch = await Self.findSaves(in: urls, games: games)
+                // A stale or cancelled session (ended meanwhile) changes nothing.
                 guard saveImports.scanFinished(id) else {
                     access.stop()
                     return
                 }
+                saveScanTask = nil
                 if !SaveImportPhase.mayWrite(gameOpen: isGameOpen) {
                     saveImports.end(id)
+                    saveImportID = nil
                     access.stop()
                     presentImportResult(.error("Close the game, then import the saves again."))
                 } else if batch.items.isEmpty, batch.skipped.isEmpty {
                     saveImports.end(id)
+                    saveImportID = nil
                     access.stop()
                     presentImportResult(.error(
                         "No saves in the selection. Pick battery saves (.sav, .srm), memory cards (.mcr, .mcd), PSP SAVEDATA folders, or a folder that holds them."
                     ))
                 } else {
                     saveImportAccess = access
-                    saveImportID = id
                     saveImport = SaveImportSession(id: id, batch: batch)
                 }
             }
+        }
+    }
+
+    /// Off the main actor, and a child of the scan task, so cancelling that stops the walk.
+    private nonisolated static func findSaves(in urls: [URL], games: [LibraryGame]) async -> SaveImportBatch {
+        LibrarySaveImporter().plan(SaveFolderScanner.scan(urls), games: games)
+    }
+
+    /// Ends the scan's session at once (games can start again); the walk stops at its next entry.
+    private func cancelSaveScan() {
+        saveScanTask?.cancel()
+        saveScanTask = nil
+        if let id = saveImportID {
+            saveImports.cancel(id)
+            saveImportID = nil
         }
     }
 

@@ -62,6 +62,8 @@ public struct SaveScanResult: Sendable, Equatable {
     public var ignoredFiles = 0
     /// The scan stopped at a limit; some saves may not have been looked at.
     public var truncated = false
+    /// The task was cancelled: the result is incomplete and shouldn't be shown.
+    public var cancelled = false
 }
 
 /// One save ready to write.
@@ -196,6 +198,10 @@ public enum SaveFolderScanner {
         var entries = 0
         for root in urls {
             guard !result.truncated else { break }
+            if Task.isCancelled {
+                result.cancelled = true
+                break
+            }
             // Picked items count against the limits like anything found inside a folder.
             if entries >= limits.maxEntries || result.candidates.count >= limits.maxCandidates {
                 result.truncated = true
@@ -240,6 +246,10 @@ public enum SaveFolderScanner {
 
         let rootComponents = root.standardizedFileURL.pathComponents
         while let next = walker.nextObject() {
+            if Task.isCancelled {
+                result.cancelled = true
+                return
+            }
             guard let url = next as? URL else { continue }
             entries += 1
             if entries > limits.maxEntries || result.candidates.count >= limits.maxCandidates {
@@ -408,8 +418,10 @@ public struct LibrarySaveImporter: Sendable {
             .filter { $0.systemID == .psp && $0.pspProductID != nil }
             .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
 
+        guard !scan.cancelled else { return SaveImportBatch() }
         var planned: [(item: SaveImportItem, modified: Date?)] = []
         for candidate in scan.candidates {
+            if Task.isCancelled { return SaveImportBatch() }
             let outcome: Result<SaveImportItem, SkippedSave>
             switch candidate.kind {
             case .file(let ext, let size):
@@ -590,6 +602,12 @@ public struct LibrarySaveImporter: Sendable {
     ) -> SaveImportOutcome {
         var outcome = SaveImportOutcome()
         for item in batch.items {
+            // Cancelled: the saves not yet started stay as they are; one already installing
+            // has finished by the time this loop looks again.
+            if Task.isCancelled {
+                outcome.failed.append(SkippedSave(name: item.sourceName, reason: "Cancelled."))
+                continue
+            }
             // Re-checked now: the destination may have appeared since the summary was shown.
             let exists = fileManager.fileExists(atPath: item.plan.destinationURL.path)
             if exists, !replaceExisting {

@@ -312,11 +312,22 @@ public struct SaveGameImporter: Sendable {
     }
 
     /// PARAM.SFO's URL in a save folder, whatever its case.
+    /// Looks at no more than `pspFolderMaxEntries` children: an oversized folder isn't listed
+    /// whole just to find it.
     public static func paramSFO(in folder: URL, fileManager: FileManager = .default) -> URL? {
         let exact = folder.appendingPathComponent("PARAM.SFO")
         if fileManager.fileExists(atPath: exact.path) { return exact }
-        let names = (try? fileManager.contentsOfDirectory(atPath: folder.path)) ?? []
-        return names.first { $0.uppercased() == "PARAM.SFO" }.map { folder.appendingPathComponent($0) }
+        guard let children = fileManager.enumerator(
+            at: folder,
+            includingPropertiesForKeys: nil,
+            options: [.skipsSubdirectoryDescendants]
+        ) else { return nil }
+        var seen = 0
+        while seen < pspFolderMaxEntries, let next = children.nextObject() as? URL {
+            seen += 1
+            if next.lastPathComponent.uppercased() == "PARAM.SFO" { return next }
+        }
+        return nil
     }
 
     /// A PSP save folder holds plain files and folders only (no links that would point outside
@@ -326,10 +337,12 @@ public struct SaveGameImporter: Sendable {
         if (try? folder.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
             throw pspLinkError
         }
-        guard paramSFO(in: folder, fileManager: fileManager) != nil else {
-            throw SaveGameImportError.missingPSPMetadata
+        // PARAM.SFO is found during the bounded walk, not by listing the folder first.
+        var hasParam = false
+        try walkPSPFolder(folder, fileManager: fileManager) { _, relative, isDirectory in
+            if !isDirectory, relative.count == 1, relative[0].uppercased() == "PARAM.SFO" { hasParam = true }
         }
-        try walkPSPFolder(folder, fileManager: fileManager) { _, _, _ in }
+        guard hasParam else { throw SaveGameImportError.missingPSPMetadata }
     }
 
     static func copyPSPFolder(from source: URL, to destination: URL, fileManager: FileManager) throws {
@@ -346,7 +359,9 @@ public struct SaveGameImporter: Sendable {
 
     private static let pspLinkError = SaveGameImportError.unsupportedFormat("Save folders with links in them aren't imported.")
 
-    /// Visits every entry (parents before children), throwing as soon as a cap is passed.
+    /// Visits every entry (parents before children), throwing as soon as a cap is passed, a
+    /// part of the folder can't be read (a copy missing a subfolder must not be installed), or
+    /// the task is cancelled.
     private static func walkPSPFolder(
         _ folder: URL,
         fileManager: FileManager,
@@ -354,13 +369,28 @@ public struct SaveGameImporter: Sendable {
     ) throws {
         let keys: Set<URLResourceKey> = [.isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey, .fileSizeKey]
         let tooBig = SaveGameImportError.unsupportedFormat("Too big to be a PSP save folder.")
-        guard let walker = fileManager.enumerator(at: folder, includingPropertiesForKeys: Array(keys)) else {
+        let unreadable = UnreadableEntry()
+        guard let walker = fileManager.enumerator(
+            at: folder,
+            includingPropertiesForKeys: Array(keys),
+            errorHandler: { url, _ in
+                unreadable.url = url
+                return false
+            }
+        ) else {
             throw SaveGameImportError.copyFailed("The folder couldn't be read.")
         }
         let rootCount = folder.standardizedFileURL.pathComponents.count
         var entries = 0
         var bytes = 0
+        func checkReadable() throws {
+            if let url = unreadable.url {
+                throw SaveGameImportError.copyFailed("\(url.lastPathComponent) couldn't be read.")
+            }
+        }
         while let next = walker.nextObject() {
+            try checkReadable()
+            try Task.checkCancellation()
             guard let url = next as? URL else { continue }
             let values = try url.resourceValues(forKeys: keys)
             if values.isSymbolicLink == true { throw pspLinkError }
@@ -373,6 +403,11 @@ public struct SaveGameImporter: Sendable {
             }
             try visit(url, Array(url.standardizedFileURL.pathComponents.dropFirst(rootCount)), isDirectory)
         }
+        try checkReadable()
+    }
+
+    private final class UnreadableEntry: @unchecked Sendable {
+        var url: URL?
     }
 
     // MARK: - PSP SAVEDATA folder
