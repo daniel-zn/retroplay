@@ -1031,6 +1031,11 @@ public struct PlayView: View {
             return
         }
 
+        // Saves imported from the library since the last session: boot fresh, as an in-game
+        // import does, since the quick save would bring the old save back.
+        let freshAfterImport = autoResume && FreshBoot.consume(game.id, paths: SavePaths())
+        let autoResume = autoResume && !freshAfterImport
+
         // Re-entering a game continues from the save written when it was last left.
         // mupen64plus-next rejects retro_unserialize until its first retro_run, so N64
         // resumes after the first frame instead of before start().
@@ -1087,7 +1092,7 @@ public struct PlayView: View {
         case .loaded, .failed:
             showToast(AutoResumeLoader.statusLine(for: resumeStatus))
         case .firstRun, .cancelled:
-            break
+            if freshAfterImport { showToast("Started fresh with the imported save") }
         }
         if system == .psp {
             watchForRuntimeError(instance)

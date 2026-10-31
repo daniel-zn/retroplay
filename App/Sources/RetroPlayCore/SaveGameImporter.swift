@@ -67,19 +67,6 @@ public struct SaveGameImportPlan: Sendable, Equatable {
 public struct SaveGameImporter: Sendable {
     public init() {}
 
-    private static let n64CombinedSRMSize = 296_960
-
-    /// Largest SAVE_RAM any libretro system here uses (PS1 memory card: 128 KiB) with room to spare.
-    private static let retroSaveMaxSize = 1 << 20
-
-    private static let gbaAllowedSizes: Set<Int> = [
-        512, 8_192, 32_768, 65_536, 131_072, 136_192, 137_216,
-    ]
-
-    private static let ndsAllowedSizes: Set<Int> = [
-        512, 8_192, 65_536, 131_072, 262_144, 524_288, 1_048_576, 8_388_608, 33_554_432,
-    ]
-
     private static let pspProductIDPattern = try! NSRegularExpression(
         pattern: #"^(UC|UL|NP|EP|EB|HB|NPUH|NPEG|NPHH)[A-Z0-9]{4,8}(\d{2})?$"#,
         options: []
@@ -131,8 +118,13 @@ public struct SaveGameImporter: Sendable {
         guard SaveImportContentTypes.isBatteryExtension(ext) else {
             throw SaveGameImportError.unsupportedFormat(".\(ext) is not a supported battery-save extension.")
         }
+        if game.systemID == .psp {
+            throw SaveGameImportError.unsupportedFormat(
+                "PSP in-game saves are folders (SAVEDATA/<GAMEID>/ with PARAM.SFO). Pick that folder, not a loose file."
+            )
+        }
 
-        let romBase = romBasename(for: game)
+        let romBase = Self.romBasename(for: game)
         let saveBase = (sourceURL.lastPathComponent as NSString).deletingPathExtension
         if saveBase != romBase {
             throw SaveGameImportError.basenameMismatch(expected: romBase, got: saveBase)
@@ -141,35 +133,41 @@ public struct SaveGameImporter: Sendable {
         let data = try withReadableSource(sourceURL, fileManager: fileManager) {
             try Data(contentsOf: sourceURL, options: [.mappedIfSafe])
         }
-        if SaveGameImporter.looksRzipCompressed(data) {
+        try Self.validateBatteryFile(extension: ext, size: data.count, header: data.prefix(8), system: game.systemID)
+        let dest = SaveFormat.of(game.systemID).destination(for: game, paths: paths)
+        return plan(dest: dest, source: sourceURL.lastPathComponent, fileManager: fileManager)
+    }
+
+    /// Checks a battery file against its system's `SaveFormat`: the extension, the size, and
+    /// that it isn't a RetroArch rzip-compressed save. `header` is at least the file's first
+    /// five bytes (or all of it when shorter).
+    public static func validateBatteryFile(
+        extension rawExt: String,
+        size: Int,
+        header: Data,
+        system: SystemID
+    ) throws {
+        let ext = rawExt.lowercased()
+        if SaveImportContentTypes.isSaveStateExtension(ext) {
+            throw SaveGameImportError.saveStateNotImportable
+        }
+        if looksRzipCompressed(header) {
             throw SaveGameImportError.compressedRetroArchSave
         }
-
-        switch game.systemID {
-        case .gba:
-            try validateGBASize(data.count)
-            let dest = paths.sramURL(forRelativeROMPath: game.relativePath)
-            return plan(dest: dest, source: sourceURL.lastPathComponent, fileManager: fileManager)
-        case .n64:
-            try validateN64Payload(data: data, ext: ext)
-            let dest = paths.n64SRAMURL(forRelativeROMPath: game.relativePath)
-            return plan(dest: dest, source: sourceURL.lastPathComponent, fileManager: fileManager)
-        case .nds:
-            try validateNDSSize(data.count)
-            let dest = paths.sramURL(forRelativeROMPath: game.relativePath)
-            return plan(dest: dest, source: sourceURL.lastPathComponent, fileManager: fileManager)
-        case .nes, .snes, .genesis, .atari7800, .ps1:
-            // The libretro cores keep one SAVE_RAM block (cartridge battery RAM, or the PS1
-            // memory card); its size depends on the game, so only absurd sizes are refused.
-            guard data.count > 0, data.count <= Self.retroSaveMaxSize else {
-                throw SaveGameImportError.invalidSize(system: game.systemID, bytes: data.count)
-            }
-            let dest = paths.sramURL(forRelativeROMPath: game.relativePath)
-            return plan(dest: dest, source: sourceURL.lastPathComponent, fileManager: fileManager)
-        case .psp:
+        let format = SaveFormat.of(system)
+        guard format.layout == .batteryFile else {
             throw SaveGameImportError.unsupportedFormat(
-                "PSP in-game saves are folders (SAVEDATA/<GAMEID>/ with PARAM.SFO). Pick that folder, not a loose file."
+                "\(system.displayName) saves are folders, not single files."
             )
+        }
+        if let reason = format.unusableExtensions[ext] {
+            throw SaveGameImportError.unsupportedFormat(reason)
+        }
+        guard format.extensions.contains(ext) else {
+            throw SaveGameImportError.unsupportedFormat(".\(ext) is not a \(system.displayName) save.")
+        }
+        guard format.acceptsSize(size) else {
+            throw SaveGameImportError.invalidSize(system: system, bytes: size)
         }
     }
 
@@ -230,7 +228,7 @@ public struct SaveGameImporter: Sendable {
 
     // MARK: - PSP SAVEDATA folder
 
-    private func planPSPFolderImport(
+    func planPSPFolderImport(
         from folderURL: URL,
         for game: LibraryGame,
         paths: SavePaths,
@@ -303,46 +301,12 @@ public struct SaveGameImporter: Sendable {
         return pattern.firstMatch(in: name, options: [], range: range) != nil
     }
 
-    private func validateGBASize(_ count: Int) throws {
-        if Self.gbaAllowedSizes.contains(count) { return }
-        if count > 131_072, count <= 131_072 + 16_384 { return }
-        throw SaveGameImportError.invalidSize(system: .gba, bytes: count)
-    }
-
-    private func validateNDSSize(_ count: Int) throws {
-        guard Self.ndsAllowedSizes.contains(count) else {
-            throw SaveGameImportError.invalidSize(system: .nds, bytes: count)
-        }
-    }
-
-    private func validateN64Payload(data: Data, ext: String) throws {
-        switch ext {
-        case "srm":
-            guard data.count == Self.n64CombinedSRMSize else {
-                throw SaveGameImportError.invalidSize(system: .n64, bytes: data.count)
-            }
-        case "eep":
-            guard data.count == 512 || data.count == 2_048 else {
-                throw SaveGameImportError.invalidSize(system: .n64, bytes: data.count)
-            }
-            throw SaveGameImportError.unsupportedFormat(
-                "Loose .eep files must be packed into a 290 KiB Mupen64Plus-Next .srm (RetroArch export or ra_mp64_srm_convert)."
-            )
-        case "fla", "sra", "mpk":
-            throw SaveGameImportError.unsupportedFormat(
-                "Loose .\(ext) files must be packed into a 290 KiB Mupen64Plus-Next .srm before importing."
-            )
-        default:
-            throw SaveGameImportError.unsupportedFormat(".\(ext) is not valid for N64.")
-        }
-    }
-
-    private func romBasename(for game: LibraryGame) -> String {
+    static func romBasename(for game: LibraryGame) -> String {
         let leaf = (game.relativePath as NSString).lastPathComponent
         return (leaf as NSString).deletingPathExtension
     }
 
-    private func plan(
+    func plan(
         dest: URL,
         source: String,
         fileManager: FileManager,

@@ -12,6 +12,13 @@ public struct RetroPlayRootView: View {
     @AppStorage("retroplay.appearance") private var appearanceRaw = AppearancePreference.dark.rawValue
     @State private var systemTab: SystemTab = .all
     @State private var showImporter = false
+    /// What the Files picker is open for: games, or saves (files and folders).
+    @State private var importKind = ImportKind.games
+    /// A saves pick, scanned and matched, waiting for the player to confirm.
+    @State private var saveImport: SaveImportSession?
+    @State private var saveImportAccess: SecurityScopedAccess?
+    @State private var savesScanning = false
+    @State private var savesCommitting = false
     @State private var showSettings = false
     @State private var playGame: LibraryGame?
     @State private var navigator = ControllerNavigator()
@@ -163,6 +170,10 @@ public struct RetroPlayRootView: View {
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSettings") {
                 showSettings = true
             }
+            // `-RetroPlaySmokeSaveImport YES`: the save import summary with sample rows.
+            if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSaveImport") {
+                saveImport = SaveImportSession(batch: .smokeSample)
+            }
             // `-RetroPlaySmokeLandscape YES`: the library in landscape too.
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeLandscape") {
                 for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
@@ -242,18 +253,34 @@ public struct RetroPlayRootView: View {
         .onChange(of: store.libraryLoadFailureMessage) { _, message in
             showLibraryLoadError = message != nil
         }
+        // One picker for both: two .fileImporter modifiers on one view don't both present.
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: ImportContentTypes.allowedContentTypes,
+            allowedContentTypes: importKind == .games
+                ? ImportContentTypes.allowedContentTypes
+                : SaveImportContentTypes.allowedContentTypes,
             allowsMultipleSelection: true
         ) { result in
-            handleImport(result)
+            switch importKind {
+            case .games: handleImport(result)
+            case .saves: handleSaveImport(result)
+            }
+        }
+        // Swiped away or imported: either way the picked files are done with.
+        .sheet(item: $saveImport, onDismiss: {
+            saveImportAccess?.stop()
+            saveImportAccess = nil
+        }) { session in
+            SaveImportSheet(batch: session.batch, committing: savesCommitting) { replace in
+                commitSaveImport(session, replaceExisting: replace)
+            }
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showSettings, onDismiss: {
             // Presenting the picker in the same update that dismisses the sheet can drop it.
             if importAfterSettingsDismiss {
                 importAfterSettingsDismiss = false
-                showImporter = true
+                openImporter(.games)
             }
         }) {
             SettingsView(
@@ -337,7 +364,7 @@ public struct RetroPlayRootView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
                             libraryTitle
-                            LibraryOnboardingView { showImporter = true }
+                            LibraryOnboardingView { openImporter(.games) }
                                 .padding(.top, 12)
                         }
                     }
@@ -361,7 +388,7 @@ public struct RetroPlayRootView: View {
                         if filteredGames.isEmpty {
                             EmptyFilterView(
                                 tab: systemTab,
-                                onImport: { showImporter = true },
+                                onImport: { openImporter(.games) },
                                 onShowAll: { systemTab = .all }
                             )
                         }
@@ -384,7 +411,7 @@ public struct RetroPlayRootView: View {
                         if filteredGames.isEmpty {
                             EmptyFilterView(
                                 tab: systemTab,
-                                onImport: { showImporter = true },
+                                onImport: { openImporter(.games) },
                                 onShowAll: { systemTab = .all }
                             )
                         } else {
@@ -427,7 +454,19 @@ public struct RetroPlayRootView: View {
                     .accessibilityAddTraits(.isHeader)
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
-                    if store.importsInProgress > 0 {
+                    if savesScanning {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Finding saves")
+                                .font(RetroPlayFont.caption2)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .retroPlayGlassChrome()
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Finding saves")
+                    } else if store.importsInProgress > 0 {
                         HStack(spacing: 6) {
                             ProgressView()
                                 .controlSize(.small)
@@ -447,9 +486,10 @@ public struct RetroPlayRootView: View {
                 // the four share one glass capsule, close together.
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 0) {
-                        LibraryTopBarButton(title: "Import", symbol: "plus") {
-                            showImporter = true
-                        }
+                        LibraryImportMenu(
+                            onImportGames: { openImporter(.games) },
+                            onImportSaves: { openImporter(.saves) }
+                        )
                         LibraryFilterMenu(
                             selection: $systemTab,
                             sort: sortBinding,
@@ -721,6 +761,76 @@ public struct RetroPlayRootView: View {
         }
     }
 
+    private func openImporter(_ kind: ImportKind) {
+        importKind = kind
+        showImporter = true
+    }
+
+    /// Scans and matches the picked saves off the main actor, then shows what would be imported.
+    private func handleSaveImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            presentImportResult(.error(error.localizedDescription))
+        case .success(let urls):
+            guard !urls.isEmpty else { return }
+            // Held until the sheet closes: files inside a picked folder read under its access.
+            let access = SecurityScopedAccess(urls)
+            let games = store.games
+            savesScanning = true
+            Task {
+                let batch = await Task.detached(priority: .userInitiated) {
+                    LibrarySaveImporter().plan(SaveFolderScanner.scan(urls), games: games)
+                }.value
+                savesScanning = false
+                if batch.items.isEmpty, batch.skipped.isEmpty {
+                    access.stop()
+                    presentImportResult(.error(
+                        "No saves in the selection. Pick battery saves (.sav, .srm), memory cards (.mcr, .mcd), PSP SAVEDATA folders, or a folder that holds them."
+                    ))
+                } else {
+                    saveImportAccess = access
+                    saveImport = SaveImportSession(batch: batch)
+                }
+            }
+        }
+    }
+
+    private func commitSaveImport(_ session: SaveImportSession, replaceExisting: Bool) {
+        guard !savesCommitting else { return }
+        savesCommitting = true
+        let batch = session.batch
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) {
+                LibrarySaveImporter().commit(batch, replaceExisting: replaceExisting)
+            }.value
+            savesCommitting = false
+            saveImport = nil
+            presentImportResult(Self.saveImportResult(outcome))
+        }
+    }
+
+    private static func saveImportResult(_ outcome: SaveImportOutcome) -> ImportResultAlert {
+        var lines: [String] = []
+        let games = Set(outcome.imported.map(\.game.id)).count
+        if !outcome.imported.isEmpty {
+            let saves = outcome.imported.count == 1 ? "1 save" : "\(outcome.imported.count) saves"
+            lines.append("Imported \(saves) for \(gameCountText(games)). Each game starts fresh the next time you play it, so it loads the imported save.")
+        }
+        if !outcome.kept.isEmpty {
+            lines.append(outcome.kept.count == 1
+                ? "Kept the save already here for \(outcome.kept[0].game.displayName)."
+                : "Kept the saves already here for \(outcome.kept.count) games.")
+        }
+        for failure in outcome.failed.prefix(3) {
+            lines.append("\(failure.name): \(failure.reason)")
+        }
+        if outcome.failed.count > 3 {
+            lines.append("\(outcome.failed.count - 3) more couldn't be imported.")
+        }
+        let message = lines.joined(separator: "\n\n")
+        return outcome.imported.isEmpty && !outcome.failed.isEmpty ? .error(message) : .notice(message)
+    }
+
     /// What to tell the player about files that were not added. Empty when everything went in.
     private static func importNotices(for summary: LibraryImportSummary) -> [String] {
         var notices: [String] = []
@@ -787,6 +897,55 @@ public struct RetroPlayRootView: View {
         }
     }
 }
+
+@available(iOS 18.0, *)
+private enum ImportKind {
+    case games
+    case saves
+}
+
+/// A scanned saves pick waiting for the player's go-ahead.
+@available(iOS 18.0, *)
+private struct SaveImportSession: Identifiable {
+    let id = UUID()
+    let batch: SaveImportBatch
+}
+
+#if DEBUG
+@available(iOS 18.0, *)
+private extension SaveImportBatch {
+    /// Sample rows for `-RetroPlaySmokeSaveImport` screenshots.
+    static var smokeSample: SaveImportBatch {
+        let saves = SavePaths().savesDirectory
+        func item(_ name: String, _ system: SystemID, _ source: String, replaces: Bool) -> SaveImportItem {
+            let game = LibraryGame(displayName: name, systemID: system, relativePath: "\(name).rom")
+            return SaveImportItem(
+                game: game,
+                sourceURL: URL(fileURLWithPath: "/\(source)"),
+                sourceName: source,
+                plan: SaveGameImportPlan(
+                    sourceDescription: source,
+                    destinationURL: saves.appendingPathComponent("\(name).sav"),
+                    replacesExisting: replaces
+                )
+            )
+        }
+        return SaveImportBatch(
+            items: [
+                item("Golden Sun", .gba, "saves/mGBA/Golden Sun (USA).srm", replaces: false),
+                item("Super Mario 64", .n64, "saves/Mupen64Plus-Next/Super Mario 64 (USA).srm", replaces: false),
+                item("Final Fantasy VII", .ps1, "memcards/Final Fantasy VII (USA)_1.mcd", replaces: true),
+                item("Patapon", .psp, "PSP/SAVEDATA/UCUS98711DATA00", replaces: false),
+            ],
+            skipped: [
+                SkippedSave(name: "states/mGBA/Golden Sun (USA).state", reason: "Save states only work in the emulator that made them; import the battery save (.sav/.srm) instead."),
+                SkippedSave(name: "saves/Snes9x/Chrono Trigger.srm", reason: "No game in your library has this name. Import the game first, or rename the save to match its file."),
+            ],
+            ignoredFiles: 12
+        )
+    }
+}
+#endif
 
 /// An import outcome for the "Import" notice or the "Import failed" alert.
 @available(iOS 18.0, *)

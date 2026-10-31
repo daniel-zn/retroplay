@@ -179,14 +179,16 @@ public struct SavePaths: Sendable {
     }
 
     public func batterySaveURL(for game: LibraryGame) -> URL {
-        switch game.systemID {
-        case .n64:
-            return n64SRAMURL(forRelativeROMPath: game.relativePath)
-        case .gba, .nds, .nes, .snes, .genesis, .atari7800, .ps1:
-            return sramURL(forRelativeROMPath: game.relativePath)
-        case .psp:
-            return pspSavedataDirectory
-        }
+        SaveFormat.of(game.systemID).destination(for: game, paths: self)
+    }
+
+    /// Set when saves were imported for a game from the library: its next launch boots fresh
+    /// instead of resuming the quick save, which still holds the old save in memory and would
+    /// write it back over the imported one.
+    public func freshBootMarkerURL(for gameID: UUID) -> URL {
+        supportURL
+            .appendingPathComponent("FreshBoot", isDirectory: true)
+            .appendingPathComponent(gameID.uuidString, isDirectory: false)
     }
 
     public func stateURL(forRelativeROMPath relativePath: String, slot: Int) -> URL {

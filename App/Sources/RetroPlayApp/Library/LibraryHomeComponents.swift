@@ -150,6 +150,42 @@ struct LibraryTopBarIcon: View {
     }
 }
 
+/// "+": add games, or saves for games already in the library. A menu like the filter's, so
+/// both open the same way from the same capsule.
+@available(iOS 18.0, *)
+struct LibraryImportMenu: View {
+    let onImportGames: () -> Void
+    let onImportSaves: () -> Void
+
+    var body: some View {
+        Menu {
+            Button(action: onImportGames) {
+                Label {
+                    Text("Games")
+                    Text("ROMs and discs")
+                } icon: {
+                    Image(systemName: "gamecontroller")
+                }
+            }
+            .accessibilityIdentifier("library.import.games")
+            Button(action: onImportSaves) {
+                Label {
+                    Text("Saves")
+                    Text("Save files or whole folders")
+                } icon: {
+                    Image(systemName: "sdcard")
+                }
+            }
+            .accessibilityIdentifier("library.import.saves")
+        } label: {
+            LibraryTopBarIcon(symbol: "plus")
+        }
+        .menuOrder(.fixed)
+        .accessibilityLabel("Import")
+        .accessibilityIdentifier("library.import")
+    }
+}
+
 /// The sort (first, so it's in reach however many systems follow) and the system filter, in
 /// one menu behind a top-bar button. The filters list
 /// their game counts and mark the one showing; L1 / R1 on a controller step through the same
