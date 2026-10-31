@@ -60,6 +60,9 @@ public struct SaveScanResult: Sendable, Equatable {
     public var skipped: [SkippedSave] = []
     /// Files that are plainly not saves (pictures, ROMs, notes), counted but not listed.
     public var ignoredFiles = 0
+    /// Saves for systems RetroPlay doesn't play (a Vita save, a Wii U account folder),
+    /// counted but not listed.
+    public var otherSystemSaves = 0
     /// The scan stopped at a limit; some saves may not have been looked at.
     public var truncated = false
     /// The task was cancelled: the result is incomplete and shouldn't be shown.
@@ -94,12 +97,21 @@ public struct SaveImportBatch: Sendable, Equatable {
     public var items: [SaveImportItem] = []
     public var skipped: [SkippedSave] = []
     public var ignoredFiles = 0
+    /// Saves for systems RetroPlay doesn't play: one count line in the summary, no rows.
+    public var otherSystemSaves = 0
     public var truncated = false
 
-    public init(items: [SaveImportItem] = [], skipped: [SkippedSave] = [], ignoredFiles: Int = 0, truncated: Bool = false) {
+    public init(
+        items: [SaveImportItem] = [],
+        skipped: [SkippedSave] = [],
+        ignoredFiles: Int = 0,
+        otherSystemSaves: Int = 0,
+        truncated: Bool = false
+    ) {
         self.items = items
         self.skipped = skipped
         self.ignoredFiles = ignoredFiles
+        self.otherSystemSaves = otherSystemSaves
         self.truncated = truncated
     }
 
@@ -301,6 +313,8 @@ public enum SaveFolderScanner {
                     ))
                 case .skip(let reason):
                     result.skipped.append(SkippedSave(name: displayPath, reason: reason))
+                case .otherSystem:
+                    result.otherSystemSaves += 1
                 }
                 continue
             }
@@ -358,6 +372,8 @@ public enum SaveFolderScanner {
     private enum FolderDecision {
         case pspSave(modified: Date?)
         case skip(String)
+        /// A whole save of another system (one game's Vita save, a Wii U account).
+        case otherSystem
     }
 
     /// Vita title IDs (PCSA00017) and Wii U account folders (80000001): only these names,
@@ -378,10 +394,10 @@ public enum SaveFolderScanner {
         let param = children.first { $0.url.lastPathComponent.uppercased() == "PARAM.SFO" && $0.values?.isDirectory != true }
         let names = Set(children.map { $0.url.lastPathComponent.lowercased() })
         if matches(vitaTitleID, name), names.contains("sce_sys") {
-            return .skip(otherSystemReason.replacingOccurrences(of: "a save", with: "saves"))
+            return .otherSystem
         }
         if matches(wiiUAccount, name) {
-            return .skip(otherSystemReason.replacingOccurrences(of: "a save", with: "saves"))
+            return .otherSystem
         }
         if SaveGameImporter.isValidPSPSaveFolderName(name.uppercased()) {
             if let param { return .pspSave(modified: param.values?.contentModificationDate) }
@@ -423,7 +439,7 @@ public enum SaveFolderScanner {
         }
         // Inside a Vita title or Wii U account folder: not a cartridge save, whatever its name.
         if folders.contains(where: { matches(vitaTitleID, $0) || matches(wiiUAccount, $0) }) {
-            result.skipped.append(SkippedSave(name: displayPath, reason: otherSystemReason))
+            result.otherSystemSaves += 1
             return
         }
         let size = values?.fileSize ?? 0
@@ -471,7 +487,12 @@ public struct LibrarySaveImporter: Sendable {
         paths: SavePaths = SavePaths(),
         fileManager: FileManager = .default
     ) -> SaveImportBatch {
-        var batch = SaveImportBatch(skipped: scan.skipped, ignoredFiles: scan.ignoredFiles, truncated: scan.truncated)
+        var batch = SaveImportBatch(
+            skipped: scan.skipped,
+            ignoredFiles: scan.ignoredFiles,
+            otherSystemSaves: scan.otherSystemSaves,
+            truncated: scan.truncated
+        )
         let index = TitleIndex(games: games.filter { SaveFormat.of($0.systemID).layout == .batteryFile })
         let pspGames = games
             .filter { $0.systemID == .psp && $0.pspProductID != nil }
@@ -490,6 +511,8 @@ public struct LibrarySaveImporter: Sendable {
             }
             switch outcome {
             case .success(let item): planned.append((item, candidate.modified))
+            case .failure(let skipped) where skipped.reason == SaveFolderScanner.otherSystemReason:
+                batch.otherSystemSaves += 1
             case .failure(let skipped): batch.skipped.append(skipped)
             }
         }

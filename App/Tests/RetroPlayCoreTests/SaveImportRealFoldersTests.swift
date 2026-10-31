@@ -107,18 +107,32 @@ final class SaveImportRealFoldersTests: XCTestCase {
 
         let batch = plan([gba])
 
+        // Counted in one line of the summary, not listed: one per Wii U account folder, Vita
+        // save, and file inside a Vita title folder.
         XCTAssertTrue(batch.items.isEmpty)
-        XCTAssertFalse(batch.skipped.isEmpty)
-        for skipped in batch.skipped {
-            XCTAssertFalse(skipped.reason.contains("No game in your library"), "\(skipped.name): \(skipped.reason)")
-            XCTAssertTrue(skipped.reason.contains("RetroPlay plays"), "\(skipped.name): \(skipped.reason)")
-        }
+        XCTAssertEqual(batch.skipped, [])
+        XCTAssertEqual(batch.otherSystemSaves, 3)
     }
 
     func testFileNoRetroPlaySystemCouldReadSaysSo() throws {
         // A .sav no system's sizes fit (2 MiB).
         try write("Random/thing.sav", count: 2 << 20)
         let batch = plan([LibraryGame(displayName: "Zelda", systemID: .gba, relativePath: "Zelda.gba")])
-        XCTAssertEqual(batch.skipped.map(\.reason), ["Not a save for a system RetroPlay plays."])
+        XCTAssertEqual(batch.skipped, [])
+        XCTAssertEqual(batch.otherSystemSaves, 1)
+    }
+
+    func testOtherSystemsSavesAddUpAcrossABackupTree() throws {
+        for game in ["PCSA00017", "PCSE00383", "PCSE00790"] {
+            try write("PSVita/\(game)/sce_sys/param.sfo", count: 3)
+        }
+        try write("Wii U/BotW/80000001/option.sav", count: 1_024)
+        try pspSave("PSP/Gran Turismo/UCUS98632-GAMEDAT")
+
+        let batch = plan([psp("Gran Turismo", "UCUS98632")])
+
+        XCTAssertEqual(batch.items.count, 1)
+        XCTAssertEqual(batch.skipped, [])
+        XCTAssertEqual(batch.otherSystemSaves, 4)
     }
 }

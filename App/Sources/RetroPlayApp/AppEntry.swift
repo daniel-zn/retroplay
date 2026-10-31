@@ -827,8 +827,10 @@ public struct RetroPlayRootView: View {
                     saveImports.end(id)
                     saveImportID = nil
                     access.stop()
-                    presentImportResult(.error(
-                        "No saves in the selection. Pick battery saves (.sav, .srm), memory cards (.mcr, .mcd), PSP SAVEDATA folders, or a folder that holds them."
+                    let others = batch.otherSystemSaves
+                    presentImportResult(.error(others > 0
+                        ? "No saves for systems RetroPlay plays in the selection. \(others == 1 ? "1 save is" : "\(others) saves are") for other systems."
+                        : "No saves in the selection. Pick battery saves (.sav, .srm), memory cards (.mcr, .mcd), PSP SAVEDATA folders, or a folder that holds them."
                     ))
                 } else {
                     saveImportAccess = access

@@ -75,6 +75,11 @@ struct SaveImportSheet: View {
                 if batch.ignoredFiles > 0 {
                     Text(batch.ignoredFiles == 1 ? "1 other file isn't a save." : "\(batch.ignoredFiles) other files aren't saves.")
                 }
+                if batch.otherSystemSaves > 0 {
+                    Text(batch.otherSystemSaves == 1
+                        ? "1 save is for a system RetroPlay doesn't play."
+                        : "\(batch.otherSystemSaves) saves are for systems RetroPlay doesn't play.")
+                }
             }
             .font(RetroPlayFont.caption2)
         }
