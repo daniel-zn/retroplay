@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import XCTest
+import UniformTypeIdentifiers
 @testable import RetroPlayCore
 
 /// Save folders as real games and backup tools name them: PSP save names with '-' and mixed
@@ -118,5 +119,11 @@ final class SaveImportRealFoldersTests: XCTestCase {
         XCTAssertEqual(batch.items.count, 1)
         XCTAssertEqual(batch.skipped, [])
         XCTAssertEqual(batch.otherSystemSaves, 4)
+    }
+
+    /// The library's Saves picker asks for a folder only: iOS's picker can't select a folder
+    /// while files are allowed too.
+    func testLibrarySavesPickerIsForFoldersOnly() {
+        XCTAssertEqual(SaveImportContentTypes.folderContentTypes, [.folder])
     }
 }

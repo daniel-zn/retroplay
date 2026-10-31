@@ -276,8 +276,8 @@ public struct RetroPlayRootView: View {
             isPresented: $showImporter,
             allowedContentTypes: importKind == .games
                 ? ImportContentTypes.allowedContentTypes
-                : SaveImportContentTypes.allowedContentTypes,
-            allowsMultipleSelection: true
+                : SaveImportContentTypes.folderContentTypes,
+            allowsMultipleSelection: importKind == .games
         ) { result in
             switch importKind {
             case .games: handleImport(result)
@@ -833,8 +833,8 @@ public struct RetroPlayRootView: View {
                     access.stop()
                     let others = batch.otherSystemSaves
                     presentImportResult(.error(others > 0
-                        ? "No saves for systems RetroPlay plays in the selection. \(others == 1 ? "1 save is" : "\(others) saves are") for other systems."
-                        : "No saves in the selection. Pick battery saves (.sav, .srm), memory cards (.mcr, .mcd), PSP SAVEDATA folders, or a folder that holds them."
+                        ? "No saves for systems RetroPlay plays in this folder. \(others == 1 ? "1 save is" : "\(others) saves are") for other systems."
+                        : "No saves in this folder. Pick a folder that holds battery saves (.sav, .srm), memory cards (.mcr, .mcd) or PSP SAVEDATA folders."
                     ))
                 } else {
                     saveImportAccess = access

@@ -213,7 +213,10 @@ public struct PlayView: View {
         }
         .fileImporter(
             isPresented: $showSaveImporter,
-            allowedContentTypes: SaveImportContentTypes.allowedContentTypes,
+            // PSP saves are SAVEDATA folders, which the picker only selects with folders alone.
+            allowedContentTypes: system == .psp
+                ? SaveImportContentTypes.folderContentTypes
+                : SaveImportContentTypes.allowedContentTypes,
             allowsMultipleSelection: false
         ) { result in
             handleSaveImportSelection(result)

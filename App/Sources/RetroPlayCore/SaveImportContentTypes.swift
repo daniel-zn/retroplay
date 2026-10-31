@@ -16,6 +16,11 @@ public enum SaveImportContentTypes {
         return types
     }
 
+    /// The library's Saves picker: a folder only (iOS's picker can't select a folder while
+    /// files are allowed too; with folders alone it offers Open for the folder showing). A
+    /// single save is imported by picking the folder it's in.
+    public static let folderContentTypes: [UTType] = [.folder]
+
     public static func isBatteryExtension(_ ext: String) -> Bool {
         batteryExtensions.contains(ext.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")))
     }

@@ -89,6 +89,26 @@ final class LibraryTopBarUITests: XCTestCase {
         }
     }
 
+    /// Saves opens the Files picker for a folder (iOS's picker only selects folders when
+    /// nothing else is allowed): it offers Open for the folder showing, enabled before anything
+    /// is selected.
+    @MainActor
+    func testSavesOpensAFolderPicker() throws {
+        let app = launch([])
+        let plus = app.buttons["library.import"].firstMatch
+        XCTAssertTrue(plus.waitForExistence(timeout: 30))
+        plus.tap()
+        let saves = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH %@", "library.import.saves", "Saves")).firstMatch
+        XCTAssertTrue(saves.waitForExistence(timeout: 5))
+        saves.tap()
+        let open = app.buttons["Open"].firstMatch
+        let found = open.waitForExistence(timeout: 20)
+        attach(app, "save-folder-picker")
+        XCTAssertTrue(found, "no Open button: the picker isn't in folder mode")
+        XCTAssertTrue(open.isEnabled, "Open isn't available for the folder showing")
+        app.terminate()
+    }
+
     /// The save import summary (sample rows from a debug launch argument): counts, sections,
     /// and both choices when a save would be replaced.
     @MainActor

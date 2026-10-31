@@ -171,7 +171,7 @@ struct LibraryImportMenu: View {
             Button(action: onImportSaves) {
                 Label {
                     Text("Saves")
-                    Text("Save files or whole folders")
+                    Text("A folder to search for saves")
                 } icon: {
                     Image(systemName: "sdcard")
                 }
