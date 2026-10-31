@@ -227,7 +227,7 @@ public struct SaveGameImporter: Sendable {
 
             do {
                 // Coordinated, so a file in iCloud Drive or on a share is downloaded first.
-                try LibraryStore.coordinatedRead(of: sourceURL) { source in
+                try CoordinatedRead.run(sourceURL) { source in
                     if isDirectory {
                         // Within the PSP caps as it copies: a folder that grew since the plan stops early.
                         try Self.copyPSPFolder(from: source, to: stagingURL, fileManager: fileManager)
@@ -253,10 +253,9 @@ public struct SaveGameImporter: Sendable {
                     try Self.validateStaged(stagingURL, check: check, fileManager: fileManager)
                 }
                 try beforeInstall()
-                if isDirectory {
-                    try Self.renameExistingPSPSlot(to: plan.destinationURL, fileManager: fileManager)
-                }
-                if fileManager.fileExists(atPath: plan.destinationURL.path) {
+                if isDirectory, let existing = Self.existingPSPSlot(for: plan.destinationURL, fileManager: fileManager) {
+                    try Self.installPSPSlot(stagingURL, over: existing, as: plan.destinationURL, swap: swap, fileManager: fileManager)
+                } else if fileManager.fileExists(atPath: plan.destinationURL.path) {
                     if isDirectory {
                         try swap(plan.destinationURL, stagingURL)
                         // The swap put the old folder at the staging path.
@@ -486,17 +485,30 @@ public struct SaveGameImporter: Sendable {
         return names.first { $0.uppercased() == wanted }.map { parent.appendingPathComponent($0, isDirectory: true) }
     }
 
-    /// Gives an existing slot the name it's about to be replaced under (a rename, so nothing is
-    /// lost if the import then fails: PPSSPP finds it under either name).
-    static func renameExistingPSPSlot(to destination: URL, fileManager: FileManager) throws {
-        guard let existing = existingPSPSlot(for: destination, fileManager: fileManager),
-              existing.lastPathComponent != destination.lastPathComponent else { return }
-        let result = existing.withUnsafeFileSystemRepresentation { from in
-            destination.withUnsafeFileSystemRepresentation { to in rename(from!, to!) }
+    /// Puts the staged slot in place of `existing`, under the game's spelling `destination`.
+    /// The swap is the install; only once it has succeeded is a differently spelled slot (from
+    /// an earlier build that upper-cased names) renamed to the game's spelling, and if that
+    /// rename fails the swap is undone, so a failed import leaves the old slot as it was.
+    static func installPSPSlot(
+        _ staging: URL,
+        over existing: URL,
+        as destination: URL,
+        swap: (URL, URL) throws -> Void,
+        fileManager: FileManager
+    ) throws {
+        try swap(existing, staging)
+        if existing.lastPathComponent != destination.lastPathComponent {
+            let renamed = existing.withUnsafeFileSystemRepresentation { from in
+                destination.withUnsafeFileSystemRepresentation { to in rename(from!, to!) }
+            }
+            if renamed != 0 {
+                let reason = String(cString: strerror(errno))
+                try? swap(existing, staging)
+                throw SaveGameImportError.copyFailed(reason)
+            }
         }
-        guard result == 0 else {
-            throw SaveGameImportError.copyFailed(String(cString: strerror(errno)))
-        }
+        // The swap left the old slot at the staging path.
+        try? fileManager.removeItem(at: staging)
     }
 
     // MARK: - Validation helpers

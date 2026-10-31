@@ -75,10 +75,9 @@ public struct SaveImportItem: Sendable, Equatable, Identifiable {
     /// Every library entry that reads this save: the game, or for PSP each copy of the title
     /// (an ISO and a CSO share the memory stick folder).
     public let gameIDs: [UUID]
-    /// The destination; PSP slots in any case are one slot (see `existingPSPSlot`).
-    public var id: String {
-        plan.check == .pspFolder ? plan.destinationURL.path.uppercased() : plan.destinationURL.path
-    }
+    /// The destination, in its exact spelling (spellings of one PSP slot are settled before
+    /// copies are compared; see `LibrarySaveImporter.plan`).
+    public var id: String { plan.destinationURL.path }
     public var replacesExisting: Bool { plan.replacesExisting }
 
     public init(game: LibraryGame, sourceURL: URL, sourceName: String, plan: SaveGameImportPlan, gameIDs: [UUID]? = nil) {
@@ -189,9 +188,15 @@ public enum SaveFolderScanner {
         .isDirectoryKey, .isPackageKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey,
     ]
     private static let linkReason = "Links aren't imported; pick the file or folder itself."
+    static let otherSystemReason = "Not a save for a system RetroPlay plays."
 
     /// Walks the picked files and folders. Doesn't read file contents (sizes and names only),
     /// so it stays quick on big trees; the planner reads what it needs.
+    ///
+    /// Folders are walked breadth-first, each listed (one level) inside its own short
+    /// coordinated read, as Apple recommends for File Provider locations (iCloud Drive, an SMB
+    /// share): a provider fills each folder when it's asked for it, which one claim on the
+    /// picked folder doesn't do. Cancelling the task stops a read still waiting.
     public static func scan(
         _ urls: [URL],
         limits: SaveScanLimits = SaveScanLimits(),
@@ -200,7 +205,7 @@ public enum SaveFolderScanner {
         var result = SaveScanResult()
         var entries = 0
         for root in urls {
-            guard !result.truncated else { break }
+            guard !result.truncated, !result.cancelled else { break }
             if Task.isCancelled {
                 result.cancelled = true
                 break
@@ -210,56 +215,39 @@ public enum SaveFolderScanner {
                 result.truncated = true
                 break
             }
-            // A coordinated read, as Files expects for a picked folder: it makes a File
-            // Provider (iCloud Drive, an SMB share) bring the folder down before it's walked.
-            var coordinationError: NSError?
-            var coordinated = false
-            NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: root, options: [], error: &coordinationError) { url in
-                coordinated = true
-                scanRoot(url, limits: limits, entries: &entries, result: &result, fileManager: fileManager)
-            }
-            if !coordinated {
+            let values: URLResourceValues
+            do {
+                values = try CoordinatedRead.run(root) { try $0.resourceValues(forKeys: Set(resourceKeys)) }
+            } catch is CancellationError {
+                result.cancelled = true
+                break
+            } catch {
+                // Not known to be a file or a folder: say so rather than guess.
                 entries += 1
-                result.skipped.append(readError(root.lastPathComponent, coordinationError))
+                result.skipped.append(readError(root.lastPathComponent, error))
+                continue
+            }
+            if values.isSymbolicLink == true {
+                entries += 1
+                result.skipped.append(SkippedSave(name: root.lastPathComponent, reason: linkReason))
+            } else if values.isDirectory == true {
+                walk(root, limits: limits, entries: &entries, result: &result, fileManager: fileManager)
+            } else {
+                entries += 1
+                classifyFile(root, values: values, displayPath: root.lastPathComponent, folders: [], limits: limits, result: &result)
             }
         }
         return result
     }
 
-    private static func scanRoot(
-        _ root: URL,
-        limits: SaveScanLimits,
-        entries: inout Int,
-        result: inout SaveScanResult,
-        fileManager: FileManager
-    ) {
-        let values: URLResourceValues
-        do {
-            values = try root.resourceValues(forKeys: Set(resourceKeys))
-        } catch {
-            // Not known to be a file or a folder: say so rather than guess.
-            entries += 1
-            result.skipped.append(readError(root.lastPathComponent, error))
-            return
-        }
-        if values.isSymbolicLink == true {
-            entries += 1
-            result.skipped.append(SkippedSave(name: root.lastPathComponent, reason: linkReason))
-        } else if values.isDirectory == true {
-            walk(root, limits: limits, entries: &entries, result: &result, fileManager: fileManager)
-        } else {
-            entries += 1
-            classifyFile(root, values: values, displayPath: root.lastPathComponent, hintPath: [], limits: limits, result: &result)
-        }
-    }
-
     static func readError(_ name: String, _ error: Error?) -> SkippedSave {
-        SkippedSave(name: name, reason: "Couldn't read it: \(error?.localizedDescription ?? "unknown error").")
+        SkippedSave(name: name, reason: "Couldn't read it: \(error?.localizedDescription ?? "its contents can't be looked at").")
     }
 
-    /// Enumeration errors, kept to report (the enumerator's handler can't write to the result).
-    private final class ReadErrors: @unchecked Sendable {
-        var errors: [(URL, Error)] = []
+    private struct Folder {
+        let url: URL
+        /// Names from the picked folder (included) down to this one.
+        let path: [String]
     }
 
     private static func walk(
@@ -269,179 +257,150 @@ public enum SaveFolderScanner {
         result: inout SaveScanResult,
         fileManager: FileManager
     ) {
-        let rootName = root.lastPathComponent
-        // The picked folder may itself be a PSP save (SAVEDATA/ULUS10041DATA00).
-        if let kind = pspFolderKind(root, fileManager: fileManager) {
-            entries += 1
-            addPSPFolder(root, kind: kind, displayPath: rootName, result: &result)
-            return
-        }
-        if let reason = unusableFolderReason(root, fileManager: fileManager) {
-            entries += 1
-            result.skipped.append(SkippedSave(name: rootName, reason: reason))
-            return
-        }
-        // A folder that can't be read (not downloaded, no permission) is reported, and the
-        // walk goes on with the rest.
-        let readErrors = ReadErrors()
-        guard let walker = fileManager.enumerator(
-            at: root,
-            includingPropertiesForKeys: resourceKeys,
-            // Hidden files are skipped by hand: iCloud placeholders (".Name.sav.icloud") are
-            // worth naming.
-            options: [.skipsPackageDescendants],
-            errorHandler: { url, error in
-                readErrors.errors.append((url, error))
-                return true
-            }
-        ) else {
-            result.skipped.append(readError(rootName, nil))
-            return
-        }
-
-        let rootComponents = root.standardizedFileURL.pathComponents
-        defer {
-            for (url, error) in readErrors.errors {
-                let relative = url.standardizedFileURL.pathComponents.dropFirst(rootComponents.count)
-                result.skipped.append(readError(([rootName] + relative).joined(separator: "/"), error))
-            }
-        }
-        while let next = walker.nextObject() {
+        var queue = [Folder(url: root, path: [root.lastPathComponent])]
+        var next = 0
+        while next < queue.count {
+            let folder = queue[next]
+            next += 1
             if Task.isCancelled {
                 result.cancelled = true
                 return
             }
-            guard let url = next as? URL else { continue }
-            entries += 1
-            if entries > limits.maxEntries || result.candidates.count >= limits.maxCandidates {
-                result.truncated = true
+            let displayPath = folder.path.joined(separator: "/")
+            // This folder only, under its own claim; the claim ends before anything is done
+            // with the listing.
+            let children: [(url: URL, values: URLResourceValues?)]
+            do {
+                children = try CoordinatedRead.run(folder.url) { url in
+                    try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: resourceKeys, options: [])
+                        .map { ($0, try? $0.resourceValues(forKeys: Set(resourceKeys))) }
+                        .sorted { $0.0.lastPathComponent < $1.0.lastPathComponent }
+                }
+            } catch is CancellationError {
+                result.cancelled = true
                 return
-            }
-            let components = Array(url.standardizedFileURL.pathComponents.dropFirst(rootComponents.count))
-            let displayPath = ([rootName] + components).joined(separator: "/")
-            let name = url.lastPathComponent
-            let values = try? url.resourceValues(forKeys: Set(resourceKeys))
-            let isDirectory = values?.isDirectory == true
-
-            // A link could point anywhere (outside the pick, or nowhere once copied).
-            if values?.isSymbolicLink == true {
-                if !name.hasPrefix(".") {
-                    result.skipped.append(SkippedSave(name: displayPath, reason: linkReason))
-                }
+            } catch {
+                // Not downloaded, no permission: reported, and the walk goes on with the rest.
+                result.skipped.append(readError(displayPath, error))
                 continue
             }
-
-            if name.hasPrefix(".") {
-                if isDirectory {
-                    walker.skipDescendants()
-                } else if name.hasSuffix(".icloud") {
-                    let real = String(name.dropFirst().dropLast(".icloud".count))
-                    if SaveImportContentTypes.isBatteryExtension((real as NSString).pathExtension) {
-                        result.skipped.append(SkippedSave(
-                            name: ([rootName] + components.dropLast() + [real]).joined(separator: "/"),
-                            reason: "Not downloaded from iCloud yet. Open it in Files once, then import again."
-                        ))
-                    }
-                }
+            // Names it can list but nothing it can look at (no search permission): one error.
+            if !children.isEmpty, children.allSatisfy({ $0.values == nil }) {
+                result.skipped.append(readError(displayPath, nil))
                 continue
             }
-
-            if isDirectory {
-                if let kind = pspFolderKind(url, fileManager: fileManager) {
-                    addPSPFolder(url, kind: kind, displayPath: displayPath, result: &result)
-                    walker.skipDescendants()
-                } else if let reason = unusableFolderReason(url, fileManager: fileManager) {
-                    // Reported once for the whole folder, not file by file.
+            if let decision = folderDecision(folder, children: children) {
+                switch decision {
+                case .pspSave(let modified):
+                    result.candidates.append(SaveImportCandidate(
+                        url: folder.url,
+                        displayPath: displayPath,
+                        kind: .pspFolder(name: folder.url.lastPathComponent),
+                        folderHints: [.psp],
+                        modified: modified
+                    ))
+                case .skip(let reason):
                     result.skipped.append(SkippedSave(name: displayPath, reason: reason))
-                    walker.skipDescendants()
-                } else if walker.level >= limits.maxDepth {
-                    walker.skipDescendants()
-                    result.truncated = true
                 }
                 continue
             }
-            // Folder names around the file, the picked folder's own name included.
-            let hintPath = [rootName] + components.dropLast()
-            classifyFile(url, values: values, displayPath: displayPath, hintPath: hintPath, limits: limits, result: &result)
+            for child in children {
+                entries += 1
+                if entries > limits.maxEntries || result.candidates.count >= limits.maxCandidates {
+                    result.truncated = true
+                    return
+                }
+                let name = child.url.lastPathComponent
+                let childPath = folder.path + [name]
+                // A link could point anywhere (outside the pick, or nowhere once copied).
+                if child.values?.isSymbolicLink == true {
+                    if !name.hasPrefix(".") {
+                        result.skipped.append(SkippedSave(name: childPath.joined(separator: "/"), reason: linkReason))
+                    }
+                    continue
+                }
+                let isDirectory = child.values?.isDirectory == true
+                if name.hasPrefix(".") {
+                    // Hidden folders are passed over; iCloud placeholders (".Name.sav.icloud")
+                    // are worth naming.
+                    if !isDirectory, name.hasSuffix(".icloud") {
+                        let real = String(name.dropFirst().dropLast(".icloud".count))
+                        if SaveImportContentTypes.isBatteryExtension((real as NSString).pathExtension) {
+                            result.skipped.append(SkippedSave(
+                                name: (folder.path + [real]).joined(separator: "/"),
+                                reason: "Not downloaded from iCloud yet. Open it in Files once, then import again."
+                            ))
+                        }
+                    }
+                    continue
+                }
+                if isDirectory {
+                    guard child.values?.isPackage != true else { continue }
+                    if childPath.count - 1 >= limits.maxDepth {
+                        result.truncated = true
+                    } else {
+                        queue.append(Folder(url: child.url, path: childPath))
+                    }
+                    continue
+                }
+                classifyFile(
+                    child.url,
+                    values: child.values,
+                    displayPath: childPath.joined(separator: "/"),
+                    folders: folder.path,
+                    limits: limits,
+                    result: &result
+                )
+            }
         }
     }
 
-    private enum PSPFolderKind {
-        case save
-        case missingParam
+    private enum FolderDecision {
+        case pspSave(modified: Date?)
+        case skip(String)
     }
 
-    /// A PSP SAVEDATA slot: a product-ID folder name (in any case: copies through other file
-    /// systems can come back lower-cased) with a PARAM.SFO inside. An upper-case folder named
-    /// like one without PARAM.SFO is reported rather than ignored. Its contents are checked
-    /// (bounded) when it's planned, not walked here.
-    static let otherSystemReason = "Not a save for a system RetroPlay plays."
+    /// Vita title IDs (PCSA00017) and Wii U account folders (80000001): only these names,
+    /// with what's around them, say a folder isn't RetroPlay's. Names like "PC" don't.
+    private static let vitaTitleID = try! NSRegularExpression(pattern: #"^PCS[A-Z][0-9]{5}$"#)
+    private static let wiiUAccount = try! NSRegularExpression(pattern: #"^800000[0-9a-f]{2}$"#)
 
-    /// Folders of systems RetroPlay doesn't play, by the names backups and the consoles use.
-    private static let otherSystemFolders: Set<String> = [
-        "wii u", "wiiu", "wii", "gamecube", "switch", "3ds", "psvita", "ps vita", "vita",
-        "ps2", "ps3", "ps4", "ps5", "xbox", "pc",
-    ]
-    private static let otherSystemFolderPatterns = [
-        // PS Vita title IDs (PCSA00017) and their sce_sys folder.
-        try! NSRegularExpression(pattern: #"^PCS[A-Z][0-9]{5}$|^sce_sys$"#),
-        // Wii U save folders per user account (80000001).
-        try! NSRegularExpression(pattern: #"^8[0-9a-f]{7}$"#),
-    ]
+    private static func matches(_ pattern: NSRegularExpression, _ name: String) -> Bool {
+        pattern.firstMatch(in: name, range: NSRange(name.startIndex..<name.endIndex, in: name)) != nil
+    }
 
-    /// Why a folder that isn't a usable PSP slot is skipped whole: another system's saves, or
-    /// a PARAM.SFO under a name that isn't a PSP save's (a PSP product ID and save name).
-    private static func unusableFolderReason(_ url: URL, fileManager: FileManager) -> String? {
-        let name = url.lastPathComponent
-        let range = NSRange(name.startIndex..<name.endIndex, in: name)
-        if otherSystemFolders.contains(name.lowercased())
-            || otherSystemFolderPatterns.contains(where: { $0.firstMatch(in: name, range: range) != nil }) {
-            return otherSystemReason.replacingOccurrences(of: "a save", with: "saves")
+    /// What a folder is, from its own listing: a PSP save slot (a product ID and save name,
+    /// in any case, with a PARAM.SFO), a folder to skip whole (a PSP-looking slot without
+    /// PARAM.SFO, a PARAM.SFO under a name that isn't a save's, a Vita save with sce_sys, a
+    /// Wii U account folder), or nil to look inside.
+    private static func folderDecision(_ folder: Folder, children: [(url: URL, values: URLResourceValues?)]) -> FolderDecision? {
+        let name = folder.url.lastPathComponent
+        let param = children.first { $0.url.lastPathComponent.uppercased() == "PARAM.SFO" && $0.values?.isDirectory != true }
+        let names = Set(children.map { $0.url.lastPathComponent.lowercased() })
+        if matches(vitaTitleID, name), names.contains("sce_sys") {
+            return .skip(otherSystemReason.replacingOccurrences(of: "a save", with: "saves"))
         }
-        // Two quick looks, not a listing: PARAM.SFO is upper-case on a PSP.
-        for param in ["PARAM.SFO", "param.sfo"] where fileManager.fileExists(atPath: url.appendingPathComponent(param).path) {
-            return "Has a PARAM.SFO, but “\(name)” isn't a PSP save folder name (a product ID like ULUS10041 and a save name)."
+        if matches(wiiUAccount, name) {
+            return .skip(otherSystemReason.replacingOccurrences(of: "a save", with: "saves"))
+        }
+        if SaveGameImporter.isValidPSPSaveFolderName(name.uppercased()) {
+            if let param { return .pspSave(modified: param.values?.contentModificationDate) }
+            if name == name.uppercased() {
+                return .skip(SaveGameImportError.missingPSPMetadata.localizedDescription)
+            }
+            return nil
+        }
+        if param != nil {
+            return .skip("Has a PARAM.SFO, but “\(name)” isn't a PSP save folder name (a product ID like ULUS10041 and a save name).")
         }
         return nil
-    }
-
-    private static func pspFolderKind(_ url: URL, fileManager: FileManager) -> PSPFolderKind? {
-        let name = url.lastPathComponent
-        guard SaveGameImporter.isValidPSPSaveFolderName(name.uppercased()) else { return nil }
-        if SaveGameImporter.paramSFO(in: url, fileManager: fileManager) != nil { return .save }
-        return name == name.uppercased() ? .missingParam : nil
-    }
-
-    private static func addPSPFolder(
-        _ url: URL,
-        kind: PSPFolderKind,
-        displayPath: String,
-        result: inout SaveScanResult
-    ) {
-        switch kind {
-        case .save:
-            let modified = try? SaveGameImporter.paramSFO(in: url)?
-                .resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-            result.candidates.append(SaveImportCandidate(
-                url: url,
-                displayPath: displayPath,
-                kind: .pspFolder(name: url.lastPathComponent),
-                folderHints: [.psp],
-                modified: modified
-            ))
-        case .missingParam:
-            result.skipped.append(SkippedSave(
-                name: displayPath,
-                reason: SaveGameImportError.missingPSPMetadata.localizedDescription
-            ))
-        }
     }
 
     private static func classifyFile(
         _ url: URL,
         values: URLResourceValues?,
         displayPath: String,
-        hintPath: [String],
+        folders: [String],
         limits: SaveScanLimits,
         result: inout SaveScanResult
     ) {
@@ -462,6 +421,11 @@ public enum SaveFolderScanner {
             result.ignoredFiles += 1
             return
         }
+        // Inside a Vita title or Wii U account folder: not a cartridge save, whatever its name.
+        if folders.contains(where: { matches(vitaTitleID, $0) || matches(wiiUAccount, $0) }) {
+            result.skipped.append(SkippedSave(name: displayPath, reason: otherSystemReason))
+            return
+        }
         let size = values?.fileSize ?? 0
         guard size <= limits.maxFileBytes else {
             result.skipped.append(SkippedSave(name: displayPath, reason: "Too large to be a save."))
@@ -475,7 +439,7 @@ public enum SaveFolderScanner {
             url: url,
             displayPath: displayPath,
             kind: .file(extension: ext, size: size),
-            folderHints: hints(for: hintPath),
+            folderHints: hints(for: folders),
             modified: values?.contentModificationDate
         ))
     }
@@ -530,6 +494,8 @@ public struct LibrarySaveImporter: Sendable {
             }
         }
 
+        planned = settlePSPSpellings(planned, skipped: &batch.skipped)
+
         // Several copies of one game's save (two exports, or saves/ and a backup): the newest wins.
         var byDestination: [String: [(item: SaveImportItem, modified: Date?)]] = [:]
         for entry in planned {
@@ -561,6 +527,40 @@ public struct LibrarySaveImporter: Sendable {
         }
         batch.skipped.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         return batch
+    }
+
+    /// Spellings of one PSP slot (ULUS10560System, and ULUS10560SYSTEM from a build that
+    /// upper-cased names) become one: the game's mixed-case spelling, whatever the dates, since
+    /// PPSSPP only lists a save under the name the game asks for. Two different mixed-case
+    /// spellings can't be told apart, so both are reported.
+    private func settlePSPSpellings(
+        _ planned: [(item: SaveImportItem, modified: Date?)],
+        skipped: inout [SkippedSave]
+    ) -> [(item: SaveImportItem, modified: Date?)] {
+        var spellings: [String: Set<String>] = [:]
+        for entry in planned where entry.item.plan.check == .pspFolder {
+            let dest = entry.item.plan.destinationURL
+            spellings[dest.path.uppercased(), default: []].insert(dest.lastPathComponent)
+        }
+        return planned.filter { entry in
+            let dest = entry.item.plan.destinationURL
+            guard entry.item.plan.check == .pspFolder,
+                  let names = spellings[dest.path.uppercased()], names.count > 1 else { return true }
+            let mixed = names.filter { $0 != $0.uppercased() }
+            if mixed.count == 1, let chosen = mixed.first {
+                if dest.lastPathComponent == chosen { return true }
+                skipped.append(SkippedSave(
+                    name: entry.item.sourceName,
+                    reason: "The game names this save “\(chosen)”; that copy is imported."
+                ))
+                return false
+            }
+            skipped.append(SkippedSave(
+                name: entry.item.sourceName,
+                reason: "Spelled differently from another copy (\(names.sorted().joined(separator: ", "))). Keep only the one the game uses."
+            ))
+            return false
+        }
     }
 
     private func planFile(
@@ -612,7 +612,7 @@ public struct LibrarySaveImporter: Sendable {
             }
             let header: Data
             do {
-                header = try LibraryStore.coordinatedRead(of: candidate.url) { try Self.readHeader($0) }
+                header = try CoordinatedRead.run(candidate.url) { try Self.readHeader($0) }
             } catch {
                 return .failure(SaveFolderScanner.readError(name, error))
             }
@@ -674,7 +674,8 @@ public struct LibrarySaveImporter: Sendable {
             ))
         }
         do {
-            let plan = try LibraryStore.coordinatedRead(of: candidate.url) {
+            let importer = self.importer
+            let plan = try CoordinatedRead.run(candidate.url) {
                 try importer.planPSPFolderImport(from: $0, for: game, paths: paths, fileManager: fileManager)
             }
             return .success(SaveImportItem(
@@ -763,7 +764,7 @@ public struct LibrarySaveImporter: Sendable {
     static func sameContents(_ a: URL, _ b: URL, fileManager: FileManager) -> Bool {
         var isDir: ObjCBool = false
         guard fileManager.fileExists(atPath: b.path, isDirectory: &isDir), !isDir.boolValue else { return false }
-        return (try? LibraryStore.coordinatedRead(of: a) { fileManager.contentsEqual(atPath: $0.path, andPath: b.path) }) ?? false
+        return (try? CoordinatedRead.run(a) { fileManager.contentsEqual(atPath: $0.path, andPath: b.path) }) ?? false
     }
 
     static func systemList(_ systems: Set<SystemID>) -> String {
@@ -917,6 +918,56 @@ public enum FreshBoot {
         let url = paths.freshBootMarkerURL(for: gameID)
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
+    }
+}
+
+// MARK: - Coordinated reads
+
+/// A coordinated read of one item, the way File Provider locations expect to be read. Kept
+/// short (one folder listing, one file), and cancellable: cancelling the calling task stops a
+/// read still waiting for its provider instead of blocking until the provider answers.
+enum CoordinatedRead {
+    private final class Pending<T>: @unchecked Sendable {
+        let lock = NSLock()
+        let body: (URL) throws -> T
+        var result: Result<T, Error>?
+        var abandoned = false
+        init(_ body: @escaping (URL) throws -> T) { self.body = body }
+    }
+
+    static func run<T>(_ url: URL, _ body: @escaping (URL) throws -> T) throws -> T {
+        let pending = Pending(body)
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        let intent = NSFileAccessIntent.readingIntent(with: url, options: [])
+        let done = DispatchSemaphore(value: 0)
+        let queue = OperationQueue()
+        coordinator.coordinate(with: [intent], queue: queue) { [intent] error in
+            pending.lock.lock()
+            defer {
+                pending.lock.unlock()
+                done.signal()
+            }
+            guard !pending.abandoned else { return }
+            if let error {
+                pending.result = .failure(error)
+            } else {
+                pending.result = Result { try pending.body(intent.url) }
+            }
+        }
+        while done.wait(timeout: .now() + .milliseconds(50)) == .timedOut {
+            guard Task.isCancelled else { continue }
+            coordinator.cancel()
+            pending.lock.lock()
+            pending.abandoned = true
+            let finished = pending.result
+            pending.lock.unlock()
+            if let finished { return try finished.get() }
+            throw CancellationError()
+        }
+        pending.lock.lock()
+        defer { pending.lock.unlock() }
+        guard let result = pending.result else { throw CocoaError(.fileReadUnknown) }
+        return try result.get()
     }
 }
 

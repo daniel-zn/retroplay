@@ -899,7 +899,15 @@ public struct PlayView: View {
         }
         var imported = false
         do {
-            try saveImporter.commitImport(plan: pending.plan, from: pending.url, overwrite: overwrite)
+            // Off the main actor: a coordinated read of a file in iCloud Drive or on a share
+            // can wait. The source's security scope stays open until this function returns
+            // (the defer above), and the game is already stopped.
+            let importer = saveImporter
+            let plan = pending.plan
+            let source = pending.url
+            try await Task.detached(priority: .userInitiated) {
+                try importer.commitImport(plan: plan, from: source, overwrite: overwrite)
+            }.value
             imported = true
             showToast(pending.plan.warning ?? "Imported \(pending.plan.sourceDescription)")
         } catch {
