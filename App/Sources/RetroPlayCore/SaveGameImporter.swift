@@ -78,7 +78,8 @@ public struct SaveGameImporter: Sendable {
     public init() {}
 
     /// Bounds on a PSP save folder's contents (real ones hold a handful of files, a few MiB).
-    public static let pspFolderMaxFiles = 256
+    public static let pspFolderMaxEntries = 256
+    public static let pspFolderMaxDepth = 4
     public static let pspFolderMaxBytes = 128 << 20
 
     private static let pspProductIDPattern = try! NSRegularExpression(
@@ -193,11 +194,16 @@ public struct SaveGameImporter: Sendable {
         }
     }
 
+    /// Copies the source next to the destination, checks the copy (`plan.check`), runs
+    /// `beforeInstall` (a throw there stops the import with nothing replaced), then swaps the
+    /// copy in. `swap` exchanges two folders (injectable for tests).
     public func commitImport(
         plan: SaveGameImportPlan,
         from sourceURL: URL,
         overwrite: Bool,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        beforeInstall: () throws -> Void = {},
+        swap: (URL, URL) throws -> Void = SaveGameImporter.swapDirectory
     ) throws {
         if plan.replacesExisting, !overwrite {
             throw SaveGameImportError.destinationExists(plan.destinationURL)
@@ -219,10 +225,18 @@ public struct SaveGameImporter: Sendable {
 
             do {
                 if isDirectory {
-                    try copyDirectory(from: sourceURL, to: stagingURL, fileManager: fileManager)
+                    // Within the PSP caps as it copies: a folder that grew since the plan stops early.
+                    try Self.copyPSPFolder(from: sourceURL, to: stagingURL, fileManager: fileManager)
                 } else {
+                    // A file that changed since the plan (grown, emptied, now a link) isn't copied.
+                    if let check = plan.check {
+                        try Self.validateStaged(sourceURL, check: check, fileManager: fileManager)
+                    }
                     try fileManager.copyItem(at: sourceURL, to: stagingURL)
                 }
+            } catch let error as SaveGameImportError {
+                try? fileManager.removeItem(at: stagingURL)
+                throw error
             } catch {
                 try? fileManager.removeItem(at: stagingURL)
                 throw SaveGameImportError.copyFailed(error.localizedDescription)
@@ -233,9 +247,10 @@ public struct SaveGameImporter: Sendable {
                 if let check = plan.check {
                     try Self.validateStaged(stagingURL, check: check, fileManager: fileManager)
                 }
+                try beforeInstall()
                 if fileManager.fileExists(atPath: plan.destinationURL.path) {
                     if isDirectory {
-                        try Self.swapDirectory(at: plan.destinationURL, with: stagingURL)
+                        try swap(plan.destinationURL, stagingURL)
                         // The swap put the old folder at the staging path.
                         try? fileManager.removeItem(at: stagingURL)
                     } else {
@@ -269,7 +284,7 @@ public struct SaveGameImporter: Sendable {
 
     /// Exchanges two folders in one step, so the destination is never missing, even if the app
     /// dies mid-import.
-    static func swapDirectory(at destination: URL, with staging: URL) throws {
+    public static func swapDirectory(at destination: URL, with staging: URL) throws {
         let result = staging.withUnsafeFileSystemRepresentation { from in
             destination.withUnsafeFileSystemRepresentation { to in
                 renamex_np(from!, to!, UInt32(RENAME_SWAP))
@@ -283,12 +298,14 @@ public struct SaveGameImporter: Sendable {
     static func validateStaged(_ url: URL, check: SaveGameImportPlan.StagedCheck, fileManager: FileManager) throws {
         switch check {
         case .batteryFile(let system, let ext, let lenient):
-            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-            guard values.isSymbolicLink != true, values.isRegularFile == true else {
+            // Read now from the file system: a URL's cached resource values can be from the scan.
+            let attributes = try fileManager.attributesOfItem(atPath: url.path)
+            guard attributes[.type] as? FileAttributeType == .typeRegular else {
                 throw SaveGameImportError.unsupportedFormat("Links and special files aren't imported; pick the save itself.")
             }
+            let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
             let header = try LibrarySaveImporter.readHeader(url)
-            try validateBatteryFile(extension: ext, size: values.fileSize ?? 0, header: header, system: system, lenient: lenient)
+            try validateBatteryFile(extension: ext, size: size, header: header, system: system, lenient: lenient)
         case .pspFolder:
             try validatePSPFolderContents(url, fileManager: fileManager)
         }
@@ -302,30 +319,59 @@ public struct SaveGameImporter: Sendable {
         return names.first { $0.uppercased() == "PARAM.SFO" }.map { folder.appendingPathComponent($0) }
     }
 
-    /// A PSP save folder holds plain files only (no links that would point outside it once
-    /// copied) and stays within `pspFolderMaxFiles` / `pspFolderMaxBytes`.
+    /// A PSP save folder holds plain files and folders only (no links that would point outside
+    /// it once copied), at most `pspFolderMaxEntries` of them, `pspFolderMaxDepth` deep and
+    /// `pspFolderMaxBytes` in all.
     public static func validatePSPFolderContents(_ folder: URL, fileManager: FileManager = .default) throws {
-        let keys: Set<URLResourceKey> = [.isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey, .fileSizeKey]
-        let tooBig = SaveGameImportError.unsupportedFormat("Too big to be a PSP save folder.")
-        let link = SaveGameImportError.unsupportedFormat("Save folders with links in them aren't imported.")
-        if (try? folder.resourceValues(forKeys: keys))?.isSymbolicLink == true { throw link }
+        if (try? folder.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
+            throw pspLinkError
+        }
         guard paramSFO(in: folder, fileManager: fileManager) != nil else {
             throw SaveGameImportError.missingPSPMetadata
         }
+        try walkPSPFolder(folder, fileManager: fileManager) { _, _, _ in }
+    }
+
+    static func copyPSPFolder(from source: URL, to destination: URL, fileManager: FileManager) throws {
+        try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
+        try walkPSPFolder(source, fileManager: fileManager) { url, relative, isDirectory in
+            let target = relative.reduce(destination) { $0.appendingPathComponent($1) }
+            if isDirectory {
+                try fileManager.createDirectory(at: target, withIntermediateDirectories: true)
+            } else {
+                try fileManager.copyItem(at: url, to: target)
+            }
+        }
+    }
+
+    private static let pspLinkError = SaveGameImportError.unsupportedFormat("Save folders with links in them aren't imported.")
+
+    /// Visits every entry (parents before children), throwing as soon as a cap is passed.
+    private static func walkPSPFolder(
+        _ folder: URL,
+        fileManager: FileManager,
+        visit: (URL, [String], Bool) throws -> Void
+    ) throws {
+        let keys: Set<URLResourceKey> = [.isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey, .fileSizeKey]
+        let tooBig = SaveGameImportError.unsupportedFormat("Too big to be a PSP save folder.")
         guard let walker = fileManager.enumerator(at: folder, includingPropertiesForKeys: Array(keys)) else {
             throw SaveGameImportError.copyFailed("The folder couldn't be read.")
         }
-        var files = 0
+        let rootCount = folder.standardizedFileURL.pathComponents.count
+        var entries = 0
         var bytes = 0
         while let next = walker.nextObject() {
             guard let url = next as? URL else { continue }
             let values = try url.resourceValues(forKeys: keys)
-            if values.isSymbolicLink == true { throw link }
-            if values.isDirectory == true { continue }
-            guard values.isRegularFile == true else { throw link }
-            files += 1
-            bytes += values.fileSize ?? 0
-            if files > pspFolderMaxFiles || bytes > pspFolderMaxBytes { throw tooBig }
+            if values.isSymbolicLink == true { throw pspLinkError }
+            let isDirectory = values.isDirectory == true
+            guard isDirectory || values.isRegularFile == true else { throw pspLinkError }
+            entries += 1
+            bytes += isDirectory ? 0 : values.fileSize ?? 0
+            if entries > pspFolderMaxEntries || bytes > pspFolderMaxBytes || walker.level > pspFolderMaxDepth {
+                throw tooBig
+            }
+            try visit(url, Array(url.standardizedFileURL.pathComponents.dropFirst(rootCount)), isDirectory)
         }
     }
 
@@ -439,21 +485,5 @@ public struct SaveGameImporter: Sendable {
             throw SaveGameImportError.securityScopedAccessFailed
         }
         return try body()
-    }
-
-    private func copyDirectory(
-        from source: URL,
-        to destination: URL,
-        fileManager: FileManager
-    ) throws {
-        try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
-        let items = try fileManager.contentsOfDirectory(at: source, includingPropertiesForKeys: nil)
-        for item in items {
-            let destItem = destination.appendingPathComponent(item.lastPathComponent)
-            if fileManager.fileExists(atPath: destItem.path) {
-                try fileManager.removeItem(at: destItem)
-            }
-            try fileManager.copyItem(at: item, to: destItem)
-        }
     }
 }

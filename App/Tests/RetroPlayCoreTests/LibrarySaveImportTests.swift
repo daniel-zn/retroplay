@@ -375,7 +375,8 @@ final class LibrarySaveImportTests: XCTestCase {
         try Data([2]).write(to: old)
         try fm.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: old.path)
         XCTAssertFalse(FreshBoot.isPending(zelda.id, system: .gba, paths: paths, fileManager: fm))
-        XCTAssertFalse(fm.fileExists(atPath: paths.freshBootMarkerURL(for: zelda.id).path))
+        // Kept: automatic resume still never falls back to a state from before the import.
+        XCTAssertNotNil(FreshBoot.importDate(zelda.id, paths: paths))
     }
 
     func testEveryCopyOfAPSPGameBootsFresh() throws {

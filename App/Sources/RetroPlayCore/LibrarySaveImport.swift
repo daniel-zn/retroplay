@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
+import Observation
 
 // Library-level save import: the player picks save files and folders (a RetroArch `saves/`
 // tree, another app's export, a PSP `SAVEDATA` folder); the scanner finds what looks like a
@@ -121,6 +122,58 @@ public enum SaveImportPhase: Sendable, Equatable {
     public var allowsLaunchingGames: Bool { self == .idle }
 
     public static func mayWrite(gameOpen: Bool) -> Bool { !gameOpen }
+}
+
+/// One library save import at a time. Each scan gets an id; the scan's completion, the commit
+/// and the summary closing only act for the session still in progress, so a late completion
+/// of an earlier one can't move the phase (and let a game start while another writes).
+@MainActor
+@Observable
+public final class SaveImportSessions {
+    public private(set) var phase = SaveImportPhase.idle
+    private var current: UUID?
+
+    public init() {}
+
+    /// No new import (games or saves) while one is under way.
+    public var allowsImporting: Bool { phase == .idle }
+    public var allowsLaunchingGames: Bool { phase.allowsLaunchingGames }
+
+    /// Starts a scan, or nil while another import is under way.
+    public func beginScan() -> UUID? {
+        guard phase == .idle else { return nil }
+        let id = UUID()
+        current = id
+        phase = .scanning
+        return id
+    }
+
+    /// The scan finished. True (now reviewing) only for the session in progress.
+    public func scanFinished(_ id: UUID) -> Bool {
+        guard current == id, phase == .scanning else { return false }
+        phase = .reviewing
+        return true
+    }
+
+    /// True (now committing) only for the session under review, with no game open.
+    public func beginCommit(_ id: UUID, gameOpen: Bool) -> Bool {
+        guard current == id, phase == .reviewing, SaveImportPhase.mayWrite(gameOpen: gameOpen) else { return false }
+        phase = .committing
+        return true
+    }
+
+    /// The summary was closed without importing. Ignored while that session writes.
+    public func cancel(_ id: UUID) {
+        guard phase != .committing else { return }
+        end(id)
+    }
+
+    /// The session is over (nothing found, or written). Stale ids are ignored.
+    public func end(_ id: UUID) {
+        guard current == id else { return }
+        current = nil
+        phase = .idle
+    }
 }
 
 // MARK: - Scanner
@@ -419,36 +472,30 @@ public struct LibrarySaveImporter: Sendable {
                 reason: "This is memory card 2. RetroPlay uses card 1 only; import the _1 card."
             ))
         }
-        // Systems the save's folder (saves/melonDS/) or name (Zelda.gba.sav) says it's for. A
-        // match on any other system is refused, even when it's the only one.
-        var hinted = candidate.folderHints
-        let inner = (base as NSString).pathExtension.lowercased()
-        if !inner.isEmpty {
-            hinted.formUnion(SystemID.allCases.filter { $0.fileExtensions.contains(inner) })
+        // Which systems it can be for, before any name is looked at: a ROM extension in the
+        // name (Zelda.gba.sav) says so outright; otherwise the folder (saves/melonDS/) does. A
+        // name and folder that disagree, or a match only on another system, are refused.
+        let named = Set(SystemID.allCases.filter { system in
+            let inner = (base as NSString).pathExtension.lowercased()
+            return !inner.isEmpty && system.fileExtensions.contains(inner)
+        })
+        let folder = candidate.folderHints
+        if !named.isEmpty, !folder.isEmpty, named.isDisjoint(with: folder) {
+            return .failure(SkippedSave(
+                name: name,
+                reason: "Its name says \(Self.systemList(named)) but its folder says \(Self.systemList(folder)). Not imported."
+            ))
         }
-        var firstRejection: String?
+        let hinted = !named.isEmpty ? named : folder
+        let fits = Set(SystemID.allCases.filter { SaveFormat.of($0).accepts(extension: ext, size: size) })
+        let eligible = (hinted.isEmpty ? fits : hinted.intersection(fits))
+
+        var otherSystemMatch: LibraryGame?
         for tier in TitleIndex.Tier.allCases {
             let matches = index.games(named: base, tier: tier, saveExtension: ext)
-            guard !matches.isEmpty else { continue }
-            let fitting = matches.filter { SaveFormat.of($0.systemID).accepts(extension: ext, size: size) }
-            guard !fitting.isEmpty else {
-                if firstRejection == nil, let game = matches.first {
-                    firstRejection = rejection(ext: ext, size: size, system: game.systemID)
-                }
-                continue
-            }
-            var choices = fitting
-            if !hinted.isEmpty {
-                choices = fitting.filter { hinted.contains($0.systemID) }
-                guard !choices.isEmpty else {
-                    let saysFor = hinted.map(Self.shortSystem).sorted().joined(separator: "/")
-                    let names = fitting.prefix(3).map { "\($0.displayName) (\(Self.shortSystem($0.systemID)))" }
-                    return .failure(SkippedSave(
-                        name: name,
-                        reason: "Its folder or name says \(saysFor), but it matches \(names.joined(separator: ", ")). Not imported."
-                    ))
-                }
-            }
+            if otherSystemMatch == nil { otherSystemMatch = matches.first { !eligible.contains($0.systemID) } }
+            let choices = matches.filter { eligible.contains($0.systemID) }
+            guard !choices.isEmpty else { continue }
             guard choices.count == 1, let game = choices.first else {
                 let names = choices.prefix(4).map { "\($0.displayName) (\(Self.shortSystem($0.systemID)))" }
                 return .failure(SkippedSave(
@@ -476,10 +523,19 @@ public struct LibrarySaveImporter: Sendable {
             )
             return .success(SaveImportItem(game: game, sourceURL: candidate.url, sourceName: name, plan: plan))
         }
-        return .failure(SkippedSave(
-            name: name,
-            reason: firstRejection ?? "No game in your library has this name. Import the game first, or rename the save to match its file."
-        ))
+        guard let other = otherSystemMatch else {
+            return .failure(SkippedSave(
+                name: name,
+                reason: "No game in your library has this name. Import the game first, or rename the save to match its file."
+            ))
+        }
+        if !hinted.isEmpty, !hinted.contains(other.systemID) {
+            return .failure(SkippedSave(
+                name: name,
+                reason: "Its folder or name says \(Self.systemList(hinted)), but it matches \(other.displayName) (\(Self.shortSystem(other.systemID))). Not imported."
+            ))
+        }
+        return .failure(SkippedSave(name: name, reason: rejection(ext: ext, size: size, system: other.systemID)))
     }
 
     private func rejection(ext: String, size: Int, system: SystemID) -> String {
@@ -524,8 +580,8 @@ public struct LibrarySaveImporter: Sendable {
 
     /// Writes each save on its own (staged copy, checked again, then an atomic replace), so a
     /// failure leaves that game's old save whole and doesn't stop the others. Every game that
-    /// reads the save is marked to boot fresh first (`FreshBoot`); if that fails, its save
-    /// isn't touched. The caller makes sure no game is running.
+    /// reads the save is marked to boot fresh (`FreshBoot`) just before the install; if that
+    /// fails, its save isn't touched. The caller makes sure no game is running.
     public func commit(
         _ batch: SaveImportBatch,
         replaceExisting: Bool,
@@ -547,13 +603,30 @@ public struct LibrarySaveImporter: Sendable {
                 warning: item.plan.warning,
                 check: item.plan.check
             )
+            // Markers go in once the staged copy has passed its checks, right before it's
+            // installed; if anything fails from there, each game's previous marker comes back.
+            let previous = Dictionary(uniqueKeysWithValues: item.gameIDs.map { ($0, FreshBoot.marker($0, paths: paths)) })
+            var marked = false
             do {
-                for id in item.gameIDs {
-                    try FreshBoot.mark(id, paths: paths, fileManager: fileManager)
-                }
-                try importer.commitImport(plan: plan, from: item.sourceURL, overwrite: replaceExisting, fileManager: fileManager)
+                try importer.commitImport(
+                    plan: plan,
+                    from: item.sourceURL,
+                    overwrite: replaceExisting,
+                    fileManager: fileManager,
+                    beforeInstall: {
+                        marked = true
+                        for id in item.gameIDs {
+                            try FreshBoot.mark(id, paths: paths, fileManager: fileManager)
+                        }
+                    }
+                )
                 outcome.imported.append(item)
             } catch {
+                if marked {
+                    for (id, data) in previous {
+                        FreshBoot.restore(data, for: id, paths: paths, fileManager: fileManager)
+                    }
+                }
                 outcome.failed.append(SkippedSave(name: item.sourceName, reason: error.localizedDescription))
             }
         }
@@ -572,6 +645,10 @@ public struct LibrarySaveImporter: Sendable {
         var isDir: ObjCBool = false
         guard fileManager.fileExists(atPath: b.path, isDirectory: &isDir), !isDir.boolValue else { return false }
         return fileManager.contentsEqual(atPath: a.path, andPath: b.path)
+    }
+
+    static func systemList(_ systems: Set<SystemID>) -> String {
+        systems.map(shortSystem).sorted().joined(separator: "/")
     }
 
     static func shortSystem(_ system: SystemID) -> String {
@@ -670,40 +747,57 @@ struct TitleIndex {
 
 // MARK: - Fresh boot after a library import
 
-/// A game whose save was replaced from the library must not auto-resume its quick save: the
-/// state carries the old save in memory, and the core would write it back on exit. The marker
-/// makes launches boot fresh until a quick save newer than the import exists (the one written
-/// when that fresh session is left); a session that dies before then still boots fresh again.
+/// A game whose save was replaced from the library must not auto-resume a quick save from
+/// before the import: it carries the old save in memory, and the core would write it back on
+/// exit. The marker holds the import time. Launches boot fresh until a committed quick save
+/// newer than that exists (a staged one from a session that died doesn't count), and even
+/// then automatic resume never falls back to a state older than the import
+/// (`AutoResumeLoader.apply(notBefore:)`). Deleting the game removes the marker.
 public enum FreshBoot {
-    public static func mark(_ gameID: UUID, paths: SavePaths, fileManager: FileManager = .default) throws {
-        let url = paths.freshBootMarkerURL(for: gameID)
-        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        // Written anew so its date is the import's.
-        try Data().write(to: url, options: .atomic)
+    public static func mark(_ gameID: UUID, at date: Date = Date(), paths: SavePaths, fileManager: FileManager = .default) throws {
+        try write(Data(String(date.timeIntervalSince1970).utf8), for: gameID, paths: paths, fileManager: fileManager)
     }
 
-    /// True while the game should boot without resuming. Clears the marker once a quick save
-    /// newer than it exists.
+    /// When the game's save was last imported from the library, if ever.
+    public static func importDate(_ gameID: UUID, paths: SavePaths) -> Date? {
+        guard let data = marker(gameID, paths: paths),
+              let seconds = Double(String(decoding: data, as: UTF8.self)) else { return nil }
+        return Date(timeIntervalSince1970: seconds)
+    }
+
+    /// True while the game should boot without resuming at all.
     public static func isPending(
         _ gameID: UUID,
         system: SystemID,
         paths: SavePaths,
         fileManager: FileManager = .default
     ) -> Bool {
-        let url = paths.freshBootMarkerURL(for: gameID)
-        guard let marked = (try? fileManager.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date else {
-            return false
+        guard let imported = importDate(gameID, paths: paths) else { return false }
+        let committed = SaveStateStore.entries(system: system, gameID: gameID, paths: paths, fileManager: fileManager)
+        return !committed.contains { ($0.modifiedAt ?? .distantPast) > imported }
+    }
+
+    /// The marker's bytes, to put back with `restore` if an import that replaced it fails.
+    public static func marker(_ gameID: UUID, paths: SavePaths) -> Data? {
+        try? Data(contentsOf: paths.freshBootMarkerURL(for: gameID))
+    }
+
+    public static func restore(_ data: Data?, for gameID: UUID, paths: SavePaths, fileManager: FileManager = .default) {
+        if let data {
+            try? write(data, for: gameID, paths: paths, fileManager: fileManager)
+        } else {
+            clear(gameID, paths: paths, fileManager: fileManager)
         }
-        let newest = SaveStateStore.newestEntry(system: system, gameID: gameID, paths: paths, fileManager: fileManager)
-        if let saved = newest?.modifiedAt, saved > marked {
-            try? fileManager.removeItem(at: url)
-            return false
-        }
-        return true
     }
 
     public static func clear(_ gameID: UUID, paths: SavePaths, fileManager: FileManager = .default) {
         try? fileManager.removeItem(at: paths.freshBootMarkerURL(for: gameID))
+    }
+
+    private static func write(_ data: Data, for gameID: UUID, paths: SavePaths, fileManager: FileManager) throws {
+        let url = paths.freshBootMarkerURL(for: gameID)
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url, options: .atomic)
     }
 }
 

@@ -47,14 +47,18 @@ public enum AutoResumeLoader: Sendable {
         paths: SavePaths = SavePaths(),
         fileManager: FileManager = .default,
         resumeAfterLoad: Bool = true,
+        notBefore: Date? = nil,
         shouldContinue: @escaping @MainActor () -> Bool = { true }
     ) async -> Status {
+        // `notBefore`: saves were imported then (FreshBoot); older states hold the old save.
         let entries = SaveStateStore.resolvedEntries(
             system: system,
             gameID: gameID,
             paths: paths,
             fileManager: fileManager
-        )
+        ).filter { entry in
+            notBefore.map { (entry.modifiedAt ?? .distantPast) > $0 } ?? true
+        }
         guard !entries.isEmpty else {
             return .firstRun
         }

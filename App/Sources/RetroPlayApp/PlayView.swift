@@ -1035,6 +1035,7 @@ public struct PlayView: View {
         // import does, since the quick save would bring the old save back.
         let freshAfterImport = autoResume && FreshBoot.isPending(game.id, system: system, paths: SavePaths())
         let autoResume = autoResume && !freshAfterImport
+        let importedAt = FreshBoot.importDate(game.id, paths: SavePaths())
 
         // Re-entering a game continues from the save written when it was last left.
         // mupen64plus-next rejects retro_unserialize until its first retro_run, so N64
@@ -1047,6 +1048,7 @@ public struct PlayView: View {
                 system: system,
                 gameID: game.id,
                 resumeAfterLoad: false,
+                notBefore: importedAt,
                 shouldContinue: { token.isCurrent(live: sessionToken) && !didLeave }
             )
             refreshSaveEntries()
@@ -1070,6 +1072,7 @@ public struct PlayView: View {
                 system: system,
                 gameID: game.id,
                 resumeAfterLoad: false,
+                notBefore: importedAt,
                 shouldContinue: { token.isCurrent(live: sessionToken) && !didLeave }
             )
             // A newer boot owns the flag once the token moved on.
