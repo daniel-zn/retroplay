@@ -75,7 +75,10 @@ public struct SaveImportItem: Sendable, Equatable, Identifiable {
     /// Every library entry that reads this save: the game, or for PSP each copy of the title
     /// (an ISO and a CSO share the memory stick folder).
     public let gameIDs: [UUID]
-    public var id: String { plan.destinationURL.path }
+    /// The destination; PSP slots in any case are one slot (see `existingPSPSlot`).
+    public var id: String {
+        plan.check == .pspFolder ? plan.destinationURL.path.uppercased() : plan.destinationURL.path
+    }
     public var replacesExisting: Bool { plan.replacesExisting }
 
     public init(game: LibraryGame, sourceURL: URL, sourceName: String, plan: SaveGameImportPlan, gameIDs: [UUID]? = nil) {
@@ -235,6 +238,11 @@ public enum SaveFolderScanner {
             addPSPFolder(root, kind: kind, displayPath: rootName, result: &result)
             return
         }
+        if let reason = unusableFolderReason(root, fileManager: fileManager) {
+            entries += 1
+            result.skipped.append(SkippedSave(name: rootName, reason: reason))
+            return
+        }
         guard let walker = fileManager.enumerator(
             at: root,
             includingPropertiesForKeys: resourceKeys,
@@ -289,6 +297,10 @@ public enum SaveFolderScanner {
                 if let kind = pspFolderKind(url, fileManager: fileManager) {
                     addPSPFolder(url, kind: kind, displayPath: displayPath, result: &result)
                     walker.skipDescendants()
+                } else if let reason = unusableFolderReason(url, fileManager: fileManager) {
+                    // Reported once for the whole folder, not file by file.
+                    result.skipped.append(SkippedSave(name: displayPath, reason: reason))
+                    walker.skipDescendants()
                 } else if walker.level >= limits.maxDepth {
                     walker.skipDescendants()
                     result.truncated = true
@@ -310,6 +322,36 @@ public enum SaveFolderScanner {
     /// systems can come back lower-cased) with a PARAM.SFO inside. An upper-case folder named
     /// like one without PARAM.SFO is reported rather than ignored. Its contents are checked
     /// (bounded) when it's planned, not walked here.
+    static let otherSystemReason = "Not a save for a system RetroPlay plays."
+
+    /// Folders of systems RetroPlay doesn't play, by the names backups and the consoles use.
+    private static let otherSystemFolders: Set<String> = [
+        "wii u", "wiiu", "wii", "gamecube", "switch", "3ds", "psvita", "ps vita", "vita",
+        "ps2", "ps3", "ps4", "ps5", "xbox", "pc",
+    ]
+    private static let otherSystemFolderPatterns = [
+        // PS Vita title IDs (PCSA00017) and their sce_sys folder.
+        try! NSRegularExpression(pattern: #"^PCS[A-Z][0-9]{5}$|^sce_sys$"#),
+        // Wii U save folders per user account (80000001).
+        try! NSRegularExpression(pattern: #"^8[0-9a-f]{7}$"#),
+    ]
+
+    /// Why a folder that isn't a usable PSP slot is skipped whole: another system's saves, or
+    /// a PARAM.SFO under a name that isn't a PSP save's (a PSP product ID and save name).
+    private static func unusableFolderReason(_ url: URL, fileManager: FileManager) -> String? {
+        let name = url.lastPathComponent
+        let range = NSRange(name.startIndex..<name.endIndex, in: name)
+        if otherSystemFolders.contains(name.lowercased())
+            || otherSystemFolderPatterns.contains(where: { $0.firstMatch(in: name, range: range) != nil }) {
+            return otherSystemReason.replacingOccurrences(of: "a save", with: "saves")
+        }
+        // Two quick looks, not a listing: PARAM.SFO is upper-case on a PSP.
+        for param in ["PARAM.SFO", "param.sfo"] where fileManager.fileExists(atPath: url.appendingPathComponent(param).path) {
+            return "Has a PARAM.SFO, but “\(name)” isn't a PSP save folder name (a product ID like ULUS10041 and a save name)."
+        }
+        return nil
+    }
+
     private static func pspFolderKind(_ url: URL, fileManager: FileManager) -> PSPFolderKind? {
         let name = url.lastPathComponent
         guard SaveGameImporter.isValidPSPSaveFolderName(name.uppercased()) else { return nil }
@@ -538,7 +580,9 @@ public struct LibrarySaveImporter: Sendable {
         guard let other = otherSystemMatch else {
             return .failure(SkippedSave(
                 name: name,
-                reason: "No game in your library has this name. Import the game first, or rename the save to match its file."
+                reason: eligible.isEmpty
+                    ? SaveFolderScanner.otherSystemReason
+                    : "No game in your library has this name. Import the game first, or rename the save to match its file."
             ))
         }
         if !hinted.isEmpty, !hinted.contains(other.systemID) {
@@ -609,7 +653,9 @@ public struct LibrarySaveImporter: Sendable {
                 continue
             }
             // Re-checked now: the destination may have appeared since the summary was shown.
-            let exists = fileManager.fileExists(atPath: item.plan.destinationURL.path)
+            let exists = item.plan.check == .pspFolder
+                ? SaveGameImporter.existingPSPSlot(for: item.plan.destinationURL, fileManager: fileManager) != nil
+                : fileManager.fileExists(atPath: item.plan.destinationURL.path)
             if exists, !replaceExisting {
                 outcome.kept.append(item)
                 continue

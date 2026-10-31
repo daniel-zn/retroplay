@@ -171,7 +171,9 @@ final class LibraryPolishTests: XCTestCase {
         XCTAssertTrue(SaveGameImporter.isValidPSPSaveFolderName("UCUS98648PROFILE00"))
         XCTAssertTrue(SaveGameImporter.isValidPSPSaveFolderName("ULUS10041"))
         XCTAssertFalse(SaveGameImporter.isValidPSPSaveFolderName("SAVEDATA"))
-        XCTAssertFalse(SaveGameImporter.isValidPSPSaveFolderName("ULUS10041DATA00-EXTRA"))
+        // Real save names use '-' (Gran Turismo: UCUS98632-GAMEDAT), not spaces.
+        XCTAssertTrue(SaveGameImporter.isValidPSPSaveFolderName("UCUS98632-GAMEDAT"))
+        XCTAssertFalse(SaveGameImporter.isValidPSPSaveFolderName("ULUS10041DATA 00"))
         XCTAssertTrue(SaveGameImporter.pspSaveFolder("ULUS10041DATA00", belongsTo: "ULUS10041"))
         XCTAssertFalse(SaveGameImporter.pspSaveFolder("ULUS10042DATA00", belongsTo: "ULUS10041"))
     }

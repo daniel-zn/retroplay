@@ -96,7 +96,9 @@ public struct SaveGameImporter: Sendable {
     /// Real SAVEDATA folders append a save name to the product ID (ULUS10041DATA00,
     /// UCUS98648PROFILE00). The PSP caps the whole name at 32 characters.
     private static let pspSaveFolderPattern = try! NSRegularExpression(
-        pattern: #"^[A-Z]{4}[0-9]{5}[A-Z0-9_]{1,23}$"#,
+        // Save names games really use: ULUS10560System, UCUS98632-GAMEDAT, UCUS98731_GameData0
+        // (checked upper-cased).
+        pattern: #"^[A-Z]{4}[0-9]{5}[A-Z0-9_\-]{1,23}$"#,
         options: []
     )
 
@@ -248,6 +250,9 @@ public struct SaveGameImporter: Sendable {
                     try Self.validateStaged(stagingURL, check: check, fileManager: fileManager)
                 }
                 try beforeInstall()
+                if isDirectory {
+                    try Self.renameExistingPSPSlot(to: plan.destinationURL, fileManager: fileManager)
+                }
                 if fileManager.fileExists(atPath: plan.destinationURL.path) {
                     if isDirectory {
                         try swap(plan.destinationURL, stagingURL)
@@ -418,8 +423,9 @@ public struct SaveGameImporter: Sendable {
         paths: SavePaths,
         fileManager: FileManager
     ) throws -> SaveGameImportPlan {
-        let folderName = folderURL.lastPathComponent.uppercased()
-        guard SavePaths.isSafeFileName(folderName) else {
+        let originalName = folderURL.lastPathComponent
+        let folderName = originalName.uppercased()
+        guard SavePaths.isSafeFileName(originalName) else {
             throw SaveGameImportError.unsupportedFormat(
                 "PSP SAVEDATA folder names cannot contain path separators."
             )
@@ -449,8 +455,45 @@ public struct SaveGameImporter: Sendable {
 
         try Self.validatePSPFolderContents(folderURL, fileManager: fileManager)
 
-        let dest = paths.pspSavedataDirectory.appendingPathComponent(folderName, isDirectory: true)
-        return plan(dest: dest, source: folderName, fileManager: fileManager, check: .pspFolder)
+        let installName = Self.pspInstallName(originalName)
+        let dest = paths.pspSavedataDirectory.appendingPathComponent(installName, isDirectory: true)
+        return SaveGameImportPlan(
+            sourceDescription: installName,
+            destinationURL: dest,
+            replacesExisting: Self.existingPSPSlot(for: dest, fileManager: fileManager) != nil,
+            check: .pspFolder
+        )
+    }
+
+    /// The name the game itself uses: PPSSPP compares save folder names case-sensitively when
+    /// it lists them (SavedataParam), so ULUS10560System must stay ULUS10560System. Only a
+    /// name that came back all lower-case (copied through a file system that folded it) is
+    /// upper-cased again, as PSP product IDs and most save names are.
+    static func pspInstallName(_ name: String) -> String {
+        name == name.lowercased() ? name.uppercased() : name
+    }
+
+    /// The slot already on the memory stick for `destination`, matching its name in any case
+    /// (an earlier build upper-cased names; iOS is case-sensitive, so it'd be a second folder).
+    public static func existingPSPSlot(for destination: URL, fileManager: FileManager = .default) -> URL? {
+        let parent = destination.deletingLastPathComponent()
+        let wanted = destination.lastPathComponent.uppercased()
+        let names = (try? fileManager.contentsOfDirectory(atPath: parent.path)) ?? []
+        if names.contains(destination.lastPathComponent) { return destination }
+        return names.first { $0.uppercased() == wanted }.map { parent.appendingPathComponent($0, isDirectory: true) }
+    }
+
+    /// Gives an existing slot the name it's about to be replaced under (a rename, so nothing is
+    /// lost if the import then fails: PPSSPP finds it under either name).
+    static func renameExistingPSPSlot(to destination: URL, fileManager: FileManager) throws {
+        guard let existing = existingPSPSlot(for: destination, fileManager: fileManager),
+              existing.lastPathComponent != destination.lastPathComponent else { return }
+        let result = existing.withUnsafeFileSystemRepresentation { from in
+            destination.withUnsafeFileSystemRepresentation { to in rename(from!, to!) }
+        }
+        guard result == 0 else {
+            throw SaveGameImportError.copyFailed(String(cString: strerror(errno)))
+        }
     }
 
     // MARK: - Validation helpers
