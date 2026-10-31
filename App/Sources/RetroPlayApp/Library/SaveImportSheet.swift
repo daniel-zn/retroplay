@@ -14,6 +14,10 @@ struct SaveImportSheet: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
+    /// The system grouped-list colours, so rows sit on visible cards in light and dark alike.
+    private static let groupedBackground = Color(uiColor: .systemGroupedBackground)
+    private static let rowBackground = Color(uiColor: .secondarySystemGroupedBackground)
+
     var body: some View {
         NavigationStack {
             List {
@@ -33,7 +37,7 @@ struct SaveImportSheet: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(RetroPlayTheme.canvas(for: colorScheme))
+            .background(Self.groupedBackground)
             .navigationTitle("Import Saves")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
@@ -74,7 +78,7 @@ struct SaveImportSheet: View {
             }
             .font(RetroPlayFont.caption2)
         }
-        .listRowBackground(RetroPlayTheme.card(for: colorScheme))
+        .listRowBackground(Self.rowBackground)
     }
 
     private func itemSection(_ title: String, items: [SaveImportItem], footer: String? = nil) -> some View {
@@ -101,7 +105,7 @@ struct SaveImportSheet: View {
                 Text(footer).font(RetroPlayFont.caption2)
             }
         }
-        .listRowBackground(RetroPlayTheme.card(for: colorScheme))
+        .listRowBackground(Self.rowBackground)
     }
 
     private var skippedSection: some View {
@@ -120,7 +124,7 @@ struct SaveImportSheet: View {
         } header: {
             sectionHeader("Skipped (\(batch.skipped.count))")
         }
-        .listRowBackground(RetroPlayTheme.card(for: colorScheme))
+        .listRowBackground(Self.rowBackground)
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -171,6 +175,8 @@ struct SaveImportSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 8)
-        .background(RetroPlayTheme.canvas(for: colorScheme).opacity(0.94))
+        // Opaque down to the screen's edge, so rows scrolling under the buttons don't show
+        // through below them.
+        .background(Self.groupedBackground.ignoresSafeArea(edges: .bottom))
     }
 }
