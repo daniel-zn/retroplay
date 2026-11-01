@@ -990,7 +990,12 @@ enum CoordinatedRead {
             } else if cancellation.isCancelled {
                 value = .failure(CancellationError())
             } else {
+                // A provider's item that isn't on disk yet (a "dataless" folder or file, as
+                // On My iPhone and iCloud Drive keep them on a device) is fetched when read,
+                // rather than listing empty.
+                let restore = Materialization.forceOnThisThread()
                 value = Result { try box.value(intent.url) }
+                restore()
             }
             outcome.lock.lock()
             outcome.value = value
@@ -1115,6 +1120,23 @@ enum FolderWalk {
     /// included). Not set in the app.
     nonisolated(unsafe) static var listed: (@Sendable (URL, Int) -> Void)?
 
+    /// Tests: stand in for what the bulk listing (the enumerator) and the plain directory read
+    /// return for a folder (nil: the real listing). On a device, a provider's folder that isn't
+    /// on disk yet can list nothing through the first.
+    nonisolated(unsafe) static var bulkListing: (@Sendable (URL) -> [URL]?)?
+    nonisolated(unsafe) static var plainListing: (@Sendable (URL) -> [URL]?)?
+
+    /// A folder that listed nothing though its metadata says it holds entries.
+    struct EmptyListing: LocalizedError {
+        /// How many entries it holds (nil: its contents aren't on this device yet).
+        let heldEntries: Int?
+        var errorDescription: String? {
+            let held = heldEntries.map { $0 == 1 ? "it holds 1 item" : "it holds \($0) items" }
+                ?? "its contents aren't on this iPhone yet"
+            return "Files listed nothing in it, but \(held). Open it in Files so its contents download, then import again"
+        }
+    }
+
     /// Entries left to look at, shared by everything one import walks.
     struct Budget {
         var entries: Int
@@ -1184,19 +1206,26 @@ enum FolderWalk {
     ) throws -> (children: [Child], exhausted: Bool, error: Error?) {
         try CoordinatedRead.run(url, cancellation) { url in
             var failure: Error?
-            guard let entries = fileManager.enumerator(
-                at: url,
-                includingPropertiesForKeys: Array(keys),
-                options: [.skipsSubdirectoryDescendants],
-                errorHandler: { _, error in
-                    failure = error
-                    return false
-                }
-            ) else { return ([], false, CocoaError(.fileReadUnknown)) }
+            let nextEntry: () -> URL?
+            if let given = bulkListing?(url) {
+                var remaining = given.makeIterator()
+                nextEntry = { remaining.next() }
+            } else {
+                guard let entries = fileManager.enumerator(
+                    at: url,
+                    includingPropertiesForKeys: Array(keys),
+                    options: [.skipsSubdirectoryDescendants],
+                    errorHandler: { _, error in
+                        failure = error
+                        return false
+                    }
+                ) else { return ([], false, CocoaError(.fileReadUnknown)) }
+                nextEntry = { entries.nextObject() as? URL }
+            }
             var children: [Child] = []
             var pulled = 0
             defer { listed?(url, pulled) }
-            while let next = entries.nextObject() as? URL {
+            func take(_ next: URL) throws -> (children: [Child], exhausted: Bool, error: Error?)? {
                 pulled += 1
                 try cancellation.check()
                 guard children.count < budget else { return (children, true, nil) }
@@ -1205,9 +1234,67 @@ enum FolderWalk {
                     return ([], false, failure ?? CocoaError(.fileReadNoPermission))
                 }
                 children.append(Child(url: next, name: next.lastPathComponent, item: item))
+                return nil
+            }
+            while let next = nextEntry() {
+                if let early = try take(next) { return early }
             }
             if let failure { return ([], false, failure) }
+            if pulled == 0, let held = DirectoryMetadata.heldEntries(url) {
+                // Nothing listed, but the folder's own metadata says it holds entries (or that
+                // its contents aren't on disk yet): ask again with a plain directory read, and
+                // if that lists nothing too, say so rather than call it empty.
+                scanLog.notice("RP_SCAN listed 0 entries where the folder holds \(held.map { String($0) } ?? "unknown (dataless)", privacy: .public); reading it again")
+                let again = plainListing?(url) ?? (try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
+                for next in again {
+                    if let early = try take(next) { return early }
+                }
+                if children.isEmpty {
+                    return ([], false, EmptyListing(heldEntries: held))
+                }
+            }
             return (children.sorted { $0.name < $1.name }, false, nil)
+        }
+    }
+}
+
+/// What a folder's own metadata says about its contents, without listing it.
+enum DirectoryMetadata {
+    /// Tests: stands in for the folder's metadata (nil: the real `stat`).
+    nonisolated(unsafe) static var stat: (@Sendable (URL) -> (links: Int, dataless: Bool)?)?
+
+    /// Entries the folder holds by its metadata: `.some(n)` with n > 0 from its link count (APFS
+    /// counts each entry), `.some(nil)` when it's a dataless folder (contents not on disk), and
+    /// nil when its metadata doesn't say it holds anything.
+    static func heldEntries(_ url: URL) -> Int?? {
+        guard let info = stat?(url) ?? statInfo(url) else { return nil }
+        if info.dataless { return .some(nil) }
+        // A folder's link count is 2 ("." and its entry in the parent) plus its entries on
+        // APFS; other file systems report 1 or 2 whatever it holds.
+        return info.links > 2 ? .some(info.links - 2) : nil
+    }
+
+    private static func statInfo(_ url: URL) -> (links: Int, dataless: Bool)? {
+        var info = Darwin.stat()
+        guard lstat(url.path, &info) == 0 else { return nil }
+        return (Int(info.st_nlink), info.st_flags & UInt32(SF_DATALESS) != 0)
+    }
+}
+
+/// Lets this thread's reads fetch a provider's items that aren't on disk yet ("dataless"), for
+/// the length of one coordinated read; the thread's previous setting comes back after.
+enum Materialization {
+    static func forceOnThisThread() -> () -> Void {
+        let previous = getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
+        let set = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, IOPOL_MATERIALIZE_DATALESS_FILES_ON)
+        if set != 0 {
+            FolderWalk.scanLog.notice("RP_SCAN couldn't turn on materializing: errno \(errno, privacy: .public)")
+            return {}
+        }
+        return {
+            if previous >= 0 {
+                _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, previous)
+            }
         }
     }
 }
