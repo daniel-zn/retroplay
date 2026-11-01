@@ -102,7 +102,9 @@ final class LibraryTopBarUITests: XCTestCase {
         XCTAssertTrue(saves.waitForExistence(timeout: 5))
         saves.tap()
         let open = app.buttons["Open"].firstMatch
-        let found = open.waitForExistence(timeout: 20)
+        // The picker draws out of process; on a cold Simulator its sheet can stay blank for
+        // well over 20 s.
+        let found = open.waitForExistence(timeout: 60)
         attach(app, "save-folder-picker")
         XCTAssertTrue(found, "no Open button: the picker isn't in folder mode")
         app.terminate()

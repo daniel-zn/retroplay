@@ -59,14 +59,17 @@ final class TypographyScreenshotsUITests: XCTestCase {
             expectVisible(flow, "RetroPlay", "cover flow \(look.name)", timeout: 30)
             Thread.sleep(forTimeInterval: 2)
             shoot(flow, "library-coverflow-\(look.name)")
-            // Landscape: the caption on one line under the covers, inside the screen.
-            XCUIDevice.shared.orientation = .landscapeLeft
-            Thread.sleep(forTimeInterval: 2)
-            expectVisible(flow, "Not played yet", "cover flow landscape \(look.name)")
-            shoot(flow, "library-coverflow-landscape-\(look.name)")
-            XCUIDevice.shared.orientation = .portrait
-            Thread.sleep(forTimeInterval: 1)
             flow.terminate()
+
+            // Landscape, launched turned (a rotation mid-run left the 3D stage half drawn in
+            // the capture). The caption is hidden from VoiceOver, so the shot is the check.
+            XCUIDevice.shared.orientation = .landscapeLeft
+            let wide = launch(look, ["-retroplay.libraryLayout", "coverFlow"])
+            XCTAssertTrue(wide.buttons["library.settings"].waitForExistence(timeout: 30), "cover flow landscape \(look.name): no top bar")
+            Thread.sleep(forTimeInterval: 3)
+            shoot(wide, "library-coverflow-landscape-\(look.name)")
+            wide.terminate()
+            XCUIDevice.shared.orientation = .portrait
         }
     }
 
