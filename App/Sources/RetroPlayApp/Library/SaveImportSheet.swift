@@ -41,6 +41,8 @@ struct SaveImportSheet: View {
             .navigationTitle("Import Saves")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
+            // The title in the app's face, as in Settings.
+            .retroPlayNavigationTitleChrome(for: colorScheme)
             .safeAreaInset(edge: .bottom) {
                 if !batch.items.isEmpty { actions }
             }
@@ -137,8 +139,9 @@ struct SaveImportSheet: View {
     }
 
     private func sectionHeader(_ title: String) -> some View {
+        // Footnote rather than caption2: in capitals, 11 pt section names read as specks.
         Text(title.uppercased())
-            .font(RetroPlayFont.caption2)
+            .font(RetroPlayFont.footnote)
             .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
     }
 
