@@ -8,7 +8,6 @@ enum PlaySettingsKey {
     static let sound = "retroplay.sound"
     static let respectSilentSwitch = "retroplay.respectSilentSwitch"
     static let haptics = "retroplay.haptics"
-    static let padOpacity = "retroplay.padOpacity"
     static let smoothScreen = "retroplay.smoothScreen"
     /// Settings → Flat Controls: every on-screen control drawn flat instead of Liquid Glass.
     static let flatControls = "retroplay.flatControls"
@@ -33,7 +32,10 @@ public struct PlayView: View {
     @AppStorage(PlaySettingsKey.sound) private var soundOn = true
     @AppStorage(PlaySettingsKey.respectSilentSwitch) private var respectSilentSwitch = false
     @AppStorage(PlaySettingsKey.haptics) private var haptics = true
-    @AppStorage(PlaySettingsKey.padOpacity) private var padOpacity = 0.75
+    /// The touch controls drawn over the game (landscape, and DS in portrait): one fixed
+    /// opacity, readable over bright and dark pictures alike. (It used to be a setting; a
+    /// stored value is ignored.)
+    static let overlayControlsOpacity = 0.6
     @AppStorage(PlaySettingsKey.smoothScreen) private var smoothScreen = false
     @AppStorage(PlaySettingsKey.touchWithController) private var touchWithController = false
     /// PSP internal resolution (`PSPRenderResolution` raw value); the PSP driver reads it.
@@ -351,7 +353,7 @@ public struct PlayView: View {
                 ConsolePadPortrait(system: system, size: CGSize(width: size.width, height: padHeight))
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .frame(height: padHeight)
-                    .opacity(padOpacity)
+                    .opacity(Self.overlayControlsOpacity)
                 quickButtons()
                     .frame(height: barHeight, alignment: .top)
             }
@@ -434,7 +436,7 @@ public struct PlayView: View {
         let fullHeight = size.height + safeArea.top + safeArea.bottom
         let screenHeight = min(fit ? size.height : fullHeight, max(0, availableWidth) / aspect)
         let screenWidth = screenHeight * aspect
-        let chromeOpacity = max(padOpacity, 0.6)
+        let chromeOpacity = Self.overlayControlsOpacity
         // The columns run the full height less 6 pt top and bottom (through the home strip).
         let lifts = pad.landscapeCentreLifts(columnHeight: size.height + safeArea.bottom - 12)
 
@@ -463,11 +465,11 @@ public struct PlayView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         // Centred over the D-pad / stick below.
                         pad.leftShoulders
-                            .opacity(padOpacity)
+                            .opacity(Self.overlayControlsOpacity)
                             .frame(width: pad.landscapeColumnWidth)
                         Spacer(minLength: 6)
                         pad.leftMain
-                            .opacity(padOpacity)
+                            .opacity(Self.overlayControlsOpacity)
                         // DS: D-pad and face buttons at mid-height, level with each other.
                         Color.clear
                             .frame(height: lifts.left)
@@ -479,11 +481,11 @@ public struct PlayView: View {
                     VStack(alignment: .trailing, spacing: 0) {
                         // Centred over the face buttons below.
                         pad.rightShoulders
-                            .opacity(padOpacity)
+                            .opacity(Self.overlayControlsOpacity)
                             .frame(width: pad.landscapeColumnWidth)
                         Spacer(minLength: 6)
                         pad.rightMain
-                            .opacity(padOpacity)
+                            .opacity(Self.overlayControlsOpacity)
                         // PSP: face buttons level with the D-pad.
                         Color.clear
                             .frame(height: pad.landscapeFaceLift + lifts.right)
@@ -502,7 +504,7 @@ public struct PlayView: View {
                 // Over the game every control is see-through, light ones included.
                 .environment(\.padGlass, true)
                 pad.center
-                    .opacity(padOpacity)
+                    .opacity(Self.overlayControlsOpacity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .ignoresSafeArea(edges: .bottom)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
@@ -714,7 +716,6 @@ public struct PlayView: View {
                 hasController: controllers.hasController,
                 controllerName: controllers.controllerName,
                 haptics: $haptics,
-                padOpacity: $padOpacity,
                 smoothScreen: $smoothScreen,
                 touchWithController: $touchWithController,
                 landscapeFill: $landscapeFill,

@@ -18,7 +18,6 @@ struct PlayMenuView: View {
     var controllerName: String? = nil
 
     @Binding var haptics: Bool
-    @Binding var padOpacity: Double
     @Binding var smoothScreen: Bool
     @Binding var touchWithController: Bool
     @Binding var landscapeFill: Bool
@@ -35,6 +34,8 @@ struct PlayMenuView: View {
     @State private var confirmRestart = false
     @State private var showSaves = false
     @State private var showOptions = false
+    /// The menu's content height, so the scroll view is no taller than what it holds.
+    @State private var contentHeight: CGFloat = 0
     /// The controller cursor.
     @State private var focus: MenuItem?
     @Environment(ControllerNavigator.self) private var navigator
@@ -65,15 +66,36 @@ struct PlayMenuView: View {
     }
 
     var body: some View {
-        // Landscape phones are short: scroll only when the card does not fit.
-        ViewThatFits(in: .vertical) {
-            card
+        // One scroll view the height of its content, never taller than the room it's given
+        // (the screen inside its safe area): it scrolls only once Saves and Options open past
+        // that, as iOS's own floating menus do. The controller cursor and an opened section
+        // are scrolled into view.
+        ScrollViewReader { proxy in
             ScrollView {
-                card
+                content
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
             }
             .scrollBounceBehavior(.basedOnSize)
-            .frame(maxWidth: 380)
+            .scrollIndicators(.automatic)
+            .frame(maxHeight: contentHeight > 0 ? contentHeight : .infinity)
+            .frame(maxWidth: 360)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .menuCardGlass()
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("playMenu")
+            .onChange(of: focus) { _, item in
+                guard let item else { return }
+                withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(item) }
+            }
+            .onChange(of: showSaves) { _, open in
+                if open { reveal(.saves, proxy) }
+            }
+            .onChange(of: showOptions) { _, open in
+                if open { reveal(.options, proxy) }
+            }
         }
+        // Past AX1 the menu no longer fits a phone-width card even stacked.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .environment(\.colorScheme, .dark)
         .onAppear { if navigator.isConnected { focus = .resume } }
         .onChange(of: navigator.event) { _, event in
@@ -91,7 +113,7 @@ struct PlayMenuView: View {
         )
     }
 
-    private var card: some View {
+    private var content: some View {
         VStack(spacing: 12) {
             VStack(spacing: 4) {
                 Text(title)
@@ -113,6 +135,7 @@ struct PlayMenuView: View {
             .prominentGlassButton()
             .controlSize(.large)
             .controllerFocusRing(focus == .resume, cornerRadius: 22)
+            .id(MenuItem.resume)
 
             // Quick actions: icon only.
             HStack(spacing: 14) {
@@ -123,6 +146,7 @@ struct PlayMenuView: View {
                 )
                 .disabled(!supportsSaveState || busy)
                 .controllerFocusRing(focus == .save, cornerRadius: MenuIconButton.size / 2)
+                .id(MenuItem.save)
                 AirPlayRoutePicker()
                     .frame(width: MenuIconButton.size, height: MenuIconButton.size)
                     .menuGlass(Circle(), fallback: Color.white.opacity(0.12))
@@ -142,31 +166,30 @@ struct PlayMenuView: View {
                     }
                     Toggle("Haptics", isOn: $haptics)
                         .controllerFocusRing(focus == .haptics, cornerRadius: 6)
+                        .id(MenuItem.haptics)
                     Toggle("Smooth Screen", isOn: $smoothScreen)
                         .controllerFocusRing(focus == .smooth, cornerRadius: 6)
+                        .id(MenuItem.smooth)
                     if let pspResolution {
                         resolutionPicker(pspResolution)
                             .controllerFocusRing(focus == .resolution, cornerRadius: 6)
+                            .id(MenuItem.resolution)
                     }
                     if hasController {
                         Toggle("Touch Controls with Controller", isOn: $touchWithController)
                             .controllerFocusRing(focus == .touchWithController, cornerRadius: 6)
+                            .id(MenuItem.touchWithController)
                     }
                     Toggle("Fill Screen in Landscape", isOn: $landscapeFill)
                         .controllerFocusRing(focus == .fill, cornerRadius: 6)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Landscape Controls Opacity")
-                            .font(RetroPlayFont.subheadline)
-                            .foregroundStyle(.white.opacity(0.6))
-                            .fixedSize(horizontal: false, vertical: true)
-                        Slider(value: $padOpacity, in: 0.25...1)
-                    }
+                        .id(MenuItem.fill)
                 }
                 .padding(.top, 8)
             } label: {
                 Label("Options", systemImage: "slider.horizontal.3")
                     .foregroundStyle(.white)
                     .controllerFocusRing(focus == .options, cornerRadius: 6)
+                    .id(MenuItem.options)
             }
             .font(RetroPlayFont.headline)
             .padding(.horizontal, 4)
@@ -190,14 +213,19 @@ struct PlayMenuView: View {
                 .disabled(busy)
                 .frame(minHeight: MenuTileButtonStyle.height)
                 .controllerFocusRing(focus == .quit)
+                .id(MenuItem.quit)
             }
         }
         .disabled(leaving)
         .padding(20)
-        .frame(maxWidth: 360)
-        // Past AX1 the menu no longer fits a phone-width card even stacked.
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-        .menuCardGlass()
+    }
+
+    /// An opened section: its header at the top once its rows have laid out.
+    private func reveal(_ item: MenuItem, _ proxy: ScrollViewProxy) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(200))
+            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(item, anchor: .top) }
+        }
     }
 }
 
@@ -332,6 +360,7 @@ extension PlayMenuView {
                         .buttonStyle(SaveRowButtonStyle())
                         .disabled(!supportsSaveState || busy)
                         .controllerFocusRing(focus == .saveEntry(index), cornerRadius: 12)
+                        .id(MenuItem.saveEntry(index))
                     }
                 }
 
@@ -347,6 +376,7 @@ extension PlayMenuView {
                     .buttonStyle(MenuTileButtonStyle(foreground: .red))
                     .disabled(busy)
                     .controllerFocusRing(focus == .reset)
+                    .id(MenuItem.reset)
                     Button(action: onImportSave) {
                         Label("Import", systemImage: "square.and.arrow.down.on.square")
                             .lineLimit(1)
@@ -357,6 +387,7 @@ extension PlayMenuView {
                     .disabled(busy)
                     .accessibilityLabel(PlaySavesMenuContent.importTitle)
                     .controllerFocusRing(focus == .importSave)
+                    .id(MenuItem.importSave)
                 }
             }
             .padding(.top, 8)
@@ -364,6 +395,7 @@ extension PlayMenuView {
             Label(PlaySavesMenuContent.title, systemImage: "tray.full")
                 .foregroundStyle(.white)
                 .controllerFocusRing(focus == .saves, cornerRadius: 6)
+                .id(MenuItem.saves)
         }
         .font(RetroPlayFont.headline)
         .padding(.horizontal, 4)
