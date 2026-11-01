@@ -15,6 +15,74 @@
       ],
       "line": "sim-retroplay",
       "timeout": 40
+    },
+    {
+      "name": "app",
+      "run": "Scripts/app-tests.sh",
+      "inputs": [
+        "AppHost/**",
+        "AppIcon.icon/**",
+        "App/Sources/**",
+        "App/Tests/**",
+        "App/Package.swift",
+        "project.yml",
+        "Scripts/app-tests.sh",
+        "!**/*.md"
+      ],
+      "key": "cd \"$LAND_SOURCE\" && { for f in App/Vendor/Output/*.xcframework; do echo \"$f $(stat -f %m \"$f/Info.plist\")\"; done; for x in External/*; do echo \"$x $(git -C \"$x\" rev-parse HEAD 2>/dev/null)\"; done; } | shasum",
+      "line": "sim-retroplay",
+      "timeout": 75,
+      "select": {
+        "env": "APP_TESTS",
+        "always": [
+          "LibraryTopBarUITests"
+        ],
+        "rules": [
+          {
+            "paths": [
+              "App/Sources/RetroPlayApp/Library/**",
+              "App/Sources/RetroPlayApp/AppEntry.swift"
+            ],
+            "tests": [
+              "LibraryTopBarUITests",
+              "CoverFlowTapUITests",
+              "TypographyScreenshotsUITests"
+            ]
+          },
+          {
+            "paths": [
+              "App/Sources/RetroPlayApp/Theme/**",
+              "App/Sources/RetroPlayCore/TypeScale.swift",
+              "AppHost/Supporting/**"
+            ],
+            "tests": [
+              "TypographyScreenshotsUITests"
+            ]
+          },
+          {
+            "paths": [
+              "App/Sources/RetroPlayApp/PlayView.swift",
+              "App/Sources/RetroPlayApp/PlayMenuView.swift",
+              "App/Sources/RetroPlayApp/Controls/**"
+            ],
+            "tests": [
+              "TypographyScreenshotsUITests"
+            ]
+          },
+          {
+            "paths": [
+              "App/Sources/RetroPlayCore/LibrarySaveImport.swift",
+              "App/Sources/RetroPlayCore/SaveGameImporter.swift",
+              "App/Sources/RetroPlayApp/Library/SaveImportSheet.swift"
+            ],
+            "tests": [
+              "LibraryTopBarUITests",
+              "FilesPickerSaveImportUITests",
+              "SaveImportSMBUITests"
+            ]
+          }
+        ]
+      }
     }
   ],
   "release": {

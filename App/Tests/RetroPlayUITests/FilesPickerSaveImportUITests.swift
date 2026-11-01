@@ -86,11 +86,9 @@ final class FilesPickerSaveImportUITests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.exists
     }
 
-    /// + → Saves → Browse → On My iPhone → `path`, then (with `select`) Select and a tap on
-    /// each of those folders, so each shows its selection circle checked, then Open; waits for
-    /// the summary.
+    /// + → Saves → Browse → On My iPhone → `path` → Open, then waits for the summary.
     @MainActor
-    private func pick(_ app: XCUIApplication, _ path: String, select: [String] = [], name: String) {
+    private func pick(_ app: XCUIApplication, _ path: String, name: String) {
         tap(app, "library.import", step: "plus", timeout: 30)
         tap(app, "Saves", step: "saves")
         // Browse twice: the first opens the tab, the second goes back to its locations.
@@ -99,24 +97,6 @@ final class FilesPickerSaveImportUITests: XCTestCase {
         tap(app, "On My iPhone", step: "on-my-iphone")
         for folder in path.split(separator: "/").map(String.init) {
             open(app, folder)
-        }
-        if !select.isEmpty {
-            attach(app, "files-picker-\(name)-before-select")
-            // Select is in the picker's "…" menu.
-            let more = app.buttons.matching(NSPredicate(format: "label IN %@ OR identifier IN %@", ["More", "Show More"], ["More", "Show More"])).firstMatch
-            if !app.buttons["Select"].exists, more.waitForExistence(timeout: 5) { more.tap() }
-            let selectItem = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Select")).firstMatch
-            XCTAssertTrue(selectItem.waitForExistence(timeout: 10), "no Select in the picker")
-            selectItem.tap()
-            Thread.sleep(forTimeInterval: 1)
-            attach(app, "files-picker-\(name)-select-mode")
-            for folder in select {
-                let cell = app.cells.matching(NSPredicate(format: "label BEGINSWITH %@", folder)).firstMatch
-                XCTAssertTrue(cell.waitForExistence(timeout: 10), "no “\(folder)” to select")
-                cell.tap()
-                Thread.sleep(forTimeInterval: 0.5)
-                XCTAssertTrue(cell.isSelected, "“\(folder)” isn't selected after a tap in Select mode")
-            }
         }
         attach(app, "files-picker-\(name)")
         tap(app, "Open", step: "open")
@@ -168,16 +148,15 @@ final class FilesPickerSaveImportUITests: XCTestCase {
         attach(app, "files-imported")
     }
 
-    /// Several folders at once, as on a device: Select puts a circle on each folder, and every
-    /// one picked is scanned. Then a folder inside RetroPlay's own folder in On My iPhone (the
-    /// app's Documents, which needs no security-scoped access). Opt-in like the test above:
-    /// - RETROPLAY_SELECT_PARENT: a folder under On My iPhone; RETROPLAY_SELECT_FOLDERS: the
-    ///   folders in it to select, joined with "|"; RETROPLAY_SELECT_EXPECT: summary texts.
-    /// - RETROPLAY_OWN_FOLDER: a folder under On My iPhone → RetroPlay; RETROPLAY_OWN_EXPECT.
+    /// One folder holding a save, opened and picked with Open (the folder picker takes one
+    /// folder), then a folder inside RetroPlay's own folder in On My iPhone (the app's
+    /// Documents, which needs no security-scoped access). Opt-in like the test above:
+    /// - RETROPLAY_ONE_FOLDER: a folder path under On My iPhone; RETROPLAY_ONE_FOLDER_EXPECT:
+    ///   texts, joined with "|", its summary must show.
+    /// - RETROPLAY_OWN_FOLDER: a folder path under On My iPhone → RetroPlay; RETROPLAY_OWN_EXPECT.
     @MainActor
-    func testSelectingSeveralFoldersAndTheAppsOwnFolder() throws {
-        guard let parent = env["RETROPLAY_SELECT_PARENT"], let folders = env["RETROPLAY_SELECT_FOLDERS"],
-              let expect = env["RETROPLAY_SELECT_EXPECT"] else {
+    func testPickingOneFolderAndOneInTheAppsOwnFolder() throws {
+        guard let one = env["RETROPLAY_ONE_FOLDER"], let expect = env["RETROPLAY_ONE_FOLDER_EXPECT"] else {
             throw XCTSkip("No On My iPhone folders given to the test runner.")
         }
         let app = XCUIApplication()
@@ -185,15 +164,14 @@ final class FilesPickerSaveImportUITests: XCTestCase {
         app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
         app.launch()
 
-        pick(app, parent, select: folders.split(separator: "|").map(String.init), name: "select")
+        pick(app, one, name: "one-folder")
         for text in expect.split(separator: "|").map(String.init) {
-            XCTAssertTrue(shows(app, text), "\(folders): no “\(text)” in the summary")
+            XCTAssertTrue(shows(app, text), "\(one): no “\(text)” in the summary")
         }
         closeSummary(app)
 
         if let own = env["RETROPLAY_OWN_FOLDER"], let ownExpect = env["RETROPLAY_OWN_EXPECT"] {
-            let path = own.split(separator: "/").map(String.init)
-            pick(app, (["RetroPlay"] + path.dropLast()).joined(separator: "/"), select: [path.last!], name: "own")
+            pick(app, "RetroPlay/" + own, name: "own")
             for text in ownExpect.split(separator: "|").map(String.init) {
                 XCTAssertTrue(shows(app, text), "\(own): no “\(text)” in the summary")
             }

@@ -107,14 +107,6 @@ final class LibraryTopBarUITests: XCTestCase {
         let found = open.waitForExistence(timeout: 60)
         attach(app, "save-folder-picker")
         XCTAssertTrue(found, "no Open button: the picker isn't in folder mode")
-        // Several folders may be picked: the picker offers Select (in its "…" menu), which puts
-        // circles on them.
-        let more = app.buttons.matching(NSPredicate(format: "label IN %@ OR identifier IN %@", ["More", "Show More"], ["More", "Show More"])).firstMatch
-        if !app.buttons["Select"].exists, more.waitForExistence(timeout: 5) { more.tap() }
-        let select = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Select")).firstMatch
-        let offered = select.waitForExistence(timeout: 10)
-        attach(app, "save-folder-picker-menu")
-        XCTAssertTrue(offered, "no Select: only one folder can be picked")
         app.terminate()
     }
 

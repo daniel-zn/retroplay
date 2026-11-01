@@ -278,9 +278,9 @@ public struct RetroPlayRootView: View {
             allowedContentTypes: importKind == .games
                 ? ImportContentTypes.allowedContentTypes
                 : SaveImportContentTypes.folderContentTypes,
-            // Saves too: with several allowed, the picker's Select mode puts a circle on each
-            // folder (with one, a folder can only be opened, then picked with Open).
-            allowsMultipleSelection: true
+            // Saves: one folder (open it, then Open). The folder picker has no Select mode for
+            // several folders; every picked URL is scanned all the same.
+            allowsMultipleSelection: importKind == .games
         ) { result in
             switch importKind {
             case .games: handleImport(result)
