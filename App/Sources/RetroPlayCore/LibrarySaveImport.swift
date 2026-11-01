@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 import Observation
+import os
 
 // Library-level save import: the player picks save files and folders (a RetroArch `saves/`
 // tree, another app's export, a PSP `SAVEDATA` folder); the scanner finds what looks like a
@@ -1022,6 +1023,8 @@ private final class UncheckedBox<T>: @unchecked Sendable {
 /// breadth-first, each folder listed one level deep inside its own coordinated read (so a
 /// provider fills it when it's asked), entry by entry, so the listing stops at the budget.
 enum FolderWalk {
+    static let scanLog = Logger(subsystem: "com.danielzn.retroplay", category: "SaveScan")
+
     static let keys: Set<URLResourceKey> = [
         .isDirectoryKey, .isRegularFileKey, .isPackageKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey,
     ]
@@ -1097,14 +1100,11 @@ enum FolderWalk {
         let folder = values.isDirectory == true || (exists && isDirectory.boolValue) || url.hasDirectoryPath
         let file = !folder && (values.isRegularFile == true || values.isDirectory == false || exists)
         let kind: Item.Kind = folder ? (values.isPackage == true ? .package : .folder) : file ? .file : .folder
-        #if DEBUG
-        // What a provider reports, for checking an SMB share or iCloud Drive in the Simulator.
-        NSLog(
-            "RP_SCAN %@ reported isDirectory=%@ isRegularFile=%@ exists=%d fsDirectory=%d hasDirectoryPath=%d -> %@",
-            url.lastPathComponent, String(describing: values.isDirectory), String(describing: values.isRegularFile),
-            exists ? 1 : 0, isDirectory.boolValue ? 1 : 0, url.hasDirectoryPath ? 1 : 0, String(describing: kind)
+        // What a provider reports, in every build (Console on a Mac shows it for a device;
+        // names are redacted unless a debugger is attached).
+        scanLog.notice(
+            "RP_SCAN \(url.lastPathComponent, privacy: .private) reported isDirectory=\(String(describing: values.isDirectory), privacy: .public) isRegularFile=\(String(describing: values.isRegularFile), privacy: .public) exists=\(exists, privacy: .public) fsDirectory=\(isDirectory.boolValue, privacy: .public) hasDirectoryPath=\(url.hasDirectoryPath, privacy: .public) -> \(String(describing: kind), privacy: .public)"
         )
-        #endif
         return Item(kind: kind, size: size, modified: values.modified)
     }
 
@@ -1150,13 +1150,16 @@ enum FolderWalk {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
+                scanLog.notice("RP_SCAN list failed: \(error.localizedDescription, privacy: .public)")
                 try unreadable(folder, error)
                 continue
             }
             if let error = listing.error {
+                scanLog.notice("RP_SCAN list failed: \(error.localizedDescription, privacy: .public)")
                 try unreadable(folder, error)
                 continue
             }
+            scanLog.notice("RP_SCAN listed \(listing.children.count, privacy: .public) entries at depth \(folder.path.count, privacy: .public)")
             budget.entries -= listing.children.count
             if listing.exhausted { complete = false }
             for sub in try visit(folder, listing.children) {
@@ -1217,8 +1220,23 @@ public final class SecurityScopedAccess: @unchecked Sendable {
     private let lock = NSLock()
     private var started: [URL]
 
-    public init(_ urls: [URL]) {
-        started = urls.filter { $0.startAccessingSecurityScopedResource() }
+    /// Picked URLs whose access couldn't be started and that can't be read without it (a pick
+    /// inside the app's own folder needs no access, so it isn't counted).
+    public let refused: [URL]
+
+    public init(_ urls: [URL], fileManager: FileManager = .default) {
+        var started: [URL] = []
+        var refused: [URL] = []
+        for url in urls {
+            let granted = url.startAccessingSecurityScopedResource()
+            let readable = fileManager.isReadableFile(atPath: url.path)
+            FolderWalk.scanLog.notice(
+                "RP_SCAN pick \(url.lastPathComponent, privacy: .private) access=\(granted, privacy: .public) readable=\(readable, privacy: .public)"
+            )
+            if granted { started.append(url) } else if !readable { refused.append(url) }
+        }
+        self.started = started
+        self.refused = refused
     }
 
     public func stop() {

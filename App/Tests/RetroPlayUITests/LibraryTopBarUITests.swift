@@ -107,6 +107,8 @@ final class LibraryTopBarUITests: XCTestCase {
         let found = open.waitForExistence(timeout: 60)
         attach(app, "save-folder-picker")
         XCTAssertTrue(found, "no Open button: the picker isn't in folder mode")
+        // Several folders may be picked: the picker offers Select, which puts circles on them.
+        XCTAssertTrue(app.buttons["Select"].firstMatch.waitForExistence(timeout: 10), "no Select: only one folder can be picked")
         app.terminate()
     }
 

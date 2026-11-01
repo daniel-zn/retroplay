@@ -277,7 +277,9 @@ public struct RetroPlayRootView: View {
             allowedContentTypes: importKind == .games
                 ? ImportContentTypes.allowedContentTypes
                 : SaveImportContentTypes.folderContentTypes,
-            allowsMultipleSelection: importKind == .games
+            // Saves too: with several allowed, the picker's Select mode puts a circle on each
+            // folder (with one, a folder can only be opened, then picked with Open).
+            allowsMultipleSelection: true
         ) { result in
             switch importKind {
             case .games: handleImport(result)
@@ -834,11 +836,14 @@ public struct RetroPlayRootView: View {
                     saveImportID = nil
                     access.stop()
                     let others = batch.otherSystemSaves
+                    let place = urls.count == 1 ? "this folder" : "these folders"
                     let message = others > 0
-                        ? "No saves for systems RetroPlay plays in this folder. \(others == 1 ? "1 save is" : "\(others) saves are") for other systems."
-                        : "No saves in this folder. Pick a folder that holds battery saves (.sav, .srm), memory cards (.mcr, .mcd) or PSP SAVEDATA folders."
+                        ? "No saves for systems RetroPlay plays in \(place). \(others == 1 ? "1 save is" : "\(others) saves are") for other systems."
+                        : "No saves in \(place). Pick a folder that holds battery saves (.sav, .srm), memory cards (.mcr, .mcd) or PSP SAVEDATA folders."
                     // What was looked at, so a folder that should have worked says why it didn't.
-                    let looked = batch.notes.isEmpty ? "" : "\n\n" + batch.notes.joined(separator: "\n")
+                    let refused = access.refused.map { "“\($0.lastPathComponent)”: Files didn't give RetroPlay access to it" }
+                    let notes = refused + batch.notes
+                    let looked = notes.isEmpty ? "" : "\n\n" + notes.joined(separator: "\n")
                     presentImportResult(.error(message + looked))
                 } else {
                     saveImportAccess = access
