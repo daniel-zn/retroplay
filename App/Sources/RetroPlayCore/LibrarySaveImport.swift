@@ -1097,6 +1097,14 @@ enum FolderWalk {
         let folder = values.isDirectory == true || (exists && isDirectory.boolValue) || url.hasDirectoryPath
         let file = !folder && (values.isRegularFile == true || values.isDirectory == false || exists)
         let kind: Item.Kind = folder ? (values.isPackage == true ? .package : .folder) : file ? .file : .folder
+        #if DEBUG
+        // What a provider reports, for checking an SMB share or iCloud Drive in the Simulator.
+        NSLog(
+            "RP_SCAN %@ reported isDirectory=%@ isRegularFile=%@ exists=%d fsDirectory=%d hasDirectoryPath=%d -> %@",
+            url.lastPathComponent, String(describing: values.isDirectory), String(describing: values.isRegularFile),
+            exists ? 1 : 0, isDirectory.boolValue ? 1 : 0, url.hasDirectoryPath ? 1 : 0, String(describing: kind)
+        )
+        #endif
         return Item(kind: kind, size: size, modified: values.modified)
     }
 
