@@ -283,7 +283,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                                     : RetroPlayTheme.secondaryText(for: colorScheme)
                             )
                     }
-                    .font(RetroPlayFont.caption)
+                    .font(RetroPlayFont.footnote)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 }

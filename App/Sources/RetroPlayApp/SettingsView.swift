@@ -17,7 +17,6 @@ struct SettingsView: View {
     @AppStorage(BoxArtUpdater.enabledKey) private var downloadBoxArt = true
     @AppStorage(LibraryLayout.storageKey) private var layoutRaw = LibraryLayout.grid.rawValue
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dismiss) private var dismiss
 
     @State private var storageUsed: Int64?
 
@@ -44,14 +43,6 @@ struct SettingsView: View {
             // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .retroPlayNavigationTitleChrome(for: colorScheme)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { dismiss() } label: {
-                        Text("Done")
-                            .font(RetroPlayFont.body)
-                    }
-                }
-            }
             .task { await measureStorage() }
         }
         .environment(\.font, RetroPlayFont.body)

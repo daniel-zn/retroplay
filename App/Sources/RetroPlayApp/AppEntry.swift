@@ -312,6 +312,8 @@ public struct RetroPlayRootView: View {
                     showSettings = false
                 }
             )
+            // No Done button: swipe down closes it, like the other sheets.
+            .presentationDragIndicator(.visible)
         }
         .retroPlayAlert(
             "Library Unavailable",

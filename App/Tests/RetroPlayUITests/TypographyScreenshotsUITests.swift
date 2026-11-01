@@ -59,6 +59,13 @@ final class TypographyScreenshotsUITests: XCTestCase {
             expectVisible(flow, "RetroPlay", "cover flow \(look.name)", timeout: 30)
             Thread.sleep(forTimeInterval: 2)
             shoot(flow, "library-coverflow-\(look.name)")
+            // Landscape: the caption on one line under the covers, inside the screen.
+            XCUIDevice.shared.orientation = .landscapeLeft
+            Thread.sleep(forTimeInterval: 2)
+            expectVisible(flow, "Not played yet", "cover flow landscape \(look.name)")
+            shoot(flow, "library-coverflow-landscape-\(look.name)")
+            XCUIDevice.shared.orientation = .portrait
+            Thread.sleep(forTimeInterval: 1)
             flow.terminate()
         }
     }
@@ -83,6 +90,12 @@ final class TypographyScreenshotsUITests: XCTestCase {
             settings.swipeUp()
             Thread.sleep(forTimeInterval: 1)
             shoot(settings, "settings-scrolled-\(look.name)")
+            // A swipe-down sheet: no Done button, and a swipe down closes it.
+            XCTAssertFalse(settings.buttons["Done"].exists, "settings \(look.name): has a Done button")
+            let window = settings.windows.firstMatch
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
+                .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+            XCTAssertTrue(settings.navigationBars["Settings"].waitForNonExistence(timeout: 10), "settings \(look.name): swipe down didn't close it")
             settings.terminate()
         }
     }
