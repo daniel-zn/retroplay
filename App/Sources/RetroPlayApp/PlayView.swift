@@ -434,7 +434,11 @@ public struct PlayView: View {
             ? size.width - 2 * (pad.landscapeColumnWidth + edgeInset + 4)
             : size.width + safeArea.leading + safeArea.trailing
         let fullHeight = size.height + safeArea.top + safeArea.bottom
-        let screenHeight = min(fit ? size.height : fullHeight, max(0, availableWidth) / aspect)
+        // Fitted, the picture also stays above the bottom-centre row (which uses the
+        // home-indicator strip too).
+        let rowReserve = fit ? LandscapeCentreRow.pictureReserve(bottomSafeArea: safeArea.bottom) : 0
+        let screenHeight = min(fit ? size.height - rowReserve : fullHeight, max(0, availableWidth) / aspect)
+        let rowGap = LandscapeCentreRow.gap(width: size.width, columnWidth: pad.landscapeColumnWidth, edgeInset: edgeInset)
         let screenWidth = screenHeight * aspect
         let chromeOpacity = Self.overlayControlsOpacity
         // The columns run the full height less 6 pt top and bottom (through the home strip).
@@ -456,11 +460,12 @@ public struct PlayView: View {
                         // area (landscape insets differ side to side).
                         .offset(x: fit ? 0 : (safeArea.trailing - safeArea.leading) / 2)
                 }
+                .padding(.bottom, rowReserve)
                 .ignoresSafeArea(edges: fit ? [] : .vertical)
             if showTouchControls {
                 // The thumb controls live in the side columns; fast-forward / pause / sound
-                // are the lowest control on the right; SELECT / START sit side by side at the
-                // bottom centre.
+                // sit at the bottom centre as in portrait, with SELECT / START (and the other
+                // small buttons) either side of them.
                 HStack(alignment: .top, spacing: 0) {
                     VStack(alignment: .leading, spacing: 0) {
                         // Centred over the D-pad / stick below.
@@ -489,11 +494,8 @@ public struct PlayView: View {
                         // PSP: face buttons level with the D-pad.
                         Color.clear
                             .frame(height: pad.landscapeFaceLift + lifts.right)
-                        // Beyond the face buttons' 14 pt touch slop, so taps reach the buttons.
-                        quickButtons(maxWidth: pad.landscapeColumnWidth)
-                            .frame(width: pad.landscapeColumnWidth)
-                            .opacity(chromeOpacity)
-                            .padding(.top, 18)
+                        Spacer(minLength: 0)
+                            .frame(maxHeight: 8)
                     }
                     .frame(width: pad.landscapeColumnWidth, alignment: .trailing)
                 }
@@ -503,9 +505,9 @@ public struct PlayView: View {
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 // Over the game every control is see-through, light ones included.
                 .environment(\.padGlass, true)
-                pad.center
-                    .opacity(Self.overlayControlsOpacity)
+                landscapeCentreRow(pad, gap: rowGap, chromeOpacity: chromeOpacity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, LandscapeCentreRow.bottomPadding)
                     .ignoresSafeArea(edges: .bottom)
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .environment(\.padGlass, true)
@@ -516,6 +518,34 @@ public struct PlayView: View {
                     .padding(.bottom, 4)
             }
         }
+    }
+
+    /// Landscape bottom centre: fast-forward / pause / sound in the middle of the screen, the
+    /// system's small buttons split either side, all within `gap` (between the thumb
+    /// columns), in the roomiest `LandscapeCentreRow.styles` that fits.
+    private func landscapeCentreRow(_ pad: ConsolePad, gap: CGFloat, chromeOpacity: Double) -> some View {
+        let styles = LandscapeCentreRow.styles
+        func row(_ style: LandscapeCentreRow.Style) -> some View {
+            HStack(spacing: style.sideSpacing) {
+                // Equal sides keep the group in the middle when only one side has buttons.
+                pad.centreButtons(.leading, spacing: style.sideSpacing)
+                    .opacity(Self.overlayControlsOpacity)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                quickButtons(buttonWidth: style.buttonWidth, spacing: style.buttonSpacing)
+                    .fixedSize()
+                    .opacity(chromeOpacity)
+                pad.centreButtons(.trailing, spacing: style.sideSpacing)
+                    .opacity(Self.overlayControlsOpacity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        return ViewThatFits(in: .horizontal) {
+            row(styles[0])
+            row(styles[1])
+            row(styles[2])
+        }
+        .frame(width: gap)
+        .frame(height: LandscapeCentreRow.height)
     }
 
     private var screen: some View {
@@ -564,9 +594,8 @@ public struct PlayView: View {
 
     /// Fast-forward, pause and sound: one size, centred, reachable without covering the game.
     /// `maxWidth` is the room they get (a landscape control column); they shrink to fit it.
-    private func quickButtons(maxWidth: CGFloat = .infinity) -> some View {
-        let spacing: CGFloat = 10
-        let width = min(48, (maxWidth - 2 * spacing) / 3)
+    private func quickButtons(maxWidth: CGFloat = .infinity, buttonWidth: CGFloat = 48, spacing: CGFloat = 10) -> some View {
+        let width = min(buttonWidth, (maxWidth - 2 * spacing) / 3)
         return HStack(spacing: spacing) {
             // On: inverted (white fill, dark glyph).
             chromeButton("forward.fill", tint: fastForward ? .black : .white, width: width,

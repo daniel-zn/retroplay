@@ -244,29 +244,75 @@ struct ConsolePad {
         }
     }
 
+    /// One of the system's small buttons (SELECT, START, the 7800's switches).
+    struct CentreButton {
+        let title: String
+        let bits: UInt32
+        let fill: Color
+        let ink: Color
+    }
+
+    /// The small buttons, left to right as `center` draws them in portrait.
+    var centreButtons: [CentreButton] {
+        func pair(_ select: UInt32, _ start: UInt32, _ fill: Color, _ ink: Color) -> [CentreButton] {
+            [CentreButton(title: "SELECT", bits: select, fill: fill, ink: ink),
+             CentreButton(title: "START", bits: start, fill: fill, ink: ink)]
+        }
+        switch system {
+        case .gba: return pair(GBAInput.select.bits, GBAInput.start.bits, PadPalette.GBA.startSelect, PadPalette.GBA.ink)
+        case .psp: return pair(PSPInput.select.rawValue, PSPInput.start.rawValue, PadPalette.PSP.silver, PadPalette.PSP.chassis)
+        case .nds: return pair(NDSInput.select.rawValue, NDSInput.start.rawValue, PadPalette.NDS.shoulder, PadPalette.NDS.ink)
+        case .n64: return [CentreButton(title: "START", bits: N64Input.start.rawValue, fill: PadPalette.N64.start, ink: PadPalette.N64.inkLight)]
+        case .nes: return pair(RetroPadInput.select.rawValue, RetroPadInput.start.rawValue, PadPalette.NES.pill, PadPalette.NES.ink)
+        case .snes: return pair(RetroPadInput.select.rawValue, RetroPadInput.start.rawValue, PadPalette.SNES.pill, PadPalette.SNES.ink)
+        case .genesis: return [CentreButton(title: "START", bits: RetroPadInput.start.rawValue, fill: PadPalette.Genesis.start, ink: PadPalette.Genesis.ink)]
+        case .atari7800:
+            // The console's switches; most games start on Reset or Pause.
+            let switches: [(String, RetroPadInput)] = [
+                ("SELECT", RetroPadInput.Atari7800.select), ("PAUSE", RetroPadInput.Atari7800.pause), ("RESET", RetroPadInput.Atari7800.reset),
+            ]
+            return switches.map {
+                CentreButton(title: $0.0, bits: $0.1.rawValue, fill: PadPalette.Atari7800.switchFill, ink: PadPalette.Atari7800.inkDark)
+            }
+        case .ps1: return pair(RetroPadInput.select.rawValue, RetroPadInput.start.rawValue, PadPalette.PS1.pill, PadPalette.PS1.ink)
+        }
+    }
+
+    /// Landscape: the small buttons on one side of the bottom-centre row
+    /// (`LandscapeCentreRow.split`).
+    func centreButtons(_ side: HorizontalEdge, spacing: CGFloat) -> some View {
+        let split = LandscapeCentreRow.split(centreButtons)
+        let buttons = side == .leading ? split.left : split.right
+        return HStack(spacing: spacing) {
+            ForEach(buttons.indices, id: \.self) { index in
+                let button = buttons[index]
+                PadPillButton(title: button.title, bits: button.bits, scale: pillScale, fill: button.fill, ink: button.ink)
+            }
+        }
+    }
+
     /// PSP in landscape: room under the face buttons that lines their centre up with the
     /// D-pad's, which sits above the analog stick in the left column. Measured from each
-    /// column's foot: the left one ends in an 8 pt spacer, the right one in the 18 + 32 pt
-    /// fast-forward / pause / sound row.
+    /// column's foot, an 8 pt spacer in both (fast-forward / pause / sound are in the
+    /// bottom-centre row).
     var landscapeFaceLift: CGFloat {
         guard system == .psp else { return 0 }
         let dpad: CGFloat = large ? 144 : 136
         let stick: CGFloat = large ? 122 : 108
         let diameter: CGFloat = large ? 60 : 54
         let dpadCentre = 8 + (stick + 6 + dpad / 2) * scale
-        let faceCentre = 50 + diameter * 1.4 * scale
+        let faceCentre = 8 + diameter * 1.4 * scale
         return max(0, dpadCentre - faceCentre)
     }
 
     /// DS in landscape: room under each thumb cluster that puts both at the middle of the
-    /// columns' height, level with each other. The left column ends in an 8 pt foot, the
-    /// right one in the 18 + 32 pt fast-forward / pause / sound row.
+    /// columns' height, level with each other. Both columns end in an 8 pt foot.
     func landscapeCentreLifts(columnHeight: CGFloat) -> (left: CGFloat, right: CGFloat) {
         guard system == .nds else { return (0, 0) }
         let dpad = (large ? 152 : 146) * scale
         let diamond = (large ? 60 : 54) * 2.8 * scale
         let middle = columnHeight / 2
-        return (max(0, middle - 8 - dpad / 2), max(0, middle - 50 - diamond / 2))
+        return (max(0, middle - 8 - dpad / 2), max(0, middle - 8 - diamond / 2))
     }
 
     /// SELECT / START are easy to miss small; full-size controls get bigger ones.
@@ -301,13 +347,14 @@ struct ConsolePad {
     }
 
     /// Each landscape column's height as `perScale × scale + fixed`: shoulders and thumb
-    /// cluster grow with the scale; the edge padding and the pause row don't (SELECT / START
-    /// sit at the bottom centre, outside the columns). Mirrors `PlayView.landscapeLayout`.
+    /// cluster grow with the scale; the edge padding doesn't (fast-forward / pause / sound and
+    /// SELECT / START sit in the bottom-centre row, outside the columns). Mirrors
+    /// `PlayView.landscapeLayout`.
     private static func landscapeColumns(_ system: SystemID, large: Bool) -> [(perScale: CGFloat, fixed: CGFloat)] {
         // Shoulder height.
         let top: CGFloat = large ? 42 : 40
-        // Left: 2 × 6 edge padding + 6 spacer. Right adds the 18 + 32 pause row.
-        let left: CGFloat = 18, right: CGFloat = 18 + 50
+        // Each: 2 × 6 edge padding + 6 spacer.
+        let left: CGFloat = 18, right: CGFloat = 18
         let leftCluster: CGFloat, rightCluster: CGFloat
         switch (system, large) {
         case (.gba, false): (leftCluster, rightCluster) = (150, 74 * 1.84)
@@ -336,8 +383,7 @@ struct ConsolePad {
         case .ps1: shoulders = 2 * top * psShoulderRatio + 6
         default: shoulders = top
         }
-        // PSP: the lift replaces the pause row's height under the face buttons (8 pt foot as
-        // on the left instead).
+        // PSP: the face buttons' lift is counted in the cluster, over an 8 pt foot.
         return [
             (shoulders + leftCluster, left),
             (shoulders + rightCluster, system == .psp ? left + 8 : right),
