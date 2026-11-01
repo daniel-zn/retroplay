@@ -31,7 +31,7 @@
       ],
       "key": "cd \"$LAND_SOURCE\" && { for f in App/Vendor/Output/*.xcframework; do echo \"$f $(stat -f %m \"$f/Info.plist\")\"; done; for x in External/*; do echo \"$x $(git -C \"$x\" rev-parse HEAD 2>/dev/null)\"; done; } | shasum",
       "line": "sim-retroplay",
-      "timeout": 75,
+      "timeout": 120,
       "select": {
         "env": "APP_TESTS",
         "always": [

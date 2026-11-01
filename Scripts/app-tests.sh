@@ -37,9 +37,23 @@ if [ $r -eq 0 ]; then
   ( cd "$DD/Build/Products/Debug-iphonesimulator" && for f in *.framework; do codesign -f -s - "$f" >/dev/null 2>&1; done )
   # A fresh Simulator for the run: after a long build its services can be gone.
   xcrun simctl shutdown "$s" 2>/dev/null; xcrun simctl boot "$s"; xcrun simctl bootstatus "$s" >/dev/null
-  xcodebuild test-without-building -project RetroPlay.xcodeproj -scheme RetroPlay -destination id=$s -derivedDataPath "$DD" \
-    ${only[@]+"${only[@]}"} -resultBundlePath "$R" -collect-test-diagnostics never
+  run_tests() {
+    rm -rf "$R"
+    xcodebuild test-without-building -project RetroPlay.xcodeproj -scheme RetroPlay -destination id=$s -derivedDataPath "$DD" \
+      ${only[@]+"${only[@]}"} -resultBundlePath "$R" -collect-test-diagnostics never 2>&1 | tee "$R.log"
+    return ${PIPESTATUS[0]}
+  }
+  run_tests
   r=$?
+  # The Simulator's services can die under memory pressure before the runner starts ("Failed to
+  # install or launch the test runner", no test run). That's the machine, not a test: the
+  # Simulator is restarted and the tests run once more. A test that ran and failed is final.
+  if [ $r -ne 0 ] && grep -q "Failed to install or launch the test runner" "$R.log" && ! grep -q "Test Case '.*' started" "$R.log"; then
+    echo "app-tests: the test runner didn't start (no test ran); restarting the Simulator and running the tests again"
+    xcrun simctl shutdown "$s" 2>/dev/null; sleep 5; xcrun simctl boot "$s"; xcrun simctl bootstatus "$s" >/dev/null
+    run_tests
+    r=$?
+  fi
 fi
 xcrun simctl shutdown "$s" 2>/dev/null
 
