@@ -161,13 +161,13 @@
   },
   {
     "project": "RetroPlay app resources",
-    "component": "Press Start 2P font (PressStart2P-Regular.ttf)",
-    "version": "google/fonts @ dbd72d6ef9ebea750d33c02c7189633e972d6a40; SHA-256 034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
+    "component": "Oxanium font (Oxanium-Regular/Medium/SemiBold/Bold.ttf)",
+    "version": "sevmeyer/oxanium 2.000 (oxanium-2.000.zip, SHA-256 0f9b8b2b6cd2f64aaf08752b9d038449034775e636f4b138877d288c0bc3a850): Regular, Medium, SemiBold, Bold",
     "spdx": "OFL-1.1",
-    "copyright": "Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name \"Press Start 2P\".",
-    "licenseFile": "retroplay/AppHost/Supporting/PressStart2P-OFL.txt",
+    "copyright": "Copyright 2019 The Oxanium Project Authors (https://github.com/sevmeyer/oxanium)",
+    "licenseFile": "retroplay/AppHost/Supporting/Oxanium-OFL.txt",
     "requiresNoticeText": true,
-    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches SOURCE.md. OFL requires copyright notice + license with the font (bundled OFL.txt satisfies it; also list in in-app licenses)"
+    "evidence": "project.yml copies AppHost/Supporting as resources; shasums match Oxanium-SOURCE.md. OFL requires copyright notice + license with the font (bundled Oxanium-OFL.txt satisfies it; also listed in in-app licenses)"
   },
   {
     "project": "mupen64plus-next",

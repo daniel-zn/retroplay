@@ -41,7 +41,10 @@
 	<true/>
 	<key>UIAppFonts</key>
 	<array>
-		<string>PressStart2P-Regular.ttf</string>
+		<string>Oxanium-Regular.ttf</string>
+		<string>Oxanium-Medium.ttf</string>
+		<string>Oxanium-SemiBold.ttf</string>
+		<string>Oxanium-Bold.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

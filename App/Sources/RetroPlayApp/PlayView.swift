@@ -629,7 +629,7 @@ public struct PlayView: View {
                 .font(RetroPlayFont.body)
                 .foregroundStyle(.white)
             Text("This iPhone is the controller.")
-                .font(RetroPlayFont.caption)
+                .font(RetroPlayFont.subheadline)
                 .foregroundStyle(.white.opacity(0.7))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -659,7 +659,7 @@ public struct PlayView: View {
         case .running:
             if !sawFirstFrame && slowStartHint {
                 Text("Still waiting for the first frame…")
-                    .font(RetroPlayFont.caption)
+                    .font(RetroPlayFont.subheadline)
                     .foregroundStyle(.white.opacity(0.75))
                     .padding(10)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
@@ -674,7 +674,7 @@ public struct PlayView: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
                 Text(message)
-                    .font(RetroPlayFont.caption)
+                    .font(RetroPlayFont.subheadline)
                     .foregroundStyle(.white.opacity(0.75))
                     .multilineTextAlignment(.center)
                 Button("Back to Library") { dismiss() }
@@ -689,7 +689,7 @@ public struct PlayView: View {
 
     private func toastView(_ text: String) -> some View {
         Text(text)
-            .font(RetroPlayFont.caption)
+            .font(RetroPlayFont.subheadline)
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)

@@ -131,7 +131,7 @@ struct RetroPlayPrimaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(RetroPlayFont.subheadline)
+            .font(RetroPlayFont.headline)
             .foregroundStyle(.white)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)

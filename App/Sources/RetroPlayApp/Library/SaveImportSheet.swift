@@ -45,7 +45,7 @@ struct SaveImportSheet: View {
                 if !batch.items.isEmpty { actions }
             }
         }
-        .environment(\.font, RetroPlayFont.caption)
+        .environment(\.font, RetroPlayFont.callout)
         .tint(RetroPlayTheme.accent)
         .interactiveDismissDisabled(committing)
     }
@@ -64,7 +64,7 @@ struct SaveImportSheet: View {
     private var summarySection: some View {
         Section {
             Text(summaryText)
-                .font(RetroPlayFont.subheadline)
+                .font(RetroPlayFont.headline)
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                 .accessibilityIdentifier("saveImport.summary")
         } footer: {
@@ -81,7 +81,7 @@ struct SaveImportSheet: View {
                         : "\(batch.otherSystemSaves) saves are for systems RetroPlay doesn't play.")
                 }
             }
-            .font(RetroPlayFont.caption2)
+            .font(RetroPlayFont.footnote)
         }
         .listRowBackground(Self.rowBackground)
     }
@@ -97,7 +97,7 @@ struct SaveImportSheet: View {
                         SystemBadge(system: item.game.systemID)
                     }
                     Text(item.sourceName)
-                        .font(RetroPlayFont.caption2)
+                        .font(RetroPlayFont.footnote)
                         .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
                 }
                 .padding(.vertical, 2)
@@ -107,7 +107,7 @@ struct SaveImportSheet: View {
             sectionHeader("\(title) (\(items.count))")
         } footer: {
             if let footer {
-                Text(footer).font(RetroPlayFont.caption2)
+                Text(footer).font(RetroPlayFont.footnote)
             }
         }
         .listRowBackground(Self.rowBackground)
@@ -120,7 +120,7 @@ struct SaveImportSheet: View {
                     Text(skipped.name)
                         .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                     Text(skipped.reason)
-                        .font(RetroPlayFont.caption2)
+                        .font(RetroPlayFont.footnote)
                         .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
                 }
                 .padding(.vertical, 2)
@@ -168,7 +168,7 @@ struct SaveImportSheet: View {
                     onImport(false)
                 } label: {
                     Text(adding == 1 ? "Only Add 1 New Save" : "Only Add \(adding) New Saves")
-                        .font(RetroPlayFont.caption)
+                        .font(RetroPlayFont.callout)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)

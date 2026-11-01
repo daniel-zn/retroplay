@@ -141,7 +141,7 @@ struct LibraryTopBarIcon: View {
     var body: some View {
         Image(systemName: symbol)
             // System body size, as toolbar symbols normally are (and growing with Dynamic
-            // Type): the app-wide pixel font is set smaller, which shrank the symbols.
+            // Type), not the app's text font set as the environment default.
             .font(.body)
             // The bar's scrolled look recolours plain tinted items white; an explicit style
             // keeps the accent.
@@ -265,8 +265,8 @@ struct LibraryOnboardingView: View {
                     .font(RetroPlayFont.title3)
                     .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                 Text("Import games you own from Files. RetroPlay picks the system and core for you.")
-                    .font(RetroPlayFont.caption)
-                    .lineSpacing(4)
+                    .font(RetroPlayFont.subheadline)
+                    .lineSpacing(2)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
             }
@@ -282,13 +282,13 @@ struct LibraryOnboardingView: View {
                     HStack(spacing: 10) {
                         SystemBadge(system: system)
                         Text(system.displayName)
-                            .font(RetroPlayFont.caption2)
+                            .font(RetroPlayFont.footnote)
                             .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                         Spacer(minLength: 8)
                         Text(Self.formats(system))
-                            .font(RetroPlayFont.caption2)
+                            .font(RetroPlayFont.caption)
                             .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
@@ -300,7 +300,7 @@ struct LibraryOnboardingView: View {
             .background(RetroPlayTheme.card(for: colorScheme), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
             Text("No ROMs are included. Unzip archives before importing.")
-                .font(RetroPlayFont.caption2)
+                .font(RetroPlayFont.footnote)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
         }
@@ -335,19 +335,19 @@ struct EmptyFilterView: View {
     var body: some View {
         VStack(spacing: 14) {
             Text("NO \(tab.title) GAMES")
-                .font(RetroPlayFont.subheadline)
+                .font(RetroPlayFont.headline)
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
             if let system = tab.systemID {
                 Text("Import \(LibraryOnboardingView.formats(system)) files to play \(system.displayName) games.")
-                    .font(RetroPlayFont.caption2)
-                    .lineSpacing(3)
+                    .font(RetroPlayFont.subheadline)
+                    .lineSpacing(2)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
             }
             HStack(spacing: 10) {
                 Button("Show All", action: onShowAll)
                     .glassButton()
-                    .font(RetroPlayFont.caption)
+                    .font(RetroPlayFont.callout)
                 Button(action: onImport) {
                     Label("Import", systemImage: "plus")
                 }

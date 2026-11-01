@@ -91,9 +91,9 @@ struct GameArtworkView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 4)
                 Text(game.displayName)
-                    .font(RetroPlayFont.sized(labelTitleSize + 2, relativeTo: .caption))
+                    .font(RetroPlayFont.sized(labelTitleSize + 3, weight: .bold, relativeTo: .caption))
                     .foregroundStyle(.white)
-                    .lineSpacing(3)
+                    .lineSpacing(0)
                     .lineLimit(4)
                     .minimumScaleFactor(0.6)
                     .multilineTextAlignment(.leading)
@@ -120,7 +120,7 @@ struct SystemBadge: View {
 
     var body: some View {
         Text(RetroPlayTheme.shortName(system))
-            .font(RetroPlayFont.sized(10, relativeTo: .caption2))
+            .font(RetroPlayFont.sized(10, weight: .bold, relativeTo: .caption2))
             .foregroundStyle(style == .onArt ? .white : RetroPlayTheme.systemTint(system))
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
@@ -173,13 +173,13 @@ struct GameTileView: View {
                 }
 
             Text(game.displayName)
-                .font(RetroPlayFont.caption)
+                .font(RetroPlayFont.subheadline)
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                 .lineLimit(2)
-                .lineSpacing(2)
+                .lineSpacing(0)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(subtitle)
-                .font(RetroPlayFont.caption2)
+                .font(RetroPlayFont.caption)
                 .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
                 .lineLimit(1)
         }

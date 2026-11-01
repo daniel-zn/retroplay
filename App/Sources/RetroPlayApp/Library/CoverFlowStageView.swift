@@ -320,7 +320,7 @@ private struct FaceLabel: View {
         ZStack(alignment: .topLeading) {
             colors[face.rawValue]
             Text("\(face)".uppercased() + " ↑")
-                .font(.system(size: 18, weight: .black))
+                .font(RetroPlayFont.fixed(18, weight: .bold))
                 .foregroundStyle(.white)
                 .padding(4)
         }

@@ -268,7 +268,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                         .font(RetroPlayFont.subheadline)
                         .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                         .multilineTextAlignment(.center)
-                        .lineSpacing(3)
+                        .lineSpacing(0)
                         .lineLimit(compactCaption ? 1 : 2, reservesSpace: !compactCaption)
                         .minimumScaleFactor(0.7)
                     HStack(spacing: 8) {
@@ -283,7 +283,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                                     : RetroPlayTheme.secondaryText(for: colorScheme)
                             )
                     }
-                    .font(RetroPlayFont.caption2)
+                    .font(RetroPlayFont.caption)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 }

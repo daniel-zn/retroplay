@@ -72,7 +72,7 @@ private struct RetroPlayAlertModifier: ViewModifier {
                                         action.perform()
                                     } label: {
                                         Text(action.title)
-                                            .font(RetroPlayFont.subheadline)
+                                            .font(RetroPlayFont.headline)
                                             .frame(maxWidth: .infinity)
                                     }
                                     .prominentGlassButton()

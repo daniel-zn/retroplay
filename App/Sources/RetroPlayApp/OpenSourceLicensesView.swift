@@ -34,8 +34,8 @@ struct OpenSourceLicensesView: View {
                     Text("RetroPlay")
                         .font(RetroPlayFont.body)
                     Text(Self.appNotice)
-                        .font(RetroPlayFont.caption2)
-                        .lineSpacing(3)
+                        .font(RetroPlayFont.footnote)
+                        .lineSpacing(2)
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 6)
@@ -60,9 +60,9 @@ struct OpenSourceLicensesView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(component.name)
-                                    .font(RetroPlayFont.caption)
+                                    .font(RetroPlayFont.body)
                                 Text(component.license)
-                                    .font(RetroPlayFont.caption2)
+                                    .font(RetroPlayFont.footnote)
                                     .foregroundStyle(.secondary)
                             }
                             .padding(.vertical, 2)
@@ -100,7 +100,7 @@ struct OpenSourceLicensesView: View {
 
     private func header(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(RetroPlayFont.caption2)
+            .font(RetroPlayFont.footnote)
             .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
     }
 
@@ -155,10 +155,10 @@ private struct ComponentLicenseView: View {
     private func stacked(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(RetroPlayFont.caption2)
+                .font(RetroPlayFont.footnote)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(RetroPlayFont.caption2)
+                .font(RetroPlayFont.footnote)
                 .textSelection(.enabled)
         }
     }
@@ -166,11 +166,11 @@ private struct ComponentLicenseView: View {
     private func row(_ title: String, _ value: String) -> some View {
         LabeledContent {
             Text(value)
-                .font(RetroPlayFont.caption2)
+                .font(RetroPlayFont.footnote)
                 .multilineTextAlignment(.trailing)
         } label: {
             Text(title)
-                .font(RetroPlayFont.caption2)
+                .font(RetroPlayFont.footnote)
                 .foregroundStyle(.secondary)
         }
     }
@@ -187,7 +187,7 @@ private struct LicenseTextView: View {
     var body: some View {
         ScrollView {
             Text(text)
-                .font(.system(.footnote, design: .monospaced))
+                .font(RetroPlayFont.sized(13, weight: .regular, relativeTo: .footnote))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()

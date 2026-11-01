@@ -452,12 +452,12 @@ public struct RetroPlayRootView: View {
             .retroPlayLibraryInlineNav()
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .toolbar {
-                // The collapsed title, drawn here so it keeps the pixel font: the bar's own
+                // The collapsed title, drawn here so it keeps the app's font: the bar's own
                 // title text falls back to the system font under SwiftUI's toolbar styling.
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
                         Text("RetroPlay")
-                            .font(RetroPlayFont.sized(17, relativeTo: .headline))
+                            .font(RetroPlayFont.headline)
                             .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
@@ -485,7 +485,7 @@ public struct RetroPlayRootView: View {
                                 ProgressView()
                                     .controlSize(.small)
                                 Text("Finding saves")
-                                    .font(RetroPlayFont.caption2)
+                                    .font(RetroPlayFont.caption)
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
@@ -499,7 +499,7 @@ public struct RetroPlayRootView: View {
                             ProgressView()
                                 .controlSize(.small)
                             Text("Importing \(store.importsInProgress)")
-                                .font(RetroPlayFont.caption2)
+                                .font(RetroPlayFont.caption)
                                 .monospacedDigit()
                         }
                         .padding(.horizontal, 10)
@@ -558,7 +558,7 @@ public struct RetroPlayRootView: View {
                 Text(systemTab == .all
                     ? gameCountText(store.games.count)
                     : "\(systemTab.title) · \(filteredGames.count) of \(gameCountText(store.games.count))")
-                    .font(RetroPlayFont.caption2)
+                    .font(RetroPlayFont.footnote)
                     .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
             }
         }
@@ -679,7 +679,7 @@ public struct RetroPlayRootView: View {
                         recordSearch()
                     } label: {
                         Label(query, systemImage: "clock.arrow.circlepath")
-                            .font(RetroPlayFont.caption)
+                            .font(RetroPlayFont.body)
                             .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                     }
                     .accessibilityHint("Searches for \(query)")
@@ -696,7 +696,7 @@ public struct RetroPlayRootView: View {
                         .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
                     Spacer()
                     Button("Clear") { recentSearchesRaw = "" }
-                        .font(RetroPlayFont.caption2)
+                        .font(RetroPlayFont.footnote)
                         .accessibilityLabel("Clear recent searches")
                 }
             }

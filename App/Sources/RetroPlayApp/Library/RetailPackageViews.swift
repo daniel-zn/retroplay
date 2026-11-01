@@ -74,7 +74,7 @@ struct PackageBandView: View {
         let across = verticalLabel ? size.width : size.height
         let along = verticalLabel ? size.height : size.width
         return Text(band.label)
-            .font(.system(size: max(across * (verticalLabel ? 0.36 : 0.42), 6), weight: .heavy, design: .rounded))
+            .font(RetroPlayFont.fixed(max(across * (verticalLabel ? 0.4 : 0.46), 6), weight: .bold))
             .tracking(across * 0.03)
             .foregroundStyle(band.color.isDark ? Color.white : Color(white: 0.15))
             .lineLimit(1)
@@ -169,7 +169,7 @@ struct PackageSpine: View {
                     PackageBandView(band: package.spineBand, verticalLabel: true)
                         .frame(height: band)
                     Text(title)
-                        .font(RetroPlayFont.sized(max(w * 0.4, 7), relativeTo: .caption))
+                        .font(RetroPlayFont.fixed(max(w * 0.46, 8), weight: .bold))
                         .foregroundStyle(lightTitle ? Color.white : Color(white: 0.12))
                         .shadow(color: .black.opacity(artBehindTitle ? 0.8 : 0), radius: 1.5)
                         .lineLimit(1)

@@ -95,11 +95,11 @@ struct PlayMenuView: View {
         VStack(spacing: 12) {
             VStack(spacing: 4) {
                 Text(title)
-                    .font(RetroPlayFont.body)
+                    .font(RetroPlayFont.title3)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                 Text(systemName)
-                    .font(RetroPlayFont.caption)
+                    .font(RetroPlayFont.subheadline)
                     .foregroundStyle(.secondary)
             }
             .padding(.bottom, 4)
@@ -136,7 +136,7 @@ struct PlayMenuView: View {
                 VStack(spacing: 10) {
                     if hasController {
                         Label(controllerName ?? "Controller connected", systemImage: "gamecontroller.fill")
-                            .font(RetroPlayFont.caption)
+                            .font(RetroPlayFont.subheadline)
                             .foregroundStyle(.white.opacity(0.7))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -156,7 +156,7 @@ struct PlayMenuView: View {
                         .controllerFocusRing(focus == .fill, cornerRadius: 6)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Landscape Controls Opacity")
-                            .font(RetroPlayFont.caption)
+                            .font(RetroPlayFont.subheadline)
                             .foregroundStyle(.white.opacity(0.6))
                             .fixedSize(horizontal: false, vertical: true)
                         Slider(value: $padOpacity, in: 0.25...1)
@@ -168,7 +168,7 @@ struct PlayMenuView: View {
                     .foregroundStyle(.white)
                     .controllerFocusRing(focus == .options, cornerRadius: 6)
             }
-            .font(RetroPlayFont.subheadline)
+            .font(RetroPlayFont.headline)
             .padding(.horizontal, 4)
 
             if leaving {
@@ -176,7 +176,7 @@ struct PlayMenuView: View {
                     ProgressView()
                         .tint(.white)
                     Text("Saving…")
-                        .font(RetroPlayFont.subheadline)
+                        .font(RetroPlayFont.headline)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: MenuTileButtonStyle.height)
@@ -299,7 +299,7 @@ extension PlayMenuView {
     private func resolutionPicker(_ selection: Binding<Int>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Resolution")
-                .font(RetroPlayFont.caption)
+                .font(RetroPlayFont.subheadline)
                 .foregroundStyle(.white.opacity(0.6))
             Picker("Resolution", selection: selection) {
                 ForEach(PSPRenderResolution.allCases) { option in
@@ -319,7 +319,7 @@ extension PlayMenuView {
             VStack(spacing: 8) {
                 if saveEntries.isEmpty {
                     Text(PlaySavesMenuContent.emptyTitle)
-                        .font(RetroPlayFont.caption)
+                        .font(RetroPlayFont.subheadline)
                         .foregroundStyle(.white.opacity(0.6))
                         .frame(maxWidth: .infinity, minHeight: 36)
                 } else {
@@ -365,7 +365,7 @@ extension PlayMenuView {
                 .foregroundStyle(.white)
                 .controllerFocusRing(focus == .saves, cornerRadius: 6)
         }
-        .font(RetroPlayFont.subheadline)
+        .font(RetroPlayFont.headline)
         .padding(.horizontal, 4)
     }
 }
@@ -383,12 +383,12 @@ private struct SaveRowLabel: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(PlaySavesMenuContent.name(for: entry))
-                    .font(RetroPlayFont.caption)
+                    .font(RetroPlayFont.callout)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 if let date = entry.modifiedAt {
                     Text(date, format: .dateTime.month(.abbreviated).day().hour().minute())
-                        .font(RetroPlayFont.caption2)
+                        .font(RetroPlayFont.caption)
                         .foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -433,7 +433,7 @@ struct MenuTileButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(RetroPlayFont.subheadline)
+            .font(RetroPlayFont.headline)
             .foregroundStyle(foreground.opacity(isEnabled ? 1 : 0.35))
             .multilineTextAlignment(.center)
             .padding(.vertical, 6)

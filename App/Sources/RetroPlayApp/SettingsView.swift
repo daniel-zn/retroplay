@@ -54,7 +54,7 @@ struct SettingsView: View {
             }
             .task { await measureStorage() }
         }
-        .environment(\.font, RetroPlayFont.caption)
+        .environment(\.font, RetroPlayFont.body)
         .tint(RetroPlayTheme.accent)
     }
 
@@ -130,13 +130,13 @@ struct SettingsView: View {
             .padding(.vertical, 4)
             LabeledContent {
                 Text("\(gameCounts[.all] ?? 0)")
-                    .font(RetroPlayFont.caption)
+                    .font(RetroPlayFont.body)
             } label: {
                 SettingsIconLabel("Games", symbol: "square.stack.fill", color: RetroPlayTheme.accent)
             }
             LabeledContent {
                 Text(storageUsed.map { $0.formatted(.byteCount(style: .file)) } ?? "…")
-                    .font(RetroPlayFont.caption)
+                    .font(RetroPlayFont.body)
             } label: {
                 SettingsIconLabel("Storage", symbol: "internaldrive.fill", color: .gray)
             }
@@ -156,7 +156,7 @@ struct SettingsView: View {
         Section {
             LabeledContent {
                 Text(Self.versionString)
-                    .font(RetroPlayFont.caption)
+                    .font(RetroPlayFont.body)
             } label: {
                 SettingsIconLabel("Version", symbol: "info.circle.fill", color: .blue)
             }
@@ -168,8 +168,8 @@ struct SettingsView: View {
                     Game Boy Advance, Nintendo 64, Nintendo DS and PlayStation Portable are trademarks of their respective owners, used here only to describe compatibility. RetroPlay is not affiliated with or endorsed by Nintendo or Sony.
                     """
                 )
-                .font(RetroPlayFont.caption2)
-                .lineSpacing(4)
+                .font(RetroPlayFont.footnote)
+                .lineSpacing(2)
                 .foregroundStyle(.secondary)
                 .padding(.vertical, 6)
             } label: {
@@ -249,7 +249,7 @@ struct SettingsIconLabel: View {
                 .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                 .accessibilityHidden(true)
             Text(title)
-                .font(RetroPlayFont.caption)
+                .font(RetroPlayFont.body)
                 .foregroundStyle(.primary)
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
                 .minimumScaleFactor(0.6)
