@@ -58,7 +58,11 @@ final class SaveImportSMBUITests: XCTestCase {
         let browse = element(files, "Browse")
         if browse.waitForExistence(timeout: 10) { browse.tap() }
         let entry = element(files, server)
-        guard entry.waitForExistence(timeout: 10) else { files.terminate(); return }
+        guard entry.waitForExistence(timeout: 10) else {
+            attach(files, "smb-forget-no-server")
+            files.terminate()
+            return
+        }
         entry.press(forDuration: 1.2)
         for label in ["Disconnect", "Eject", "Remove", "Forget"] {
             let action = element(files, label)
@@ -97,19 +101,28 @@ final class SaveImportSMBUITests: XCTestCase {
             address.tap()
             address.typeText("smb://\(server)")
             try tap(files, ["Connect"], step: "files-connect")
-            let fields = files.textFields
-            let name = fields.element(boundBy: max(0, fields.count - 1))
-            if name.waitForExistence(timeout: 10) {
-                name.tap()
-                name.press(forDuration: 1)
-                if files.menuItems["Select All"].exists { files.menuItems["Select All"].tap() }
-                name.typeText(user)
-            }
+            // The sign-in screen is up once it shows a password field.
             let secret = files.secureTextFields.firstMatch
-            guard secret.waitForExistence(timeout: 10) else {
-                attach(files, "smb-stuck-password")
-                throw XCTSkip("No password field.")
+            guard secret.waitForExistence(timeout: 20) else {
+                attach(files, "smb-stuck-sign-in")
+                throw XCTSkip("No sign-in screen after Connect.")
             }
+            let registered = element(files, "Registered User")
+            if registered.exists, registered.isHittable { registered.tap() }
+            attach(files, "smb-sign-in")
+            let name = files.textFields
+                .matching(NSPredicate(format: "identifier != %@", "ServerAddressTextField"))
+                .firstMatch
+            guard name.waitForExistence(timeout: 5) else {
+                attach(files, "smb-stuck-name")
+                throw XCTSkip("No name field on the sign-in screen.")
+            }
+            name.tap()
+            // It may come filled in (the device's owner): replace it.
+            if let current = name.value as? String, !current.isEmpty, current != name.placeholderValue {
+                name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+            }
+            name.typeText(user)
             // Pasted, not typed: XCUITest logs typed text, and the password mustn't be logged.
             UIPasteboard.general.string = password
             defer { UIPasteboard.general.string = "" }
