@@ -94,7 +94,7 @@ struct GameArtworkView: View {
                 // title under the tile grows instead); at larger text sizes a long word
                 // would otherwise break mid-word.
                 Text(game.displayName)
-                    .font(RetroPlayFont.fixed(labelTitleSize + 3, weight: .bold))
+                    .font(RetroPlayFont.fixed(labelTitleSize + 3))
                     .foregroundStyle(.white)
                     .lineSpacing(0)
                     .lineLimit(4)
@@ -124,7 +124,7 @@ struct SystemBadge: View {
 
     var body: some View {
         Text(RetroPlayTheme.shortName(system))
-            .font(RetroPlayFont.sized(10, weight: .bold, relativeTo: .caption2))
+            .font(RetroPlayFont.sized(10, relativeTo: .caption2))
             .foregroundStyle(style == .onArt ? .white : RetroPlayTheme.systemTint(system))
             .padding(.horizontal, 6)
             .padding(.vertical, 4)

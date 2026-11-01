@@ -115,7 +115,7 @@ struct PadFaceButton: View {
     /// them, larger and heavy so they read.
     private var labelFont: Font {
         if title.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) }) {
-            return RetroPlayFont.sized(max(12, diameter * 0.42), weight: .bold, relativeTo: .body)
+            return RetroPlayFont.sized(max(12, diameter * 0.42), relativeTo: .body)
         }
         return .system(size: max(12, diameter * 0.44), weight: .heavy)
     }
@@ -179,7 +179,7 @@ struct PadShoulderButton: View {
     var body: some View {
         let held = input.isHeld(bits)
         Text(title)
-            .font(RetroPlayFont.sized(max(12, height * 0.42), weight: .bold, relativeTo: .subheadline))
+            .font(RetroPlayFont.sized(max(12, height * 0.42), relativeTo: .subheadline))
             .foregroundStyle(Color.padLabel(fill: fill, ink: ink, glass: glass))
             .frame(width: width, height: height)
             .padSurface(shape, tint: fill.padTint(glass: glass, held: held), clear: glass) {
@@ -232,7 +232,7 @@ struct PadPillButton: View {
                 // Over the game the capsule is mostly see-through, so a dark label would vanish.
                 .foregroundStyle(glass ? Color.white.opacity(0.9) : ink)
         }
-            .font(RetroPlayFont.sized(max(9, 12 * drawn), weight: .semibold, relativeTo: .caption2))
+            .font(RetroPlayFont.sized(max(9, 12 * drawn), relativeTo: .caption2))
             .lineLimit(1)
             .fixedSize()
             .padding(.horizontal, 12 * drawn)

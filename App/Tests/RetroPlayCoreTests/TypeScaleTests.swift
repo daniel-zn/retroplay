@@ -3,10 +3,11 @@ import CoreText
 import XCTest
 @testable import RetroPlayCore
 
-/// Every text in the app is set in Oxanium: the bundled files are the weights the type scale
-/// names, each registers, and every style resolves to Oxanium in its weight (not a fallback).
+/// Every text in the app is set in Hydrogen Whiskey: the one bundled face is the one Info.plist
+/// lists, it registers, and every style resolves to it (not a fallback, and not a synthesised
+/// bold or italic: the face has one weight).
 final class TypeScaleTests: XCTestCase {
-    /// AppHost/Supporting in the checkout, where the app bundles its fonts from.
+    /// AppHost/Supporting in the checkout, where the app bundles its font from.
     private static let supporting = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()   // RetroPlayCoreTests
         .deletingLastPathComponent()   // Tests
@@ -16,33 +17,34 @@ final class TypeScaleTests: XCTestCase {
 
     override class func setUp() {
         super.setUp()
-        for weight in RetroPlayTypeface.Weight.allCases {
-            let url = supporting.appendingPathComponent(weight.fileName) as CFURL
-            CTFontManagerRegisterFontsForURL(url, .process, nil)
-        }
+        let url = supporting.appendingPathComponent(RetroPlayTypeface.fileName) as CFURL
+        CTFontManagerRegisterFontsForURL(url, .process, nil)
     }
 
-    func testEveryWeightIsBundledAndListedInInfoPlist() throws {
+    func testTheFaceIsBundledAndTheOnlyFontInInfoPlist() throws {
         let plist = try XCTUnwrap(NSDictionary(contentsOf: Self.supporting.appendingPathComponent("Info.plist")))
         let fonts = try XCTUnwrap(plist["UIAppFonts"] as? [String])
-        for weight in RetroPlayTypeface.Weight.allCases {
-            XCTAssertTrue(FileManager.default.fileExists(atPath: Self.supporting.appendingPathComponent(weight.fileName).path), weight.fileName)
-            XCTAssertTrue(fonts.contains(weight.fileName), "\(weight.fileName) isn't in UIAppFonts: \(fonts)")
-        }
-        XCTAssertEqual(Set(fonts), Set(RetroPlayTypeface.Weight.allCases.map(\.fileName)), "UIAppFonts lists other fonts")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: Self.supporting.appendingPathComponent(RetroPlayTypeface.fileName).path))
+        XCTAssertEqual(fonts, [RetroPlayTypeface.fileName])
     }
 
-    func testEveryStyleResolvesToOxaniumInItsWeight() {
+    func testEveryStyleResolvesToHydrogenWhiskeyWithoutSyntheticTraits() {
+        XCTAssertEqual(RetroPlayTypeface.postScriptName, "HydrogenWhiskey-Regular")
         for style in RetroPlayTextStyle.all {
-            let font = CTFontCreateWithName(style.weight.postScriptName as CFString, style.size, nil)
-            XCTAssertEqual(CTFontCopyFamilyName(font) as String, RetroPlayTypeface.family, style.name)
-            XCTAssertEqual(CTFontCopyPostScriptName(font) as String, style.weight.postScriptName, style.name)
+            let font = CTFontCreateWithName(RetroPlayTypeface.postScriptName as CFString, style.size, nil)
+            XCTAssertEqual(CTFontCopyFamilyName(font) as String, "Hydrogen Whiskey", style.name)
+            XCTAssertEqual(CTFontCopyPostScriptName(font) as String, "HydrogenWhiskey-Regular", style.name)
+            let traits = CTFontGetSymbolicTraits(font)
+            XCTAssertFalse(traits.contains(.traitBold), "\(style.name) is bold")
+            XCTAssertFalse(traits.contains(.traitItalic), "\(style.name) is italic")
         }
     }
 
-    func testTheScaleRunsFromLargestToSmallest() {
+    func testTheScaleRunsFromLargestToSmallestAndStaysReadable() {
         let sizes = RetroPlayTextStyle.all.map(\.size)
         XCTAssertEqual(sizes, sizes.sorted(by: >))
+        XCTAssertEqual(Set(sizes).count, sizes.count, "two styles share a size: with one weight they'd look the same")
+        XCTAssertGreaterThanOrEqual(sizes.min() ?? 0, 11)
         XCTAssertEqual(Set(RetroPlayTextStyle.all.map(\.relativeTo)).count, RetroPlayTextStyle.all.count, "two styles scale alike")
     }
 }

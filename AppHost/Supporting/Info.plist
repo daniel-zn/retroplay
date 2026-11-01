@@ -41,10 +41,7 @@
 	<true/>
 	<key>UIAppFonts</key>
 	<array>
-		<string>Oxanium-Regular.ttf</string>
-		<string>Oxanium-Medium.ttf</string>
-		<string>Oxanium-SemiBold.ttf</string>
-		<string>Oxanium-Bold.ttf</string>
+		<string>HydrogenWhiskey-Regular.otf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

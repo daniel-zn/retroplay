@@ -46,6 +46,7 @@ struct SettingsView: View {
             .task { await measureStorage() }
         }
         .environment(\.font, RetroPlayFont.body)
+        .retroPlayTracking()
         .tint(RetroPlayTheme.accent)
     }
 

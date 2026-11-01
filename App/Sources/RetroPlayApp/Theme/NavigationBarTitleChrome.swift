@@ -22,11 +22,13 @@ enum RetroPlayNavigationBarChrome {
         standard.shadowColor = .clear
         standard.titleTextAttributes = [
             .foregroundColor: foreground,
-            .font: RetroPlayFont.uiFont(.headline)
+            .font: RetroPlayFont.uiFont(.headline),
+            .kern: RetroPlayFont.uiKern
         ]
         standard.largeTitleTextAttributes = [
             .foregroundColor: foreground,
-            .font: RetroPlayFont.uiFont(.largeTitle)
+            .font: RetroPlayFont.uiFont(.largeTitle),
+            .kern: RetroPlayFont.uiKern
         ]
 
         let scrollEdge = UINavigationBarAppearance()
@@ -68,6 +70,8 @@ enum RetroPlayNavigationBarChrome {
             guard let copy = appearance?.copy() else { return nil }
             copy.titleTextAttributes[.font] = titleFont
             copy.largeTitleTextAttributes[.font] = largeTitleFont
+            copy.titleTextAttributes[.kern] = RetroPlayFont.uiKern
+            copy.largeTitleTextAttributes[.kern] = RetroPlayFont.uiKern
             return copy
         }
         item.standardAppearance = patched(item.standardAppearance ?? bar.standardAppearance)

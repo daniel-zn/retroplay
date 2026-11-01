@@ -161,13 +161,13 @@
   },
   {
     "project": "RetroPlay app resources",
-    "component": "Oxanium font (Oxanium-Regular/Medium/SemiBold/Bold.ttf)",
-    "version": "sevmeyer/oxanium 2.000 (oxanium-2.000.zip, SHA-256 0f9b8b2b6cd2f64aaf08752b9d038449034775e636f4b138877d288c0bc3a850): Regular, Medium, SemiBold, Bold",
-    "spdx": "OFL-1.1",
-    "copyright": "Copyright 2019 The Oxanium Project Authors (https://github.com/sevmeyer/oxanium)",
-    "licenseFile": "retroplay/AppHost/Supporting/Oxanium-OFL.txt",
-    "requiresNoticeText": true,
-    "evidence": "project.yml copies AppHost/Supporting as resources; shasums match Oxanium-SOURCE.md. OFL requires copyright notice + license with the font (bundled Oxanium-OFL.txt satisfies it; also listed in in-app licenses)"
+    "component": "Hydrogen Whiskey font (HydrogenWhiskey-Regular.otf)",
+    "version": "5.011 (hydrogen-whiskey.zip from 1001fonts.com, SHA-256 2e6a8829a6526902809ae792bb0cfce5a3dbba221687fef40935d1da5639978c; HydrogenWhiskey-Regular.otf SHA-256 4f4a1313a944eabcfde3c39692a3928f2c04065640e1353fca416057f07061c9)",
+    "spdx": "CC0-1.0",
+    "copyright": "Released in 2024 under CC0 license. No rights reserved. Ray Larabie",
+    "licenseFile": "retroplay/AppHost/Supporting/HydrogenWhiskey-LICENSE.txt",
+    "requiresNoticeText": false,
+    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches HydrogenWhiskey-SOURCE.md. CC0 needs no notice; the font's license record is bundled (HydrogenWhiskey-LICENSE.txt) and listed in in-app licenses"
   },
   {
     "project": "mupen64plus-next",

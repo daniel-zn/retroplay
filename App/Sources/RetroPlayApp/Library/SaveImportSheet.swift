@@ -46,6 +46,7 @@ struct SaveImportSheet: View {
             }
         }
         .environment(\.font, RetroPlayFont.callout)
+        .retroPlayTracking()
         .tint(RetroPlayTheme.accent)
         .interactiveDismissDisabled(committing)
     }

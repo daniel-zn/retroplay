@@ -143,6 +143,7 @@ public struct RetroPlayRootView: View {
         .overlay { if UserDefaults.standard.bool(forKey: "RetroPlaySmokePackages") { RetailPackageGallery() } }
         #endif
         .environment(\.font, RetroPlayFont.body)
+        .retroPlayTracking()
         .environment(navigator)
         .task { navigator.start() }
         .onChange(of: !showSearch && !showSettings && !showImporter, initial: true) { _, front in

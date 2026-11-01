@@ -187,7 +187,7 @@ private struct LicenseTextView: View {
     var body: some View {
         ScrollView {
             Text(text)
-                .font(RetroPlayFont.sized(13, weight: .regular, relativeTo: .footnote))
+                .font(RetroPlayFont.sized(13, relativeTo: .footnote))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()

@@ -1,12 +1,12 @@
 [
  {
-  "name": "Oxanium font",
+  "name": "Hydrogen Whiskey font",
   "usedBy": "App",
-  "license": "OFL-1.1",
-  "copyright": "Copyright 2019 The Oxanium Project Authors (https://github.com/sevmeyer/oxanium)",
-  "source": "https://github.com/sevmeyer/oxanium/releases/tag/2.000",
-  "version": "sevmeyer/oxanium 2.000 (oxanium-2.000.zip, SHA-256 0f9b8b2b6cd2f64aaf08752b9d038449034775e636f4b138877d288c0bc3a850): Regular, Medium, SemiBold, Bold",
-  "licenseFile": "Oxanium-font-OFL-1-1.txt"
+  "license": "CC0-1.0",
+  "copyright": "Released in 2024 under CC0 license. No rights reserved. Ray Larabie",
+  "source": "https://creativecommons.org/publicdomain/zero/1.0/ (font by Ray Larabie, Typodermic; downloaded from 1001fonts.com)",
+  "version": "5.011 (hydrogen-whiskey.zip from 1001fonts.com, SHA-256 2e6a8829a6526902809ae792bb0cfce5a3dbba221687fef40935d1da5639978c; HydrogenWhiskey-Regular.otf SHA-256 4f4a1313a944eabcfde3c39692a3928f2c04065640e1353fca416057f07061c9)",
+  "licenseFile": "Hydrogen-Whiskey-font-CC0-1-0.txt"
  },
  {
   "name": "mGBA (libmgba, GBA core only)",

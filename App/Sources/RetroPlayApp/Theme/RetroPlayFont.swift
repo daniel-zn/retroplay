@@ -4,14 +4,15 @@ import RetroPlayCore
 import SwiftUI
 import UIKit
 
-/// The app's fonts, all Oxanium, from the one type scale (`RetroPlayTextStyle`). Every font
-/// scales with Dynamic Type from its system text style; the bundled files are registered on
-/// first use, and a missing file falls back to the system face at the same style.
+/// The app's fonts, all Hydrogen Whiskey, from the one type scale (`RetroPlayTextStyle`).
+/// Every font scales with Dynamic Type from its system text style; the bundled file is
+/// registered on first use, and if it's missing the system face stands in at the same style.
+/// The face has one weight: no style asks for bold (iOS would thicken the outlines itself).
 @available(iOS 18.0, *)
 @MainActor
 enum RetroPlayFont {
-    typealias Weight = RetroPlayTypeface.Weight
     private static var didAttemptRegistration = false
+    private static let name = RetroPlayTypeface.postScriptName
 
     static var largeTitle: Font { font(.largeTitle) }
     static var title: Font { font(.title) }
@@ -26,49 +27,53 @@ enum RetroPlayFont {
     static var caption2: Font { font(.caption2) }
 
     static func font(_ style: RetroPlayTextStyle) -> Font {
-        custom(style.weight, size: style.size, relativeTo: style.relativeTo.swiftUI)
+        sized(style.size, relativeTo: style.relativeTo.swiftUI)
     }
 
     /// A size off the scale (drawn labels, controls), still scaling with `relativeTo`.
-    static func sized(_ size: CGFloat, weight: Weight = .medium, relativeTo style: Font.TextStyle = .body) -> Font {
-        custom(weight, size: size, relativeTo: style)
+    static func sized(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
+        registerBundledFont()
+        guard UIFont(name: name, size: size) != nil else { return .system(style) }
+        return .custom(name, size: size, relativeTo: style)
     }
 
     /// A size that doesn't follow Dynamic Type: text drawn into artwork (box art, covers)
     /// that is sized to the art itself.
-    static func fixed(_ size: CGFloat, weight: Weight = .bold) -> Font {
+    static func fixed(_ size: CGFloat) -> Font {
         registerBundledFont()
-        guard UIFont(name: weight.postScriptName, size: size) != nil else {
-            return .system(size: size, weight: weight.systemWeight)
-        }
-        return .custom(weight.postScriptName, fixedSize: size)
+        guard UIFont(name: name, size: size) != nil else { return .system(size: size) }
+        return .custom(name, fixedSize: size)
     }
 
     static func registerBundledFont() {
         guard !didAttemptRegistration else { return }
         didAttemptRegistration = true
-        for weight in Weight.allCases where UIFont(name: weight.postScriptName, size: 17) == nil {
-            guard let url = Bundle.main.url(forResource: weight.rawValue, withExtension: "ttf") else { continue }
-            var error: Unmanaged<CFError>?
-            if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
-                NSLog("RetroPlay font registration failed: %@", String(describing: error?.takeRetainedValue()))
-            }
+        guard UIFont(name: name, size: 17) == nil else { return }
+        let file = RetroPlayTypeface.fileName as NSString
+        guard let url = Bundle.main.url(forResource: file.deletingPathExtension, withExtension: file.pathExtension) else { return }
+        var error: Unmanaged<CFError>?
+        if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
+            NSLog("RetroPlay font registration failed: %@", String(describing: error?.takeRetainedValue()))
         }
     }
 
     static func uiFont(_ style: RetroPlayTextStyle) -> UIFont {
-        uiFont(size: style.size, weight: style.weight, textStyle: style.relativeTo.uiKit)
+        uiFont(size: style.size, textStyle: style.relativeTo.uiKit)
     }
 
-    static func uiFont(size: CGFloat, weight: Weight, textStyle: UIFont.TextStyle) -> UIFont {
+    static func uiFont(size: CGFloat, textStyle: UIFont.TextStyle) -> UIFont {
         registerBundledFont()
-        guard let base = UIFont(name: weight.postScriptName, size: size) else {
+        guard let base = UIFont(name: name, size: size) else {
             // preferredFont is already scaled; scaling it again would magnify
             // the fallback twice at non-default Dynamic Type sizes.
             return UIFont.preferredFont(forTextStyle: textStyle)
         }
         return UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base)
     }
+
+    /// The letter spacing every text gets (`RetroPlayTypeface.tracking`), grown with Dynamic
+    /// Type, for UIKit text attributes.
+    static var uiKern: CGFloat { UIFontMetrics.default.scaledValue(for: RetroPlayTypeface.tracking) }
 
     /// UIKit chrome SwiftUI fonts don't reach: bar buttons, segmented controls, search fields.
     /// (Navigation bar titles: `RetroPlayNavigationBarChrome`.)
@@ -77,32 +82,31 @@ enum RetroPlayFont {
         let bodyFont = uiFont(.body)
         let segmentFont = uiFont(.subheadline)
         for state in [UIControl.State.normal, .highlighted, .disabled, .selected] {
-            UIBarButtonItem.appearance().setTitleTextAttributes([.font: bodyFont], for: state)
-            UISegmentedControl.appearance().setTitleTextAttributes([.font: segmentFont], for: state)
+            UIBarButtonItem.appearance().setTitleTextAttributes([.font: bodyFont, .kern: uiKern], for: state)
+            UISegmentedControl.appearance().setTitleTextAttributes([.font: segmentFont, .kern: uiKern], for: state)
         }
         let searchAppearance = UISearchTextField.appearance()
         searchAppearance.font = bodyFont
         searchAppearance.adjustsFontForContentSizeCategory = true
+        searchAppearance.defaultTextAttributes[.kern] = uiKern
     }
+}
 
-    private static func custom(_ weight: Weight, size: CGFloat, relativeTo style: Font.TextStyle) -> Font {
-        registerBundledFont()
-        guard UIFont(name: weight.postScriptName, size: size) != nil else {
-            return .system(style, weight: weight.systemWeight)
-        }
-        return .custom(weight.postScriptName, size: size, relativeTo: style)
+/// The face's letter spacing for every text below (`RetroPlayTypeface.tracking`), growing
+/// with Dynamic Type. Set at each root: the app, and each sheet and full-screen cover.
+@available(iOS 18.0, *)
+private struct RetroPlayTracking: ViewModifier {
+    @ScaledMetric(relativeTo: .body) private var tracking = RetroPlayTypeface.tracking
+
+    func body(content: Content) -> some View {
+        content.tracking(tracking)
     }
 }
 
 @available(iOS 18.0, *)
-extension RetroPlayTypeface.Weight {
-    var systemWeight: Font.Weight {
-        switch self {
-        case .regular: .regular
-        case .medium: .medium
-        case .semibold: .semibold
-        case .bold: .bold
-        }
+extension View {
+    func retroPlayTracking() -> some View {
+        modifier(RetroPlayTracking())
     }
 }
 
