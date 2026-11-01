@@ -22,12 +22,15 @@ final class SaveImportSMBUITests: XCTestCase {
 
     /// The first button, cell or text labelled `label` (or starting with it).
     private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
-        let predicate = NSPredicate(format: "label == %@ OR label BEGINSWITH %@ OR identifier == %@", label, label, label)
+        // A fresh predicate per query: one handed to several would be shared across them.
+        func labelled() -> NSPredicate {
+            NSPredicate(format: "label == %@ OR label BEGINSWITH %@ OR identifier == %@", label, label, label)
+        }
         for query in [app.buttons, app.cells, app.staticTexts, app.textFields, app.otherElements] {
-            let match = query.matching(predicate).firstMatch
+            let match = query.matching(labelled()).firstMatch
             if match.exists { return match }
         }
-        return app.buttons.matching(predicate).firstMatch
+        return app.buttons.matching(labelled()).firstMatch
     }
 
     private func tap(_ app: XCUIApplication, _ labels: [String], step: String, timeout: TimeInterval = 10) throws {
