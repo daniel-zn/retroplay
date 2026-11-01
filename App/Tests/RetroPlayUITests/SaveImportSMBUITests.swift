@@ -46,6 +46,28 @@ final class SaveImportSMBUITests: XCTestCase {
         throw XCTSkip("Couldn't find \(labels) at step “\(step)”; see the attached screenshot.")
     }
 
+    /// Disconnects the server in Files (its context menu in Browse), best effort.
+    @MainActor
+    private func forgetServer(_ server: String) {
+        UIPasteboard.general.string = ""
+        let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
+        files.launch()
+        let browse = element(files, "Browse")
+        if browse.waitForExistence(timeout: 10) { browse.tap() }
+        let entry = element(files, server)
+        guard entry.waitForExistence(timeout: 10) else { files.terminate(); return }
+        entry.press(forDuration: 1.2)
+        for label in ["Disconnect", "Eject", "Remove", "Forget"] {
+            let action = element(files, label)
+            if action.waitForExistence(timeout: 2) {
+                action.tap()
+                break
+            }
+        }
+        attach(files, "smb-after-forget")
+        files.terminate()
+    }
+
     @MainActor
     func testPickingASaveFolderOnAnSMBShare() throws {
         guard let server = env["RETROPLAY_SMB_SERVER"], let user = env["RETROPLAY_SMB_USER"],
@@ -53,6 +75,9 @@ final class SaveImportSMBUITests: XCTestCase {
             throw XCTSkip("No SMB share given to the test runner.")
         }
         let path = folder.split(separator: "/").map(String.init)
+        // Pass or skip, the Simulator doesn't keep the server afterwards (the job script also
+        // resets its keychain).
+        defer { forgetServer(server) }
 
         // 1. Files: connect to the server (kept for the picker afterwards).
         let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
