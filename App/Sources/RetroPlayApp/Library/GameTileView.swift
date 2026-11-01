@@ -90,12 +90,16 @@ struct GameArtworkView: View {
             }
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 4)
+                // Drawn into the art, so sized to the tile rather than Dynamic Type (the
+                // title under the tile grows instead); at larger text sizes a long word
+                // would otherwise break mid-word.
                 Text(game.displayName)
-                    .font(RetroPlayFont.sized(labelTitleSize + 3, weight: .bold, relativeTo: .caption))
+                    .font(RetroPlayFont.fixed(labelTitleSize + 3, weight: .bold))
                     .foregroundStyle(.white)
                     .lineSpacing(0)
                     .lineLimit(4)
                     .minimumScaleFactor(0.6)
+                    .allowsTightening(true)
                     .multilineTextAlignment(.leading)
                     .shadow(color: .black.opacity(0.5), radius: 0, x: 1, y: 1)
             }

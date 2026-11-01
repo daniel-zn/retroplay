@@ -82,6 +82,7 @@ struct SaveImportSheet: View {
                 }
             }
             .font(RetroPlayFont.footnote)
+            .lineSpacing(2)
         }
         .listRowBackground(Self.rowBackground)
     }
@@ -98,6 +99,7 @@ struct SaveImportSheet: View {
                     }
                     Text(item.sourceName)
                         .font(RetroPlayFont.footnote)
+                        .lineSpacing(2)
                         .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
                 }
                 .padding(.vertical, 2)
@@ -107,7 +109,7 @@ struct SaveImportSheet: View {
             sectionHeader("\(title) (\(items.count))")
         } footer: {
             if let footer {
-                Text(footer).font(RetroPlayFont.footnote)
+                Text(footer).font(RetroPlayFont.footnote).lineSpacing(2)
             }
         }
         .listRowBackground(Self.rowBackground)
@@ -121,6 +123,7 @@ struct SaveImportSheet: View {
                         .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                     Text(skipped.reason)
                         .font(RetroPlayFont.footnote)
+                        .lineSpacing(2)
                         .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
                 }
                 .padding(.vertical, 2)
