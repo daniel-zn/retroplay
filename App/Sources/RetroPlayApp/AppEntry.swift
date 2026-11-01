@@ -832,10 +832,12 @@ public struct RetroPlayRootView: View {
                     saveImportID = nil
                     access.stop()
                     let others = batch.otherSystemSaves
-                    presentImportResult(.error(others > 0
+                    let message = others > 0
                         ? "No saves for systems RetroPlay plays in this folder. \(others == 1 ? "1 save is" : "\(others) saves are") for other systems."
                         : "No saves in this folder. Pick a folder that holds battery saves (.sav, .srm), memory cards (.mcr, .mcd) or PSP SAVEDATA folders."
-                    ))
+                    // What was looked at, so a folder that should have worked says why it didn't.
+                    let looked = batch.notes.isEmpty ? "" : "\n\n" + batch.notes.joined(separator: "\n")
+                    presentImportResult(.error(message + looked))
                 } else {
                     saveImportAccess = access
                     saveImport = SaveImportSession(id: id, batch: batch)

@@ -370,16 +370,15 @@ public struct SaveGameImporter: Sendable {
             var subfolders: [FolderWalk.Child] = []
             for child in children {
                 try cancellation.check()
-                if child.values.isSymbolicLink == true { throw pspLinkError }
-                if child.values.isDirectory == true {
+                if child.item.kind == .link { throw pspLinkError }
+                if child.item.kind == .folder || child.item.kind == .package {
                     if let here {
                         try fileManager.createDirectory(at: here.appendingPathComponent(child.name), withIntermediateDirectories: true)
                     }
                     subfolders.append(child)
                     continue
                 }
-                guard child.values.isRegularFile == true else { throw pspLinkError }
-                bytes += child.values.fileSize ?? 0
+                bytes += child.item.size
                 guard bytes <= pspFolderMaxBytes else { throw tooBig }
                 if folder.path.count == 1, child.name.uppercased() == "PARAM.SFO" { hasParam = true }
                 if let here {

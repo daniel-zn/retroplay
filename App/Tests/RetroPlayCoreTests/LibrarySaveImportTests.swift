@@ -235,7 +235,7 @@ final class LibrarySaveImportTests: XCTestCase {
         )
         XCTAssertTrue(batch.items.allSatisfy { $0.game.id == gow.id })
         XCTAssertTrue(try XCTUnwrap(skipReason("ULUS10041DATA00", in: batch)).contains("ULUS10041"))
-        XCTAssertEqual(skipReason("UCUS98737DATA01", in: batch), SaveGameImportError.missingPSPMetadata.localizedDescription)
+        XCTAssertTrue(try XCTUnwrap(skipReason("UCUS98737DATA01", in: batch)).hasPrefix(SaveGameImportError.missingPSPMetadata.localizedDescription))
         // The slot's own files aren't looked at as loose saves.
         XCTAssertFalse(batch.skipped.contains { $0.name.hasSuffix("DATA.BIN") })
     }

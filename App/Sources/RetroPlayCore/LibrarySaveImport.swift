@@ -63,6 +63,9 @@ public struct SaveScanResult: Sendable, Equatable {
     /// Saves for systems RetroPlay doesn't play (a Vita save, a Wii U account folder),
     /// counted but not listed.
     public var otherSystemSaves = 0
+    /// What the scan looked at and why it wasn't a save, for when nothing was found
+    /// ("“2026-10-30”: 1 folder, 0 files").
+    public var notes: [String] = []
     /// The scan stopped at a limit; some saves may not have been looked at.
     public var truncated = false
     /// The task was cancelled: the result is incomplete and shouldn't be shown.
@@ -99,6 +102,8 @@ public struct SaveImportBatch: Sendable, Equatable {
     public var ignoredFiles = 0
     /// Saves for systems RetroPlay doesn't play: one count line in the summary, no rows.
     public var otherSystemSaves = 0
+    /// What the scan looked at (`SaveScanResult.notes`), shown when nothing was found.
+    public var notes: [String] = []
     public var truncated = false
 
     public init(
@@ -217,13 +222,14 @@ public enum SaveFolderScanner {
                 break
             }
             do {
-                let values = try CoordinatedRead.run(root, cancellation) { try $0.resourceValues(forKeys: FolderWalk.keys) }
-                if values.isSymbolicLink == true {
+                let item = try CoordinatedRead.run(root, cancellation) { try FolderWalk.item($0) }
+                switch item.kind {
+                case .link:
                     result.skipped.append(SkippedSave(name: root.lastPathComponent, reason: linkReason))
-                } else if values.isDirectory == true {
+                case .folder, .package:
                     try walk(root, limits: limits, budget: &budget, result: &result, fileManager: fileManager, cancellation: cancellation)
-                } else {
-                    try classifyFile(root, values: values, displayPath: root.lastPathComponent, folders: [], limits: limits, result: &result)
+                case .file:
+                    try classifyFile(root, item: item, displayPath: root.lastPathComponent, folders: [], limits: limits, result: &result)
                 }
             } catch is CancellationError {
                 result.cancelled = true
@@ -237,6 +243,21 @@ public enum SaveFolderScanner {
             }
         }
         return result
+    }
+
+    /// At most this many notes; the rest are counted in a last one.
+    static let maxNotes = 8
+
+    private static func note(_ text: String, in result: inout SaveScanResult) {
+        if result.notes.count < maxNotes {
+            result.notes.append(text)
+        } else if result.notes.count == maxNotes {
+            result.notes.append("…")
+        }
+    }
+
+    private static func count(_ n: Int, _ noun: String) -> String {
+        n == 1 ? "1 \(noun)" : "\(n) \(noun)s"
     }
 
     static func readError(_ name: String, _ error: Error?) -> SkippedSave {
@@ -283,17 +304,19 @@ public enum SaveFolderScanner {
             case nil:
                 break
             }
+            let folders = children.filter { $0.item.kind == .folder || $0.item.kind == .package }.count
+            note("“\(displayPath)”: \(count(folders, "folder")), \(count(children.count - folders, "file"))", in: &result)
             var subfolders: [FolderWalk.Child] = []
             for child in children {
                 let childPath = (folder.path + [child.name]).joined(separator: "/")
                 // A link could point anywhere (outside the pick, or nowhere once copied).
-                if child.values.isSymbolicLink == true {
+                if child.item.kind == .link {
                     if !child.name.hasPrefix(".") {
                         result.skipped.append(SkippedSave(name: childPath, reason: linkReason))
                     }
                     continue
                 }
-                let isDirectory = child.values.isDirectory == true
+                let isDirectory = child.item.kind == .folder || child.item.kind == .package
                 if child.name.hasPrefix(".") {
                     // Hidden folders are passed over; iCloud placeholders (".Name.sav.icloud")
                     // are worth naming.
@@ -309,10 +332,14 @@ public enum SaveFolderScanner {
                     continue
                 }
                 if isDirectory {
-                    if child.values.isPackage != true { subfolders.append(child) }
+                    if child.item.kind == .package {
+                        note("“\(childPath)”: a package, not looked into", in: &result)
+                    } else {
+                        subfolders.append(child)
+                    }
                     continue
                 }
-                try classifyFile(child.url, values: child.values, displayPath: childPath, folders: folder.path, limits: limits, result: &result)
+                try classifyFile(child.url, item: child.item, displayPath: childPath, folders: folder.path, limits: limits, result: &result)
             }
             return subfolders
         }
@@ -341,15 +368,16 @@ public enum SaveFolderScanner {
     /// Vita title folder with sce_sys, a Wii U account folder), or nil to look inside.
     private static func folderDecision(_ folder: FolderWalk.Folder, children: [FolderWalk.Child]) -> FolderDecision? {
         let name = folder.url.lastPathComponent
-        let param = children.first { $0.name.uppercased() == "PARAM.SFO" && $0.values.isDirectory != true }
+        let param = children.first { $0.name.uppercased() == "PARAM.SFO" && $0.item.kind == .file }
         if matches(vitaTitleID, name), children.contains(where: { $0.name.lowercased() == "sce_sys" }) {
             return .otherSystem
         }
         if matches(wiiUAccount, name) { return .otherSystem }
         if SaveGameImporter.isValidPSPSaveFolderName(name.uppercased()) {
-            if let param { return .pspSave(modified: param.values.contentModificationDate) }
+            if let param { return .pspSave(modified: param.item.modified) }
             if name == name.uppercased() {
-                return .skip(SaveGameImportError.missingPSPMetadata.localizedDescription)
+                let listed = children.count == 1 ? "1 entry listed" : "\(children.count) entries listed"
+                return .skip("\(SaveGameImportError.missingPSPMetadata.localizedDescription) (\(listed))")
             }
             return nil
         }
@@ -361,7 +389,7 @@ public enum SaveFolderScanner {
 
     private static func classifyFile(
         _ url: URL,
-        values: URLResourceValues?,
+        item: FolderWalk.Item,
         displayPath: String,
         folders: [String],
         limits: SaveScanLimits,
@@ -382,9 +410,10 @@ public enum SaveFolderScanner {
         }
         guard SaveImportContentTypes.isBatteryExtension(ext) else {
             result.ignoredFiles += 1
+            note("“\(displayPath)”: not a save file", in: &result)
             return
         }
-        let size = values?.fileSize ?? 0
+        let size = item.size
         guard size <= limits.maxFileBytes else {
             result.skipped.append(SkippedSave(name: displayPath, reason: "Too large to be a save."))
             return
@@ -395,7 +424,7 @@ public enum SaveFolderScanner {
             displayPath: displayPath,
             kind: .file(extension: ext, size: size),
             folderHints: hints(for: folders),
-            modified: values?.contentModificationDate
+            modified: item.modified
         ))
     }
 
@@ -432,6 +461,7 @@ public struct LibrarySaveImporter: Sendable {
             otherSystemSaves: scan.otherSystemSaves,
             truncated: scan.truncated
         )
+        batch.notes = scan.notes
         let index = TitleIndex(games: games.filter { SaveFormat.of($0.systemID).layout == .batteryFile })
         let pspGames = games
             .filter { $0.systemID == .psp && $0.pspProductID != nil }
@@ -1005,7 +1035,69 @@ enum FolderWalk {
     struct Child {
         let url: URL
         let name: String
-        let values: URLResourceValues
+        let item: Item
+    }
+
+    /// What an entry is. A File Provider (an SMB share, iCloud Drive) can leave the type out
+    /// of an entry's resource values, or report stale ones; a folder taken for a file would be
+    /// passed over silently. So the values are read fresh, a folder counts as a folder by any
+    /// account (the values, the file system, the URL), and an entry whose type nothing reports
+    /// is looked into: its listing then says what it is, and a failure there is reported.
+    struct Item {
+        enum Kind { case folder, file, link, package }
+        let kind: Kind
+        let size: Int
+        let modified: Date?
+    }
+
+    /// What resource values said about an entry (nil: not reported).
+    struct Reported {
+        var isDirectory: Bool?
+        var isRegularFile: Bool?
+        var isSymbolicLink: Bool?
+        var isPackage: Bool?
+        var size: Int?
+        var modified: Date?
+
+        init(isDirectory: Bool? = nil, isRegularFile: Bool? = nil, isSymbolicLink: Bool? = nil,
+             isPackage: Bool? = nil, size: Int? = nil, modified: Date? = nil) {
+            self.isDirectory = isDirectory
+            self.isRegularFile = isRegularFile
+            self.isSymbolicLink = isSymbolicLink
+            self.isPackage = isPackage
+            self.size = size
+            self.modified = modified
+        }
+
+        init(_ values: URLResourceValues) {
+            self.init(
+                isDirectory: values.isDirectory, isRegularFile: values.isRegularFile,
+                isSymbolicLink: values.isSymbolicLink, isPackage: values.isPackage,
+                size: values.fileSize, modified: values.contentModificationDate
+            )
+        }
+    }
+
+    /// Tests: stands in for what a File Provider reports for a URL (nil: the real values).
+    nonisolated(unsafe) static var reported: (@Sendable (URL) -> Reported?)?
+
+    /// Reads an entry's values fresh (not the copies cached on the URL) and decides what it is.
+    static func item(_ url: URL) throws -> Item {
+        var fresh = url
+        fresh.removeAllCachedResourceValues()
+        let values = try Reported(fresh.resourceValues(forKeys: keys))
+        return item(url, reported: reported?(url) ?? values)
+    }
+
+    static func item(_ url: URL, reported values: Reported) -> Item {
+        let size = values.size ?? 0
+        if values.isSymbolicLink == true { return Item(kind: .link, size: size, modified: values.modified) }
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+        let folder = values.isDirectory == true || (exists && isDirectory.boolValue) || url.hasDirectoryPath
+        let file = !folder && (values.isRegularFile == true || values.isDirectory == false || exists)
+        let kind: Item.Kind = folder ? (values.isPackage == true ? .package : .folder) : file ? .file : .folder
+        return Item(kind: kind, size: size, modified: values.modified)
     }
 
     /// Thrown by a visitor to stop the walk at a limit it keeps (candidates).
@@ -1098,10 +1190,10 @@ enum FolderWalk {
                 try cancellation.check()
                 guard children.count < budget else { return (children, true, nil) }
                 // Listed but not looked at (no search permission): the folder can't be read.
-                guard let values = try? next.resourceValues(forKeys: keys) else {
+                guard let item = try? item(next) else {
                     return ([], false, failure ?? CocoaError(.fileReadNoPermission))
                 }
-                children.append(Child(url: next, name: next.lastPathComponent, values: values))
+                children.append(Child(url: next, name: next.lastPathComponent, item: item))
             }
             if let failure { return ([], false, failure) }
             return (children.sorted { $0.name < $1.name }, false, nil)
