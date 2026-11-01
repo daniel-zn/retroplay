@@ -9,19 +9,21 @@ final class SecurityScopedAccessTests: XCTestCase {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        let access = SecurityScopedAccess([folder])
+        let access = SecurityScopedAccess([folder], start: { _ in false })
         defer { access.stop() }
         XCTAssertEqual(access.refused, [])
     }
 
-    func testAFolderThatCantBeReadIsRefused() throws {
-        #if !os(iOS)
-        // Outside a sandbox every URL's access starts, so nothing is ever refused.
-        throw XCTSkip("Security-scoped access always starts outside the iOS sandbox.")
-        #endif
+    func testAFolderThatCantBeReadWithoutAccessIsRefused() {
         let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let access = SecurityScopedAccess([missing])
+        let access = SecurityScopedAccess([missing], start: { _ in false })
         defer { access.stop() }
         XCTAssertEqual(access.refused, [missing])
+    }
+
+    func testAFolderWhoseAccessStartsIsNotRefused() {
+        let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let access = SecurityScopedAccess([missing], start: { _ in true })
+        XCTAssertEqual(access.refused, [])
     }
 }

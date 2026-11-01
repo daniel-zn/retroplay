@@ -1311,11 +1311,16 @@ public final class SecurityScopedAccess: @unchecked Sendable {
     /// inside the app's own folder needs no access, so it isn't counted).
     public let refused: [URL]
 
-    public init(_ urls: [URL], fileManager: FileManager = .default) {
+    /// `start`: tests stand in for starting a URL's access.
+    public init(
+        _ urls: [URL],
+        fileManager: FileManager = .default,
+        start: (URL) -> Bool = { $0.startAccessingSecurityScopedResource() }
+    ) {
         var started: [URL] = []
         var refused: [URL] = []
         for url in urls {
-            let granted = url.startAccessingSecurityScopedResource()
+            let granted = start(url)
             let readable = fileManager.isReadableFile(atPath: url.path)
             FolderWalk.scanLog.notice(
                 "RP_SCAN pick \(url.lastPathComponent, privacy: .private) access=\(granted, privacy: .public) readable=\(readable, privacy: .public)"

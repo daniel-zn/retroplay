@@ -102,7 +102,12 @@ final class FilesPickerSaveImportUITests: XCTestCase {
         }
         if !select.isEmpty {
             attach(app, "files-picker-\(name)-before-select")
-            tap(app, "Select", step: "select")
+            // Select is in the picker's "…" menu.
+            let more = app.buttons.matching(NSPredicate(format: "label IN %@ OR identifier IN %@", ["More", "Show More"], ["More", "Show More"])).firstMatch
+            if !app.buttons["Select"].exists, more.waitForExistence(timeout: 5) { more.tap() }
+            let selectItem = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Select")).firstMatch
+            XCTAssertTrue(selectItem.waitForExistence(timeout: 10), "no Select in the picker")
+            selectItem.tap()
             Thread.sleep(forTimeInterval: 1)
             attach(app, "files-picker-\(name)-select-mode")
             for folder in select {
