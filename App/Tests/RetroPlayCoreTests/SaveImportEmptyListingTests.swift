@@ -99,10 +99,13 @@ final class SaveImportEmptyListingTests: XCTestCase {
         let pick = root.appendingPathComponent("Pick", isDirectory: true)
         // `resolvingSymlinksInPath` hands back /var/… itself, so both spellings are made here.
         let path = pick.path
+        // Only where the temporary folder sits under the /var link (macOS, a device); the
+        // Simulator keeps it under the Mac user's folder.
+        guard path.hasPrefix("/private/var/") || path.hasPrefix("/var/") else {
+            throw XCTSkip("the temporary folder isn't under the /var link here: \(path)")
+        }
         let short = path.hasPrefix("/private/var/") ? String(path.dropFirst("/private".count)) : path
         let spellings = [URL(fileURLWithPath: short, isDirectory: true), URL(fileURLWithPath: "/private" + short, isDirectory: true)]
-        XCTAssertTrue(spellings.contains { $0.path.hasPrefix("/private/var/") } && spellings.contains { $0.path.hasPrefix("/var/") },
-                      "the temporary folder isn't under the /var link here: \(spellings)")
         for spelling in spellings {
             let found = batch([spelling])
             XCTAssertEqual(found.items.map(\.game.displayName), ["ATV Offroad Fury Pro"], "\(spelling.path): \(found.skipped)")
