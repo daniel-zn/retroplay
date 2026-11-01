@@ -30,7 +30,10 @@ final class LandscapeCentreRowUITests: XCTestCase {
     private func check(_ system: String, size: String, look: String) -> Bool {
         XCUIDevice.shared.orientation = .landscapeLeft
         let app = XCUIApplication()
-        app.launchArguments = ["-UIPreferredContentSizeCategoryName", size, "-RetroPlaySmokeSystem", system]
+        // The Simulator counts the Mac's keyboard as a controller, which hides the touch
+        // controls; they're shown with one, as a player can choose.
+        app.launchArguments = ["-UIPreferredContentSizeCategoryName", size, "-RetroPlaySmokeSystem", system,
+                               "-retroplay.touchWithController", "YES"]
         app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
         app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
         app.launch()

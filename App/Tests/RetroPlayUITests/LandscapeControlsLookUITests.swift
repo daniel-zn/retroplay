@@ -18,7 +18,9 @@ final class LandscapeControlsLookUITests: XCTestCase {
                 for opacity in opacities.isEmpty ? [""] : opacities {
                     XCUIDevice.shared.orientation = .landscapeLeft
                     let app = XCUIApplication()
-                    app.launchArguments = ["-RetroPlaySmokeSystem", system, "-retroplay.flatControls", flat ? "YES" : "NO"]
+                    app.launchArguments = ["-RetroPlaySmokeSystem", system, "-retroplay.flatControls", flat ? "YES" : "NO",
+                                           // Shown although the Simulator's keyboard counts as a controller.
+                                           "-retroplay.touchWithController", "YES"]
                     if !opacity.isEmpty { app.launchArguments += ["-retroplay.padOpacity", opacity] }
                     app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
                     app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""

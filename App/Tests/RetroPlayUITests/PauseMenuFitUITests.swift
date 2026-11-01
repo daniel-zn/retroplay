@@ -89,7 +89,10 @@ final class PauseMenuFitUITests: XCTestCase {
         shoot("\(name)-top")
         // The menu itself: inside the screen, whatever its content.
         let menu = app.otherElements["playMenu"].firstMatch
-        XCTAssertTrue(menu.exists, "\(name): no menu")
+        guard menu.exists else {
+            XCTFail("\(name): no menu")
+            return
+        }
         let window = app.windows.firstMatch.frame
         XCTAssertTrue(window.insetBy(dx: -1, dy: -1).contains(menu.frame), "\(name): the menu \(menu.frame) runs past the screen \(window)")
     }
