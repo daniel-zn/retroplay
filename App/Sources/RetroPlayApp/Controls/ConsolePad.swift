@@ -280,13 +280,13 @@ struct ConsolePad {
 
     /// Landscape: the small buttons on one side of the bottom-centre row
     /// (`LandscapeCentreRow.split`).
-    func centreButtons(_ side: HorizontalEdge, spacing: CGFloat) -> some View {
+    func centreButtons(_ side: HorizontalEdge, spacing: CGFloat, scale buttonScale: CGFloat = 1) -> some View {
         let split = LandscapeCentreRow.split(centreButtons)
         let buttons = side == .leading ? split.left : split.right
         return HStack(spacing: spacing) {
             ForEach(buttons.indices, id: \.self) { index in
                 let button = buttons[index]
-                PadPillButton(title: button.title, bits: button.bits, scale: pillScale, fill: button.fill, ink: button.ink)
+                PadPillButton(title: button.title, bits: button.bits, scale: pillScale * buttonScale, fill: button.fill, ink: button.ink)
             }
         }
     }

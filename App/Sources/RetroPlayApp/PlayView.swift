@@ -532,12 +532,12 @@ public struct PlayView: View {
             // The group in the exact middle, each side as wide as the wider one, so it stays
             // centred when one side has more buttons (the 7800's PAUSE and RESET).
             CentreRowLayout(spacing: style.sideSpacing) {
-                pad.centreButtons(.leading, spacing: style.sideSpacing)
+                pad.centreButtons(.leading, spacing: style.sideSpacing, scale: style.buttonScale)
                     .opacity(Self.overlayControlsOpacity)
                 quickButtons(buttonWidth: style.buttonWidth, spacing: style.buttonSpacing)
                     .fixedSize()
                     .opacity(chromeOpacity)
-                pad.centreButtons(.trailing, spacing: style.sideSpacing)
+                pad.centreButtons(.trailing, spacing: style.sideSpacing, scale: style.buttonScale)
                     .opacity(Self.overlayControlsOpacity)
             }
         }
@@ -545,6 +545,7 @@ public struct PlayView: View {
             row(styles[0])
             row(styles[1])
             row(styles[2])
+            row(styles[3])
         }
         .frame(width: gap)
         .frame(height: LandscapeCentreRow.height)

@@ -37,22 +37,35 @@ final class PauseMenuFitUITests: XCTestCase {
         from.press(forDuration: 0.05, thenDragTo: to)
     }
 
-    /// Scrolls until `label` is on screen and can be tapped; nil if it never is.
+    /// Scrolls until `label` lies wholly inside the menu's visible area and the screen; nil if
+    /// it never does. Judged by frames, not XCUITest's accessibility hit-test, which can land on
+    /// the game screen listed beside the menu.
     @MainActor
     @discardableResult
     private func reach(_ app: XCUIApplication, _ label: String, _ context: String) -> XCUIElement? {
         let window = app.windows.firstMatch.frame
+        let menu = app.descendants(matching: .any)["playMenu"].firstMatch
         for down in [false, true] {
             for _ in 0..<8 {
                 let row = element(app, label)
-                if row.exists, row.isHittable, window.insetBy(dx: -1, dy: -1).contains(row.frame) { return row }
+                if row.exists, menu.exists {
+                    let frame = row.frame
+                    let visible = menu.frame.intersection(window).insetBy(dx: -1, dy: -1)
+                    if !frame.isEmpty, visible.contains(frame) { return row }
+                }
                 drag(app, down: down)
                 Thread.sleep(forTimeInterval: 0.4)
             }
         }
         shoot("\(context)-unreachable-\(label)")
-        XCTFail("\(context): “\(label)” can't be scrolled into view (frame \(element(app, label).frame), window \(window))")
+        XCTFail("\(context): “\(label)” can't be scrolled into view (frame \(element(app, label).frame), menu \(menu.frame), window \(window))")
         return nil
+    }
+
+    /// Scrolls `label` into view and taps where it's drawn.
+    @MainActor
+    private func tapRow(_ app: XCUIApplication, _ label: String, _ context: String) {
+        reach(app, label, context)?.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     @MainActor
@@ -75,9 +88,9 @@ final class PauseMenuFitUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         shoot("\(name)-closed")
 
-        reach(app, "Saves", name)?.tap()
+        tapRow(app, "Saves", name)
         Thread.sleep(forTimeInterval: 0.6)
-        reach(app, "Options", name)?.tap()
+        tapRow(app, "Options", name)
         Thread.sleep(forTimeInterval: 0.8)
         shoot("\(name)-open")
 
