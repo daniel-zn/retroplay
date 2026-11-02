@@ -141,6 +141,9 @@ public struct RetroPlayRootView: View {
         libraryNavigation
         #if DEBUG
         .overlay { if UserDefaults.standard.bool(forKey: "RetroPlaySmokePackages") { RetailPackageGallery() } }
+        .overlay(alignment: .topLeading) {
+            if UserDefaults.standard.bool(forKey: "RetroPlaySmokeAccessibilityProbe") { AccessibilityProbeOverlay() }
+        }
         #endif
         .environment(\.font, RetroPlayFont.body)
         .retroPlayTypography()
