@@ -534,11 +534,17 @@ public struct PlayView: View {
             CentreRowLayout(spacing: style.sideSpacing) {
                 pad.centreButtons(.leading, spacing: style.sideSpacing, scale: style.buttonScale)
                     .opacity(Self.overlayControlsOpacity)
+                    // Their labels stay at the default text size here: past it, the 7800's
+                    // switches run into its face buttons in this wide face.
+                    .dynamicTypeSize(...DynamicTypeSize.large)
                 quickButtons(buttonWidth: style.buttonWidth, spacing: style.buttonSpacing)
                     .fixedSize()
                     .opacity(chromeOpacity)
                 pad.centreButtons(.trailing, spacing: style.sideSpacing, scale: style.buttonScale)
                     .opacity(Self.overlayControlsOpacity)
+                    // Their labels stay at the default text size here: past it, the 7800's
+                    // switches run into its face buttons in this wide face.
+                    .dynamicTypeSize(...DynamicTypeSize.large)
             }
         }
         return ViewThatFits(in: .horizontal) {
