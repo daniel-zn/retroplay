@@ -38,7 +38,7 @@ final class TypographyScreenshotsUITests: XCTestCase {
     /// A text that must be on screen, whole and inside the window.
     @MainActor
     private func expectVisible(_ app: XCUIApplication, _ label: String, _ context: String, timeout: TimeInterval = 20) {
-        let text = app.staticTexts.matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", label, label)).firstMatch
+        let text = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@ OR label BEGINSWITH[c] %@", label, label)).firstMatch
         guard text.waitForExistence(timeout: timeout) else {
             XCTFail("\(context): no “\(label)”")
             return
@@ -78,7 +78,7 @@ final class TypographyScreenshotsUITests: XCTestCase {
             let window = app.windows.firstMatch
             window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
                 .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
-            XCTAssertTrue(app.navigationBars["Settings"].waitForNonExistence(timeout: 10), "settings \(look.name): didn't close")
+            XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier ==[c] %@", "Settings")).firstMatch.waitForNonExistence(timeout: 10), "settings \(look.name): didn't close")
 
             let search = app.buttons["library.search"].firstMatch
             XCTAssertTrue(search.waitForExistence(timeout: 10))
@@ -102,7 +102,7 @@ final class TypographyScreenshotsUITests: XCTestCase {
 
             // A game's pause menu (opened by the smoke argument once the game runs).
             let play = launch(look, ["-RetroPlaySmokeSystem", "nes", "-RetroPlaySmokeMenu", "YES"])
-            let resume = play.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Resume")).firstMatch
+            let resume = play.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Resume")).firstMatch
             XCTAssertTrue(resume.waitForExistence(timeout: 45), "play menu \(look.name): no Resume")
             Thread.sleep(forTimeInterval: 1)
             shoot(play, "play-menu-\(look.name)")

@@ -70,12 +70,12 @@ final class LibraryTopBarUITests: XCTestCase {
     @MainActor
     func testSettingsHasNoDoneButtonAndSwipesClosed() {
         let app = launch(["-RetroPlaySmokeSettings", "YES"])
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 30), "no Settings")
+        XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier ==[c] %@", "Settings")).firstMatch.waitForExistence(timeout: 30), "no Settings")
         XCTAssertFalse(app.buttons["Done"].exists, "Settings has a Done button")
         let window = app.windows.firstMatch
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
             .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
-        XCTAssertTrue(app.navigationBars["Settings"].waitForNonExistence(timeout: 10), "a swipe down didn't close Settings")
+        XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier ==[c] %@", "Settings")).firstMatch.waitForNonExistence(timeout: 10), "a swipe down didn't close Settings")
         app.terminate()
     }
 
@@ -90,7 +90,7 @@ final class LibraryTopBarUITests: XCTestCase {
             plus.tap()
             // Menu rows carry their subtitle in the label ("Games, ROMs and discs").
             func item(_ id: String, _ title: String) -> XCUIElement {
-                app.buttons.matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH %@", id, title)).firstMatch
+                app.buttons.matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH[c] %@", id, title)).firstMatch
             }
             let games = item("library.import.games", "Games")
             let saves = item("library.import.saves", "Saves")
@@ -111,7 +111,7 @@ final class LibraryTopBarUITests: XCTestCase {
         let plus = app.buttons["library.import"].firstMatch
         XCTAssertTrue(plus.waitForExistence(timeout: 30))
         plus.tap()
-        let saves = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH %@", "library.import.saves", "Saves")).firstMatch
+        let saves = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH[c] %@", "library.import.saves", "Saves")).firstMatch
         XCTAssertTrue(saves.waitForExistence(timeout: 5))
         saves.tap()
         let open = app.buttons["Open"].firstMatch
@@ -155,7 +155,7 @@ final class LibraryTopBarUITests: XCTestCase {
         let summary = app.staticTexts["saveImport.summary"].firstMatch
         XCTAssertTrue(summary.waitForExistence(timeout: 30), "no summary: the walk found nothing")
         let row = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label CONTAINS %@", "SmokeSaves/A/B/C/Zelda.sav"))
+            .matching(NSPredicate(format: "label CONTAINS[c] %@", "SmokeSaves/A/B/C/Zelda.sav"))
             .firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5), "the nested save isn't listed")
         attach(app, "save-import-nested-folder")

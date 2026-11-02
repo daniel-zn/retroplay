@@ -29,7 +29,7 @@ final class AutoResumeLoaderTests: XCTestCase {
     func testStatusLinesNeverImplyATrapOrCrash() {
         XCTAssertEqual(AutoResumeLoader.statusLine(for: .loaded), "Resumed from quick save")
         XCTAssertEqual(AutoResumeLoader.statusLine(for: .firstRun), "Waiting for first frame…")
-        XCTAssertEqual(AutoResumeLoader.statusLine(for: .failed), "Auto-load failed — starting fresh")
+        XCTAssertEqual(AutoResumeLoader.statusLine(for: .failed), "Auto-load failed. Starting fresh")
         XCTAssertEqual(AutoResumeLoader.statusLine(for: .cancelled), "Waiting for first frame…")
     }
 

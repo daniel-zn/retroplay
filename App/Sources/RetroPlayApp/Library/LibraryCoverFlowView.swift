@@ -274,7 +274,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                     HStack(spacing: 8) {
                         Text(game.systemID.displayName)
                             .foregroundStyle(RetroPlayTheme.systemTint(game.systemID))
-                        Text("·")
+                        Text("/")
                             .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
                         Text(subtitle(game))
                             .foregroundStyle(

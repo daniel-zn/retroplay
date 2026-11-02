@@ -24,7 +24,7 @@ final class SaveImportSMBUITests: XCTestCase {
     private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
         // A fresh predicate per query: one handed to several would be shared across them.
         func labelled() -> NSPredicate {
-            NSPredicate(format: "label == %@ OR label BEGINSWITH %@ OR identifier == %@", label, label, label)
+            NSPredicate(format: "label ==[c] %@ OR label BEGINSWITH[c] %@ OR identifier == %@", label, label, label)
         }
         for query in [app.buttons, app.cells, app.staticTexts, app.textFields, app.otherElements] {
             let match = query.matching(labelled()).firstMatch

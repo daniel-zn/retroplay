@@ -38,7 +38,7 @@ struct SaveImportSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Self.groupedBackground)
-            .navigationTitle("Import Saves")
+            .navigationTitle(retroPlayDisplayString("Import Saves"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             // The title in the app's face, as in Settings.
@@ -48,7 +48,7 @@ struct SaveImportSheet: View {
             }
         }
         .environment(\.font, RetroPlayFont.callout)
-        .retroPlayTracking()
+        .retroPlayTypography()
         .tint(RetroPlayTheme.accent)
         .interactiveDismissDisabled(committing)
     }

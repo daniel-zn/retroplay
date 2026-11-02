@@ -31,7 +31,7 @@ final class FilesPickerSaveImportUITests: XCTestCase {
     @MainActor
     private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
         func labelled() -> NSPredicate {
-            NSPredicate(format: "label == %@ OR identifier == %@", label, label)
+            NSPredicate(format: "label ==[c] %@ OR identifier == %@", label, label)
         }
         for query in [app.cells, app.buttons, app.staticTexts] {
             let match = query.matching(labelled()).firstMatch
@@ -62,13 +62,13 @@ final class FilesPickerSaveImportUITests: XCTestCase {
         // The picker's title is a button with a menu chevron, not plain text.
         func titled() -> Bool {
             app.navigationBars.descendants(matching: .any)
-                .matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", folder, folder + ","))
+                .matching(NSPredicate(format: "label ==[c] %@ OR label BEGINSWITH[c] %@", folder, folder + ","))
                 .firstMatch.exists
                 || app.navigationBars[folder].exists
         }
         for attempt in 1...4 {
             if titled() { return }
-            let item = app.cells.matching(NSPredicate(format: "label BEGINSWITH %@", folder)).firstMatch
+            let item = app.cells.matching(NSPredicate(format: "label BEGINSWITH[c] %@", folder)).firstMatch
             let target = item.exists ? item : element(app, folder)
             if target.waitForExistence(timeout: 10), target.isHittable { target.tap() }
             let deadline = Date().addingTimeInterval(Double(attempt) * 2)
@@ -83,7 +83,7 @@ final class FilesPickerSaveImportUITests: XCTestCase {
     /// Something on screen whose label contains `text` (summary rows combine their texts).
     @MainActor
     private func shows(_ app: XCUIApplication, _ text: String) -> Bool {
-        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.exists
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", text)).firstMatch.exists
     }
 
     /// + → Saves → Browse → On My iPhone → `path` → Open, then waits for the summary.
@@ -143,7 +143,7 @@ final class FilesPickerSaveImportUITests: XCTestCase {
             XCTAssertTrue(shows(app, text), "\(all): no “\(text)” in the summary")
         }
         tap(app, "saveImport.import", step: "import")
-        let done = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Imported")).firstMatch
+        let done = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Imported")).firstMatch
         XCTAssertTrue(done.waitForExistence(timeout: 60), "no “Imported …” notice")
         attach(app, "files-imported")
     }

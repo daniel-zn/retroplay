@@ -143,7 +143,7 @@ public struct RetroPlayRootView: View {
         .overlay { if UserDefaults.standard.bool(forKey: "RetroPlaySmokePackages") { RetailPackageGallery() } }
         #endif
         .environment(\.font, RetroPlayFont.body)
-        .retroPlayTracking()
+        .retroPlayTypography()
         .environment(navigator)
         .task { navigator.start() }
         .onChange(of: !showSearch && !showSettings && !showImporter, initial: true) { _, front in
@@ -451,7 +451,7 @@ public struct RetroPlayRootView: View {
                 }
             }
             .background(RetroPlayTheme.canvas(for: colorScheme))
-            .navigationTitle(showsInlineTitle ? "RetroPlay" : "")
+            .navigationTitle(showsInlineTitle ? retroPlayDisplayString("RetroPlay") : "")
             .onChange(of: layoutRaw) { libraryTitleCollapsed = false }
             .navigationBarTitleDisplayMode(.inline)
             .retroPlayLibraryInlineNav()
@@ -562,7 +562,7 @@ public struct RetroPlayRootView: View {
                 // With the filter chips gone, the title says which games are showing.
                 Text(systemTab == .all
                     ? gameCountText(store.games.count)
-                    : "\(systemTab.title) · \(filteredGames.count) of \(gameCountText(store.games.count))")
+                    : "\(systemTab.title) / \(filteredGames.count) of \(gameCountText(store.games.count))")
                     .font(RetroPlayFont.footnote)
                     .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
             }
@@ -649,7 +649,7 @@ public struct RetroPlayRootView: View {
         .onScrollPhaseChange { _, phase in
             searchDragStart = phase == .interacting ? searchScrollOffset : nil
         }
-        .navigationTitle("Search")
+        .navigationTitle(retroPlayDisplayString("Search"))
         .navigationBarTitleDisplayMode(.large)
         // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
         .toolbarColorScheme(colorScheme, for: .navigationBar)
@@ -658,8 +658,11 @@ public struct RetroPlayRootView: View {
             text: $searchQuery,
             isPresented: $isSearchPresented,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Games"
+            prompt: retroPlayDisplayString("Games")
         )
+        // Typed text shows as typed (a text field has no display case), and the face's lowercase
+        // are display variants, so the keyboard starts in capitals; search ignores case.
+        .textInputAutocapitalization(.characters)
         .searchFocused($searchFocused)
         .onSubmit(of: .search) { recordSearch() }
         .navigationDestination(item: $searchPlayGame) { game in

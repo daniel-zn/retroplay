@@ -76,7 +76,7 @@ struct OpenSourceLicensesView: View {
         }
         .scrollContentBackground(.hidden)
         .background(RetroPlayTheme.canvas(for: colorScheme))
-        .navigationTitle("Licenses")
+        .navigationTitle(retroPlayDisplayString("Licenses"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -147,7 +147,7 @@ private struct ComponentLicenseView: View {
         }
         .scrollContentBackground(.hidden)
         .background(RetroPlayTheme.canvas(for: colorScheme))
-        .navigationTitle(component.name)
+        .navigationTitle(retroPlayDisplayString(component.name))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -193,7 +193,7 @@ private struct LicenseTextView: View {
                 .padding()
         }
         .background(RetroPlayTheme.canvas(for: colorScheme))
-        .navigationTitle(title)
+        .navigationTitle(retroPlayDisplayString(title))
         .navigationBarTitleDisplayMode(.inline)
     }
 

@@ -161,13 +161,13 @@
   },
   {
     "project": "RetroPlay app resources",
-    "component": "Hydrogen Whiskey font (HydrogenWhiskey-Regular.otf)",
-    "version": "5.011 (hydrogen-whiskey.zip from 1001fonts.com, SHA-256 2e6a8829a6526902809ae792bb0cfce5a3dbba221687fef40935d1da5639978c; HydrogenWhiskey-Regular.otf SHA-256 4f4a1313a944eabcfde3c39692a3928f2c04065640e1353fca416057f07061c9)",
-    "spdx": "CC0-1.0",
-    "copyright": "Released in 2024 under CC0 license. No rights reserved. Ray Larabie",
-    "licenseFile": "retroplay/AppHost/Supporting/HydrogenWhiskey-LICENSE.txt",
-    "requiresNoticeText": false,
-    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches HydrogenWhiskey-SOURCE.md. CC0 needs no notice; the font's license record is bundled (HydrogenWhiskey-LICENSE.txt) and listed in in-app licenses"
+    "component": "Game Of Squids font (GameOfSquids-1GMVL.ttf)",
+    "version": "1.00 (GameOfSquids-1GMVL.ttf from FontSpace, unchanged, SHA-256 3e31f5f6bd44bc1bdf8a6cda5d79648307f0b2502bdb155490a98debf417da89)",
+    "spdx": "LicenseRef-GameOfSquids-Freeware",
+    "copyright": "Darrell Flood. Free for all use; the font files may not be resold or reformatted for redistribution",
+    "licenseFile": "retroplay/AppHost/Supporting/GameOfSquids-license.txt",
+    "requiresNoticeText": true,
+    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches GameOfSquids-SOURCE.md. The file ships unchanged (its license forbids reselling or reformatting the files); the license text is bundled verbatim and listed in in-app licenses"
   },
   {
     "project": "mupen64plus-next",

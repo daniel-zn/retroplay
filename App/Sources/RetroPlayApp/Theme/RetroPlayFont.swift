@@ -4,7 +4,7 @@ import RetroPlayCore
 import SwiftUI
 import UIKit
 
-/// The app's fonts, all Hydrogen Whiskey, from the one type scale (`RetroPlayTextStyle`).
+/// The app's fonts, all Game Of Squids, from the one type scale (`RetroPlayTextStyle`).
 /// Every font scales with Dynamic Type from its system text style; the bundled file is
 /// registered on first use, and if it's missing the system face stands in at the same style.
 /// The face has one weight: no style asks for bold (iOS would thicken the outlines itself).
@@ -92,22 +92,31 @@ enum RetroPlayFont {
     }
 }
 
-/// The face's letter spacing for every text below (`RetroPlayTypeface.tracking`), growing
-/// with Dynamic Type. Set at each root: the app, and each sheet and full-screen cover.
+/// The face's settings for every text below: capitals (its lowercase are display variants,
+/// `RetroPlayTypeface.showsCapitalsOnly`) and its letter spacing, growing with Dynamic Type.
+/// Set at each root: the app, and each sheet and full-screen cover.
 @available(iOS 18.0, *)
-private struct RetroPlayTracking: ViewModifier {
+private struct RetroPlayTypography: ViewModifier {
     @ScaledMetric(relativeTo: .body) private var tracking = RetroPlayTypeface.tracking
 
     func body(content: Content) -> some View {
-        content.tracking(tracking)
+        content
+            .tracking(tracking)
+            .textCase(RetroPlayTypeface.showsCapitalsOnly ? .uppercase : nil)
     }
 }
 
 @available(iOS 18.0, *)
 extension View {
-    func retroPlayTracking() -> some View {
-        modifier(RetroPlayTracking())
+    func retroPlayTypography() -> some View {
+        modifier(RetroPlayTypography())
     }
+}
+
+/// A string UIKit draws itself (navigation titles, segmented controls, search prompts), where
+/// SwiftUI's text case doesn't reach: in capitals when the face needs them.
+func retroPlayDisplayString(_ text: String) -> String {
+    RetroPlayTypeface.showsCapitalsOnly ? text.uppercased() : text
 }
 
 @available(iOS 18.0, *)

@@ -331,7 +331,7 @@ extension PlayMenuView {
                 .foregroundStyle(.white.opacity(0.6))
             Picker("Resolution", selection: selection) {
                 ForEach(PSPRenderResolution.allCases) { option in
-                    Text(option.title)
+                    Text(retroPlayDisplayString(option.title))
                         .accessibilityLabel(option.accessibilityTitle)
                         .tag(option.rawValue)
                 }

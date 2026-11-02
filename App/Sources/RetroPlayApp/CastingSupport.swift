@@ -120,7 +120,7 @@ public struct ExternalGameDisplayView: View {
             }
         }
         .environment(\.font, RetroPlayFont.body)
-        .retroPlayTracking()
+        .retroPlayTypography()
     }
 }
 
