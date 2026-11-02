@@ -277,7 +277,9 @@ struct CoverBoxTextures {
     }
 
     private func textured(_ view: some View, width: Double, height: Double) -> UnlitMaterial {
-        let renderer = ImageRenderer(content: view.frame(width: width, height: height))
+        // Drawn outside the app's view tree, so the face's capitals are set here too.
+        let renderer = ImageRenderer(content: view.frame(width: width, height: height)
+            .textCase(RetroPlayTypeface.showsCapitalsOnly ? .uppercase : nil))
         renderer.scale = 2
         guard let image = renderer.cgImage,
               let texture = try? TextureResource(image: image, options: .init(semantic: .color))

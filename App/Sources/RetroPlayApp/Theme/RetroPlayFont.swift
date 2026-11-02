@@ -61,14 +61,18 @@ enum RetroPlayFont {
         uiFont(size: style.size, textStyle: style.relativeTo.uiKit)
     }
 
-    static func uiFont(size: CGFloat, textStyle: UIFont.TextStyle) -> UIFont {
+    static func uiFont(size: CGFloat, textStyle: UIFont.TextStyle, maximumPointSize: CGFloat? = nil) -> UIFont {
         registerBundledFont()
         guard let base = UIFont(name: name, size: size) else {
             // preferredFont is already scaled; scaling it again would magnify
             // the fallback twice at non-default Dynamic Type sizes.
             return UIFont.preferredFont(forTextStyle: textStyle)
         }
-        return UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base)
+        let metrics = UIFontMetrics(forTextStyle: textStyle)
+        if let maximumPointSize {
+            return metrics.scaledFont(for: base, maximumPointSize: maximumPointSize)
+        }
+        return metrics.scaledFont(for: base)
     }
 
     /// The letter spacing every text gets (`RetroPlayTypeface.tracking`), grown with Dynamic
@@ -80,7 +84,8 @@ enum RetroPlayFont {
     static func applyUIKitAppearance() {
         registerBundledFont()
         let bodyFont = uiFont(.body)
-        let segmentFont = uiFont(.subheadline)
+        // Capped near its XXXL size: the face is wide, and a segment's label would truncate.
+        let segmentFont = uiFont(size: RetroPlayTextStyle.subheadline.size, textStyle: .subheadline, maximumPointSize: 17)
         for state in [UIControl.State.normal, .highlighted, .disabled, .selected] {
             UIBarButtonItem.appearance().setTitleTextAttributes([.font: bodyFont, .kern: uiKern], for: state)
             UISegmentedControl.appearance().setTitleTextAttributes([.font: segmentFont, .kern: uiKern], for: state)
