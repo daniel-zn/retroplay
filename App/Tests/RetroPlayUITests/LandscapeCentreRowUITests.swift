@@ -41,7 +41,7 @@ final class LandscapeCentreRowUITests: XCTestCase {
         app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
         app.launch()
         defer { app.terminate() }
-        let pause = app.buttons["Pause menu"].firstMatch
+        let pause = app.buttons.matching(NSPredicate(format: "label ==[c] %@", "Pause menu")).firstMatch
         guard pause.waitForExistence(timeout: 45) else {
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             shot.name = "row-\(system)-\(look)-no-game"

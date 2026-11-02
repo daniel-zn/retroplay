@@ -23,7 +23,7 @@ final class LandscapeControlsLookUITests: XCTestCase {
                 app.launch()
                 // Waits for the game (the pause button) rather than a fixed time, then a moment
                 // for a picture behind the controls.
-                XCTAssertTrue(app.buttons["Pause menu"].firstMatch.waitForExistence(timeout: 45), "\(system): no game")
+                XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label ==[c] %@", "Pause menu")).firstMatch.waitForExistence(timeout: 45), "\(system): no game")
                 Thread.sleep(forTimeInterval: 3)
                 let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
                 shot.name = "controls-\(system)-\(flat ? "flat" : "glass")"

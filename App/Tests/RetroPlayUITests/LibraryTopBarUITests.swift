@@ -71,7 +71,7 @@ final class LibraryTopBarUITests: XCTestCase {
     func testSettingsHasNoDoneButtonAndSwipesClosed() {
         let app = launch(["-RetroPlaySmokeSettings", "YES"])
         XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier ==[c] %@", "Settings")).firstMatch.waitForExistence(timeout: 30), "no Settings")
-        XCTAssertFalse(app.buttons["Done"].exists, "Settings has a Done button")
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label ==[c] %@", "Done")).firstMatch.exists, "Settings has a Done button")
         let window = app.windows.firstMatch
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
             .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
