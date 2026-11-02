@@ -22,7 +22,7 @@ final class LandscapeCentreRowUITests: XCTestCase {
 
     @MainActor
     private func labelled(_ app: XCUIApplication, _ label: String) -> XCUIElement {
-        app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label)).firstMatch
+        app.descendants(matching: .any).matching(NSPredicate(format: "label ==[c] %@", label)).firstMatch
     }
 
     @MainActor
@@ -63,8 +63,8 @@ final class LandscapeCentreRowUITests: XCTestCase {
         let window = app.windows.firstMatch.frame
         let context = "\(system) \(look)"
         XCTAssertGreaterThan(window.width, window.height, "\(context): not in landscape")
-        let fastForward = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Fast forward")).firstMatch
-        let sound = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Sound")).firstMatch
+        let fastForward = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Fast forward")).firstMatch
+        let sound = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Sound")).firstMatch
         let group = [fastForward, pause, sound].map(\.frame).reduce(CGRect.null) { $0.union($1) }
         XCTAssertLessThan(abs(group.midX - window.midX), 24, "\(context): fast-forward / pause / sound \(group) aren't centred in \(window)")
         XCTAssertGreaterThan(group.maxY, window.maxY - 60, "\(context): fast-forward / pause / sound \(group) aren't at the bottom")
@@ -88,7 +88,7 @@ final class LandscapeCentreRowUITests: XCTestCase {
         // small buttons' touch areas reach past what's drawn, so a few points of overlap are
         // allowed.
         let row = small.reduce(group) { $0.union($1) }
-        let picture = app.descendants(matching: .any).matching(NSPredicate(format: "label ENDSWITH %@", " screen")).firstMatch
+        let picture = app.descendants(matching: .any).matching(NSPredicate(format: "label ENDSWITH[c] %@", " screen")).firstMatch
         if picture.exists {
             XCTAssertLessThan(row.intersection(picture.frame).height, 12, "\(context): the row \(row) covers the picture \(picture.frame)")
         }

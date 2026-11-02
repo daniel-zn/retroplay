@@ -24,7 +24,7 @@ final class PauseMenuFitUITests: XCTestCase {
     @MainActor
     private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
         app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", label, label + ","))
+            .matching(NSPredicate(format: "label ==[c] %@ OR label BEGINSWITH[c] %@", label, label + ","))
             .firstMatch
     }
 
@@ -80,7 +80,7 @@ final class PauseMenuFitUITests: XCTestCase {
         app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
         app.launch()
         defer { app.terminate() }
-        let resume = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Resume")).firstMatch
+        let resume = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Resume")).firstMatch
         guard resume.waitForExistence(timeout: 45) else {
             XCTFail("\(name): no pause menu")
             return
