@@ -2,8 +2,8 @@
 import XCTest
 
 /// Screenshots of the touch controls in landscape over a bright game and a darker one, in the
-/// Liquid Glass and the flat style, for judging the controls' fixed opacity. Each extra
-/// `-retroplay.padOpacity` value is only read by builds that still have the setting.
+/// Liquid Glass and the flat style, at their fixed opacity. A screenshot set: run by the
+/// on-request "screenshots" integration check.
 final class LandscapeControlsLookUITests: XCTestCase {
     override func tearDown() {
         XCUIDevice.shared.orientation = .portrait
@@ -11,28 +11,25 @@ final class LandscapeControlsLookUITests: XCTestCase {
 
     @MainActor
     func testLandscapeControlsOverBrightAndDarkGames() {
-        let opacities = (ProcessInfo.processInfo.environment["RETROPLAY_PAD_OPACITIES"] ?? "")
-            .split(separator: ",").map(String.init)
+        XCUIDevice.shared.orientation = .landscapeLeft
         for system in ["gba", "nes"] {
             for flat in [false, true] {
-                for opacity in opacities.isEmpty ? [""] : opacities {
-                    XCUIDevice.shared.orientation = .landscapeLeft
-                    let app = XCUIApplication()
-                    app.launchArguments = ["-RetroPlaySmokeSystem", system, "-retroplay.flatControls", flat ? "YES" : "NO",
-                                           // Shown although the Simulator's keyboard counts as a controller.
-                                           "-retroplay.touchWithController", "YES"]
-                    if !opacity.isEmpty { app.launchArguments += ["-retroplay.padOpacity", opacity] }
-                    app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-                    app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-                    app.launch()
-                    // The game runs a few seconds so there's a picture behind the controls.
-                    Thread.sleep(forTimeInterval: 9)
-                    let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-                    shot.name = "controls-\(system)-\(flat ? "flat" : "glass")\(opacity.isEmpty ? "" : "-\(opacity)")"
-                    shot.lifetime = .keepAlways
-                    add(shot)
-                    app.terminate()
-                }
+                let app = XCUIApplication()
+                app.launchArguments = ["-RetroPlaySmokeSystem", system, "-retroplay.flatControls", flat ? "YES" : "NO",
+                                       // Shown although the Simulator's keyboard counts as a controller.
+                                       "-retroplay.touchWithController", "YES"]
+                app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
+                app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
+                app.launch()
+                // Waits for the game (the pause button) rather than a fixed time, then a moment
+                // for a picture behind the controls.
+                XCTAssertTrue(app.buttons["Pause menu"].firstMatch.waitForExistence(timeout: 45), "\(system): no game")
+                Thread.sleep(forTimeInterval: 3)
+                let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+                shot.name = "controls-\(system)-\(flat ? "flat" : "glass")"
+                shot.lifetime = .keepAlways
+                add(shot)
+                app.terminate()
             }
         }
     }
