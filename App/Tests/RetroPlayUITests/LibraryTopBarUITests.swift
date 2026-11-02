@@ -66,6 +66,19 @@ final class LibraryTopBarUITests: XCTestCase {
         add(shot)
     }
 
+    /// Settings is a swipe-down sheet: no Done button, and a swipe down from its top closes it.
+    @MainActor
+    func testSettingsHasNoDoneButtonAndSwipesClosed() {
+        let app = launch(["-RetroPlaySmokeSettings", "YES"])
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 30), "no Settings")
+        XCTAssertFalse(app.buttons["Done"].exists, "Settings has a Done button")
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+        XCTAssertTrue(app.navigationBars["Settings"].waitForNonExistence(timeout: 10), "a swipe down didn't close Settings")
+        app.terminate()
+    }
+
     /// "+" opens a menu with Games and Saves (like the filter's), at the default size and a
     /// large one, in dark and light.
     @MainActor

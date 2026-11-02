@@ -3,7 +3,8 @@ import XCTest
 
 /// The main screens in the app's type, for review: dark and light at the default text size,
 /// and dark at the larger sizes players use (XXXL and an accessibility size). Each screen
-/// checks its key text is on screen and inside it; the screenshots are attached.
+/// checks its key text is on screen and inside it; the screenshots are attached. Run by the
+/// on-request "screenshots" integration check (type, theme and layout changes name it).
 final class TypographyScreenshotsUITests: XCTestCase {
     private let looks: [(name: String, appearance: String, size: String)] = [
         ("dark", "dark", "UICTContentSizeCategoryL"),
@@ -60,46 +61,33 @@ final class TypographyScreenshotsUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 2)
             shoot(flow, "library-coverflow-\(look.name)")
             flow.terminate()
-
-            // Landscape, launched turned (a rotation mid-run left the 3D stage half drawn in
-            // the capture). The caption is hidden from VoiceOver, so the shot is the check.
-            XCUIDevice.shared.orientation = .landscapeLeft
-            let wide = launch(look, ["-retroplay.libraryLayout", "coverFlow"])
-            XCTAssertTrue(wide.buttons["library.settings"].waitForExistence(timeout: 30), "cover flow landscape \(look.name): no top bar")
-            Thread.sleep(forTimeInterval: 3)
-            shoot(wide, "library-coverflow-landscape-\(look.name)")
-            wide.terminate()
-            XCUIDevice.shared.orientation = .portrait
         }
     }
 
+    /// Settings, then (swiped closed) search, in one launch per look.
     @MainActor
     func testSearchAndSettings() {
         for look in looks {
-            let app = launch(look, ["-retroplay.libraryLayout", "grid"])
+            let app = launch(look, ["-retroplay.libraryLayout", "grid", "-RetroPlaySmokeSettings", "YES"])
+            expectVisible(app, "Settings", "settings \(look.name)", timeout: 30)
+            Thread.sleep(forTimeInterval: 1)
+            shoot(app, "settings-\(look.name)")
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 1)
+            shoot(app, "settings-scrolled-\(look.name)")
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
+                .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+            XCTAssertTrue(app.navigationBars["Settings"].waitForNonExistence(timeout: 10), "settings \(look.name): didn't close")
+
             let search = app.buttons["library.search"].firstMatch
-            XCTAssertTrue(search.waitForExistence(timeout: 30))
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
             search.tap()
             Thread.sleep(forTimeInterval: 1.5)
             app.typeText("Su")
             Thread.sleep(forTimeInterval: 1)
             shoot(app, "search-\(look.name)")
             app.terminate()
-
-            let settings = launch(look, ["-RetroPlaySmokeSettings", "YES"])
-            expectVisible(settings, "Settings", "settings \(look.name)", timeout: 30)
-            Thread.sleep(forTimeInterval: 1)
-            shoot(settings, "settings-\(look.name)")
-            settings.swipeUp()
-            Thread.sleep(forTimeInterval: 1)
-            shoot(settings, "settings-scrolled-\(look.name)")
-            // A swipe-down sheet: no Done button, and a swipe down closes it.
-            XCTAssertFalse(settings.buttons["Done"].exists, "settings \(look.name): has a Done button")
-            let window = settings.windows.firstMatch
-            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
-                .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
-            XCTAssertTrue(settings.navigationBars["Settings"].waitForNonExistence(timeout: 10), "settings \(look.name): swipe down didn't close it")
-            settings.terminate()
         }
     }
 

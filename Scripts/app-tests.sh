@@ -1,11 +1,15 @@
 #!/bin/bash
-# RetroPlay's app tests (unit + UI, the RetroPlay scheme) on the "RetroPlay Build" Simulator:
-# integrate's "app" check, also fine to run by hand from a checkout.
-# APP_TESTS: UI tests to run, comma-separated, each a class of RetroPlayUITests or
-# Class/testMethod; the unit tests always run with them. Unset: every test in the scheme.
+# RetroPlay's app tests (the RetroPlay scheme) on the "RetroPlay Build" Simulator: integrate's
+# "app" and "screenshots" checks, also fine to run by hand from a checkout.
+#   app-tests.sh             unit tests and the behavioural UI tests (every UI class but the
+#                            screenshot sets below)
+#   app-tests.sh screenshots the screenshot sets only (type, theme and layout review)
+# APP_TESTS (app mode): UI tests to run, comma-separated, each a class of RetroPlayUITests or
+# Class/testMethod; the unit tests always run with them. Unset: every behavioural test.
 # Fails when a test it was given didn't run.
 set -u
 cd "$(dirname "$0")/.."
+MODE=${1:-app}
 SRC=${LAND_SOURCE:-${INTEGRATE_SOURCE:-}}
 # The prebuilt cores and their sources aren't in git: linked from the main checkout, as the
 # release does.
@@ -19,14 +23,26 @@ xcodegen generate -q || { echo "app-tests: xcodegen failed"; exit 1; }
 s=$(xcrun simctl list devices | grep -F 'RetroPlay Build (' | grep -oE '[0-9A-F-]{36}' | head -1)
 [ -n "$s" ] || { echo 'app-tests: no RetroPlay Build Simulator'; exit 1; }
 DD=build/dd-land/app
-R="${LAND_LOG_DIR:-build}/app-tests.xcresult"
+R="${LAND_LOG_DIR:-build}/app-tests-$MODE.xcresult"
 rm -rf "$R"
 
+# Screenshot sets: many launches across looks, for review rather than behaviour.
+SCREENSHOT_CLASSES=(TypographyScreenshotsUITests LandscapeControlsLookUITests)
 only=()
-if [ -n "${APP_TESTS:-}" ]; then
+if [ "$MODE" = screenshots ]; then
+  for c in "${SCREENSHOT_CLASSES[@]}"; do
+    # Only the sets this checkout has (an -only-testing that matches nothing fails the run).
+    grep -rqs "class $c\b" App/Tests/RetroPlayUITests && only+=("-only-testing:RetroPlayUITests/$c")
+  done
+  [ ${#only[@]} -gt 0 ] || { echo "app-tests: no screenshot sets here"; exit 0; }
+elif [ -n "${APP_TESTS:-}" ]; then
   only+=(-only-testing:RetroPlayCoreTests)
   IFS=',' read -ra picks <<< "$APP_TESTS"
   for t in "${picks[@]}"; do only+=("-only-testing:RetroPlayUITests/$t"); done
+else
+  for c in "${SCREENSHOT_CLASSES[@]}"; do
+    grep -rqs "class $c\b" App/Tests/RetroPlayUITests && only+=("-skip-testing:RetroPlayUITests/$c")
+  done
 fi
 
 xcrun simctl boot "$s" 2>/dev/null; xcrun simctl bootstatus "$s" >/dev/null
@@ -57,7 +73,7 @@ if [ $r -eq 0 ]; then
 fi
 xcrun simctl shutdown "$s" 2>/dev/null
 
-if [ -n "${APP_TESTS:-}" ]; then
+if [ "$MODE" = app ] && [ -n "${APP_TESTS:-}" ]; then
   if [ ! -d "$R" ]; then
     echo "app-tests: no results, so the chosen tests didn't run"
     exit 1
