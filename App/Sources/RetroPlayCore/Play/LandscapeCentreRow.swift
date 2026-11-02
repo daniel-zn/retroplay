@@ -31,6 +31,8 @@ public enum LandscapeCentreRow {
         Style(buttonWidth: 34, buttonSpacing: 6, sideSpacing: 4),
         // Three switches (the 7800's) on a narrow phone: smaller small buttons, still centred.
         Style(buttonWidth: 34, buttonSpacing: 6, sideSpacing: 4, buttonScale: 0.75),
+        // The same at XXXL, where the wide face makes the switches' labels longer.
+        Style(buttonWidth: 34, buttonSpacing: 6, sideSpacing: 4, buttonScale: 0.55),
     ]
 
     /// The row's height: the round buttons' 32 pt, or a small button's touch area.

@@ -441,7 +441,7 @@ public struct PlayView: View {
         // home-indicator strip too).
         let rowReserve = fit ? LandscapeCentreRow.pictureReserve(bottomSafeArea: safeArea.bottom) : 0
         let screenHeight = min(fit ? size.height - rowReserve : fullHeight, max(0, availableWidth) / aspect)
-        let rowGap = LandscapeCentreRow.gap(width: size.width, columnWidth: pad.landscapeColumnWidth, edgeInset: edgeInset)
+        let rowGap = LandscapeCentreRow.gap(width: size.width, columnWidth: pad.landscapeColumnWidth + pad.landscapeRowClearance, edgeInset: edgeInset)
         let screenWidth = screenHeight * aspect
         let chromeOpacity = Self.overlayControlsOpacity
         // The columns run the full height less 6 pt top and bottom (through the home strip).
@@ -546,6 +546,7 @@ public struct PlayView: View {
             row(styles[1])
             row(styles[2])
             row(styles[3])
+            row(styles[4])
         }
         .frame(width: gap)
         .frame(height: LandscapeCentreRow.height)

@@ -320,6 +320,16 @@ struct ConsolePad {
 
     // MARK: Landscape columns
 
+    /// How far the thumb cluster reaches past the column towards the middle: the 7800's and
+    /// GBA's two face buttons sit on a diagonal that overhangs the column's inner edge. The
+    /// bottom-centre row keeps clear of it.
+    var landscapeRowClearance: CGFloat {
+        switch system {
+        case .gba, .atari7800: return (large ? 78 : 74) * 0.45 * scale
+        default: return 0
+        }
+    }
+
     /// Width each landscape side column needs: the wider of its two thumb clusters
     /// (D-pad / stick on the left, face buttons on the right), so a fitted screen
     /// can sit between the columns without anything overlapping it.
