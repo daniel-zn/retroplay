@@ -59,6 +59,18 @@
               "FilesPickerSaveImportUITests",
               "SaveImportSMBUITests"
             ]
+          },
+          {
+            "paths": [
+              "App/Sources/RetroPlayApp/PlayView.swift",
+              "App/Sources/RetroPlayApp/PlayMenuView.swift",
+              "App/Sources/RetroPlayApp/Controls/**",
+              "App/Sources/RetroPlayCore/Play/LandscapeCentreRow.swift"
+            ],
+            "tests": [
+              "PauseMenuFitUITests",
+              "LandscapeCentreRowUITests"
+            ]
           }
         ]
       }
