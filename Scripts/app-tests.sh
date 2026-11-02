@@ -62,9 +62,9 @@ if [ $r -eq 0 ]; then
   run_tests
   r=$?
   # The Simulator's services can die under memory pressure before the runner starts ("Failed to
-  # install or launch the test runner", no test run). That's the machine, not a test: the
+  # install or launch the test runner", no UI test run; the unit tests may have). That's the machine, not a test: the
   # Simulator is restarted and the tests run once more. A test that ran and failed is final.
-  if [ $r -ne 0 ] && grep -q "Failed to install or launch the test runner" "$R.log" && ! grep -q "Test Case '.*' started" "$R.log"; then
+  if [ $r -ne 0 ] && grep -q "Failed to install or launch the test runner" "$R.log" && ! grep -q "Test Case '-\[RetroPlayUITests\..*' started" "$R.log"; then
     echo "app-tests: the test runner didn't start (no test ran); restarting the Simulator and running the tests again"
     xcrun simctl shutdown "$s" 2>/dev/null; sleep 5; xcrun simctl boot "$s"; xcrun simctl bootstatus "$s" >/dev/null
     run_tests
