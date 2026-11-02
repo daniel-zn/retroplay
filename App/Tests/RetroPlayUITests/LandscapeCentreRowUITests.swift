@@ -33,7 +33,10 @@ final class LandscapeCentreRowUITests: XCTestCase {
         // The Simulator counts the Mac's keyboard as a controller, which hides the touch
         // controls; they're shown with one, as a player can choose.
         app.launchArguments = ["-UIPreferredContentSizeCategoryName", size, "-RetroPlaySmokeSystem", system,
-                               "-retroplay.touchWithController", "YES"]
+                               "-retroplay.touchWithController", "YES",
+                               // The fitted layout (a Simulator may remember Fill Screen in
+                               // Landscape, where the picture runs under the controls on purpose).
+                               "-retroplay.landscapeFill.\(system)", "NO"]
         app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
         app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
         app.launch()

@@ -139,6 +139,9 @@ public struct PlayView: View {
                 }
                 statusOverlay
             }
+            // Behind the open menu the game and its controls aren't there for VoiceOver (and
+            // accessibility hit-testing): a touch on a menu row must not land on the game screen.
+            .accessibilityHidden(menuOpen)
             // A controller coming or going fades the touch controls in or out (and moves the
             // picture to its new place) rather than switching at once; the game keeps running.
             .animation(.easeInOut(duration: ControllerHandover.fade), value: showTouchControls)
@@ -526,17 +529,16 @@ public struct PlayView: View {
     private func landscapeCentreRow(_ pad: ConsolePad, gap: CGFloat, chromeOpacity: Double) -> some View {
         let styles = LandscapeCentreRow.styles
         func row(_ style: LandscapeCentreRow.Style) -> some View {
-            HStack(spacing: style.sideSpacing) {
-                // Equal sides keep the group in the middle when only one side has buttons.
+            // The group in the exact middle, each side as wide as the wider one, so it stays
+            // centred when one side has more buttons (the 7800's PAUSE and RESET).
+            CentreRowLayout(spacing: style.sideSpacing) {
                 pad.centreButtons(.leading, spacing: style.sideSpacing)
                     .opacity(Self.overlayControlsOpacity)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
                 quickButtons(buttonWidth: style.buttonWidth, spacing: style.buttonSpacing)
                     .fixedSize()
                     .opacity(chromeOpacity)
                 pad.centreButtons(.trailing, spacing: style.sideSpacing)
                     .opacity(Self.overlayControlsOpacity)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         return ViewThatFits(in: .horizontal) {
@@ -757,6 +759,7 @@ public struct PlayView: View {
             )
             .padding(20)
         }
+        .accessibilityAddTraits(.isModal)
         .transition(.opacity)
     }
 
@@ -1462,3 +1465,36 @@ final class MenuInputGateBox {
     func setMenuOpen(_ open: Bool) -> PhysicalPadState { gate.setMenuOpen(open) }
 }
 
+/// Three views in a row: the middle one centred, the first ending and the last starting
+/// `spacing` from it. Its width counts the wider side twice, so a parent (ViewThatFits) only
+/// picks it when both sides fit with the middle one centred.
+@available(iOS 18.0, *)
+struct CentreRowLayout: Layout {
+    var spacing: CGFloat
+
+    private func sizes(_ subviews: Subviews) -> [CGSize] {
+        subviews.map { $0.sizeThatFits(.unspecified) }
+    }
+
+    private func side(_ sizes: [CGSize]) -> CGFloat {
+        let widest = max(sizes[0].width, sizes[2].width)
+        return widest > 0 ? widest + spacing : 0
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 3 else { return .zero }
+        let sizes = sizes(subviews)
+        return CGSize(width: sizes[1].width + 2 * side(sizes), height: sizes.map(\.height).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 3 else { return }
+        let sizes = sizes(subviews)
+        let middle = CGPoint(x: bounds.midX, y: bounds.midY)
+        subviews[1].place(at: middle, anchor: .center, proposal: ProposedViewSize(sizes[1]))
+        subviews[0].place(at: CGPoint(x: middle.x - sizes[1].width / 2 - spacing, y: middle.y),
+                          anchor: .trailing, proposal: ProposedViewSize(sizes[0]))
+        subviews[2].place(at: CGPoint(x: middle.x + sizes[1].width / 2 + spacing, y: middle.y),
+                          anchor: .leading, proposal: ProposedViewSize(sizes[2]))
+    }
+}

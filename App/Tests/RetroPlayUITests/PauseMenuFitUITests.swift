@@ -88,7 +88,8 @@ final class PauseMenuFitUITests: XCTestCase {
         }
         shoot("\(name)-top")
         // The menu itself: inside the screen, whatever its content.
-        let menu = app.otherElements["playMenu"].firstMatch
+        // The menu is a scroll view (any element type is matched).
+        let menu = app.descendants(matching: .any)["playMenu"].firstMatch
         guard menu.exists else {
             XCTFail("\(name): no menu")
             return
