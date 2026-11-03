@@ -318,9 +318,18 @@ struct LibraryCoverFlowView<Header: View>: View {
         }
         .frame(maxWidth: 560)
         .animation(.easeOut(duration: 0.18), value: focusedGame?.id)
-        // VoiceOver reads the same on each cover; UI tests find the drawn caption by its id.
-        .accessibilityHidden(true)
+        // VoiceOver reads the same on each cover. Debug builds keep the drawn caption for UI tests
+        // that ask (`-RetroPlayTestCaptionAccessible YES`), so they can check where it is.
+        .accessibilityHidden(!(shown && Self.captionAccessibleForTests))
         .accessibilityIdentifier(shown ? "coverFlow.caption" : "")
+    }
+
+    private static var captionAccessibleForTests: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "RetroPlayTestCaptionAccessible")
+        #else
+        false
+        #endif
     }
 
     private var compactCaption: Bool { verticalSizeClass == .compact }

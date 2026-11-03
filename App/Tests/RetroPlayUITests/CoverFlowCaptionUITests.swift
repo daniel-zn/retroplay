@@ -17,7 +17,9 @@ final class CoverFlowCaptionUITests: XCTestCase {
     private func check(_ orientation: UIDeviceOrientation, _ size: String, _ name: String) {
         XCUIDevice.shared.orientation = orientation
         let app = XCUIApplication()
-        app.launchArguments = ["-UIPreferredContentSizeCategoryName", size, "-retroplay.libraryLayout", "coverFlow"]
+        app.launchArguments = ["-UIPreferredContentSizeCategoryName", size, "-retroplay.libraryLayout", "coverFlow",
+                               // The caption is hidden from VoiceOver; debug builds expose it for this check.
+                               "-RetroPlayTestCaptionAccessible", "YES"]
         app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
         app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
         app.launch()
