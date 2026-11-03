@@ -277,8 +277,8 @@ struct LibraryCoverFlowView<Header: View>: View {
     /// Title, system and last played for the middle game. `shown: false` is the caption as it
     /// was before it grew, which the covers are laid out around; `shown: true` is the one drawn:
     /// a headline-sized title (two lines in portrait, then "…"; one in landscape) over a
-    /// readable system / last-played line. Two title lines are always reserved in portrait so
-    /// the covers don't jump as names change length.
+    /// readable system / last-played line. The unseen one always holds two title lines in
+    /// portrait, so the covers don't jump as names change length.
     private func caption(shown: Bool) -> some View {
         let titleFont = shown ? (compactCaption ? RetroPlayFont.headline : RetroPlayFont.title3) : RetroPlayFont.subheadline
         let detailFont = shown ? RetroPlayFont.subheadline : RetroPlayFont.footnote
@@ -293,7 +293,10 @@ struct LibraryCoverFlowView<Header: View>: View {
                         .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                         .multilineTextAlignment(.center)
                         .lineSpacing(0)
-                        .lineLimit(compactCaption ? 1 : 2, reservesSpace: !compactCaption)
+                        // The covers are laid out around the unseen caption, which keeps two
+                        // lines; the one drawn holds only the lines a title needs, so a short
+                        // title sits with its system line.
+                        .lineLimit(compactCaption ? 1 : 2, reservesSpace: !compactCaption && !shown)
                         .truncationMode(.tail)
                         .minimumScaleFactor(shown ? 1 : 0.7)
                     HStack(spacing: 8) {
