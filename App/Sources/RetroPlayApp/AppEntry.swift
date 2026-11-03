@@ -825,12 +825,14 @@ public struct RetroPlayRootView: View {
             guard !urls.isEmpty, let id = saveImports.beginScan() else { return }
             // Held until the sheet closes: files inside a picked folder read under its access.
             let access = SecurityScopedAccess(urls)
+            // An alias the picker handed over is read where it points (each pick logged).
+            let readURLs = access.readURLs
             let games = store.games
             saveImportID = id
             let cancellation = ImportCancellation()
             saveScanCancellation = cancellation
             saveScanTask = Task {
-                let batch = await Self.findSaves(in: urls, games: games, cancellation: cancellation)
+                let batch = await Self.findSaves(in: readURLs, games: games, cancellation: cancellation)
                 // A stale or cancelled session (ended meanwhile) changes nothing.
                 guard saveImports.scanFinished(id) else {
                     access.stop()

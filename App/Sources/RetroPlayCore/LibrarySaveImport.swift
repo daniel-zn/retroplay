@@ -1272,11 +1272,11 @@ enum FolderWalk {
     /// return for a folder (nil: the real listing). On a device, a provider's folder that isn't
     /// on disk yet can list nothing through the first.
     nonisolated(unsafe) static var bulkListing: (@Sendable (URL) -> [URL]?)?
-    nonisolated(unsafe) static var plainListing: (@Sendable (URL) -> [URL]?)?
+    nonisolated(unsafe) static var plainListing: (@Sendable (URL) throws -> [URL]?)?
     /// Tests: stand in for `contentsOfDirectory(atPath:)`, and for the listing of the picked URL
     /// outside the coordinated read (nil: the real ones).
-    nonisolated(unsafe) static var pathListing: (@Sendable (URL) -> [URL]?)?
-    nonisolated(unsafe) static var uncoordinatedListing: (@Sendable (URL) -> [URL]?)?
+    nonisolated(unsafe) static var pathListing: (@Sendable (URL) throws -> [URL]?)?
+    nonisolated(unsafe) static var uncoordinatedListing: (@Sendable (URL) throws -> [URL]?)?
 
     /// A folder that listed nothing though its metadata says it holds entries.
     struct EmptyListing: LocalizedError {
@@ -1350,6 +1350,36 @@ enum FolderWalk {
 
     /// One folder's children, at most `budget` of them (`exhausted` when there were more),
     /// read inside one coordinated read of that folder.
+    /// One way of listing a folder and how it went: entries, or the error it gave.
+    struct ListingAttempt: Sendable {
+        let method: String
+        let count: Int?
+        let error: String?
+
+        var summary: String { "\(method) \(error ?? String(count ?? 0))" }
+    }
+
+    /// A folder no listing could read: every method listed nothing and at least one failed.
+    /// Says what each did, so the cause shows on screen ("enumerator 0, contents: Operation not
+    /// permitted, …").
+    struct ListingFailed: LocalizedError {
+        let folder: String
+        let attempts: [ListingAttempt]
+        var errorDescription: String? {
+            "Couldn't list \(folder): " + attempts.map(\.summary).joined(separator: ", ")
+        }
+    }
+
+    /// "Operation not permitted" rather than "The operation couldn't be completed. (…)": the
+    /// POSIX reason when there is one.
+    static func shortReason(_ error: Error) -> String {
+        let ns = error as NSError
+        let posix = ns.domain == NSPOSIXErrorDomain ? ns
+            : (ns.userInfo[NSUnderlyingErrorKey] as? NSError).flatMap { $0.domain == NSPOSIXErrorDomain ? $0 : nil }
+        if let posix { return String(cString: strerror(Int32(posix.code))) }
+        return ns.localizedDescription
+    }
+
     private static func list(
         _ url: URL,
         budget: Int,
@@ -1359,6 +1389,7 @@ enum FolderWalk {
         var children: [Child] = []
         var pulled = 0
         var failure: Error?
+        var attempts: [ListingAttempt] = []
         defer { listed?(url, pulled) }
         /// One more entry; non-nil when the listing has to stop there.
         func take(_ next: URL) throws -> (children: [Child], exhausted: Bool, error: Error?)? {
@@ -1372,9 +1403,23 @@ enum FolderWalk {
             children.append(Child(url: next, name: next.lastPathComponent, item: item))
             return nil
         }
+        /// A fallback listing, its result or error recorded (never taken for "empty").
+        func attempt(_ method: String, _ list: () throws -> [URL]) -> [URL] {
+            do {
+                let found = try list()
+                attempts.append(ListingAttempt(method: method, count: found.count, error: nil))
+                scanLog.notice("RP_SCAN \(method, privacy: .public) lists \(found.count, privacy: .public)")
+                return found
+            } catch {
+                let reason = shortReason(error)
+                attempts.append(ListingAttempt(method: method, count: nil, error: reason))
+                scanLog.notice("RP_SCAN \(method, privacy: .public) failed: \(reason, privacy: .public)")
+                return []
+            }
+        }
         // Inside the folder's coordinated read: the enumerator, and when it lists nothing, the
         // plain directory reads (a provider's folder, an SMB share, can list nothing through
-        // one and everything through another, with no error).
+        // one and everything through another).
         let inside: (children: [Child], exhausted: Bool, error: Error?)? = try CoordinatedRead.run(url, cancellation) { readURL in
             if readURL != url {
                 scanLog.notice("RP_SCAN the coordinator gave another URL to read than the one picked")
@@ -1400,14 +1445,16 @@ enum FolderWalk {
             }
             if let failure { return ([], false, failure) }
             guard pulled == 0 else { return nil }
-            let plain = plainListing?(readURL) ?? (try? fileManager.contentsOfDirectory(at: readURL, includingPropertiesForKeys: nil)) ?? []
-            scanLog.notice("RP_SCAN the enumerator listed 0 entries; contentsOfDirectory(at:) lists \(plain.count, privacy: .public)")
-            var again = plain
+            attempts.append(ListingAttempt(method: "enumerator", count: 0, error: nil))
+            var again = attempt("contents") {
+                try plainListing.map { try $0(readURL) ?? [] }
+                    ?? fileManager.contentsOfDirectory(at: readURL, includingPropertiesForKeys: nil)
+            }
             if again.isEmpty {
-                let names = pathListing.map { $0(readURL)?.map(\.lastPathComponent) ?? [] }
-                    ?? (try? fileManager.contentsOfDirectory(atPath: readURL.path)) ?? []
-                scanLog.notice("RP_SCAN contentsOfDirectory(atPath:) lists \(names.count, privacy: .public)")
-                again = names.map { readURL.appendingPathComponent($0) }
+                again = attempt("path") {
+                    try pathListing.map { try $0(readURL) ?? [] }
+                        ?? fileManager.contentsOfDirectory(atPath: readURL.path).map { readURL.appendingPathComponent($0) }
+                }
             }
             for next in again {
                 if let early = try take(next) { return early }
@@ -1418,16 +1465,25 @@ enum FolderWalk {
         if pulled == 0 {
             // Every listing in the coordinated read came back empty: the picked URL itself, as
             // the picker handed it over (its security scope), outside the coordinator.
-            let outside = uncoordinatedListing?(url) ?? (try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
-            scanLog.notice("RP_SCAN the picked URL, outside the coordinated read, lists \(outside.count, privacy: .public)")
+            let outside = attempt("picked URL") {
+                try uncoordinatedListing.map { try $0(url) ?? [] }
+                    ?? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+            }
             for next in outside {
                 if let early = try take(next) { return early }
             }
-            if children.isEmpty, let held = DirectoryMetadata.heldEntries(url) {
-                // Nothing listed by any means, though the folder's metadata says it holds
-                // entries (or that they aren't on disk yet): said, not taken for empty.
-                scanLog.notice("RP_SCAN every listing is empty where the folder holds \(held.map { String($0) } ?? "unknown (dataless)", privacy: .public)")
-                return ([], false, EmptyListing(heldEntries: held))
+            if children.isEmpty {
+                // Empty only if no listing failed: a failure (no permission, the scope not
+                // active) isn't an empty folder.
+                if attempts.contains(where: { $0.error != nil }) {
+                    return ([], false, ListingFailed(folder: url.lastPathComponent, attempts: attempts))
+                }
+                if let held = DirectoryMetadata.heldEntries(url) {
+                    // Nothing listed by any means, though the folder's metadata says it holds
+                    // entries (or that they aren't on disk yet): said, not taken for empty.
+                    scanLog.notice("RP_SCAN every listing is empty where the folder holds \(held.map { String($0) } ?? "unknown (dataless)", privacy: .public)")
+                    return ([], false, EmptyListing(heldEntries: held))
+                }
             }
         }
         return (children.sorted { $0.name < $1.name }, false, nil)
@@ -1477,6 +1533,26 @@ enum Materialization {
 
 // MARK: - Security-scoped access
 
+/// What a picked URL is, logged (`RP_SCAN pick …`, release builds too) for both imports (the
+/// library's "+ → Saves" and the pause menu's), and an alias resolved to what it points at.
+public enum SaveImportPick {
+    /// The URL to read: the pick itself, or what it points at if the picker handed over an
+    /// alias. `granted` is whether its security-scoped access started.
+    public static func resolved(_ url: URL, granted: Bool, fileManager: FileManager = .default) -> URL {
+        var fresh = url
+        fresh.removeAllCachedResourceValues()
+        let values = try? fresh.resourceValues(forKeys: [.isAliasFileKey, .isDirectoryKey, .isSymbolicLinkKey])
+        let alias = values?.isAliasFile == true && values?.isSymbolicLink != true
+        let readable = fileManager.isReadableFile(atPath: url.path)
+        FolderWalk.scanLog.notice(
+            "RP_SCAN pick \(url.lastPathComponent, privacy: .private) access=\(granted, privacy: .public) readable=\(readable, privacy: .public) directory=\(String(describing: values?.isDirectory), privacy: .public) alias=\(alias, privacy: .public) fileURL=\(url.isFileURL, privacy: .public)"
+        )
+        guard alias, let target = try? URL(resolvingAliasFileAt: url) else { return url }
+        FolderWalk.scanLog.notice("RP_SCAN the pick is an alias; reading what it points at")
+        return target
+    }
+}
+
 /// Keeps every picked URL readable from the scan until the commit (or the summary closes);
 /// files inside a picked folder are covered by the folder's access.
 public final class SecurityScopedAccess: @unchecked Sendable {
@@ -1486,6 +1562,8 @@ public final class SecurityScopedAccess: @unchecked Sendable {
     /// Picked URLs whose access couldn't be started and that can't be read without it (a pick
     /// inside the app's own folder needs no access, so it isn't counted).
     public let refused: [URL]
+    /// The picks as they're read: each one, or what it points at if it's an alias (logged).
+    public private(set) var readURLs: [URL] = []
 
     /// `start`: tests stand in for starting a URL's access.
     public init(
@@ -1498,9 +1576,7 @@ public final class SecurityScopedAccess: @unchecked Sendable {
         for url in urls {
             let granted = start(url)
             let readable = fileManager.isReadableFile(atPath: url.path)
-            FolderWalk.scanLog.notice(
-                "RP_SCAN pick \(url.lastPathComponent, privacy: .private) access=\(granted, privacy: .public) readable=\(readable, privacy: .public)"
-            )
+            readURLs.append(SaveImportPick.resolved(url, granted: granted, fileManager: fileManager))
             if granted { started.append(url) } else if !readable { refused.append(url) }
         }
         self.started = started

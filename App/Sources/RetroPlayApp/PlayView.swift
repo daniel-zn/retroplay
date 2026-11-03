@@ -94,7 +94,10 @@ public struct PlayView: View {
 
     /// A battery save waiting for "Replace?" confirmation (security scope still open).
     private struct PendingSaveImport {
+        /// What's read (the pick, or what an alias points at).
         let url: URL
+        /// The URL the picker handed over, whose security scope is held until the import ends.
+        let scopedURL: URL
         let plan: SaveGameImportPlan
         let securityScoped: Bool
     }
@@ -887,8 +890,11 @@ public struct PlayView: View {
         case .failure(let error):
             saveImportError = error.localizedDescription
         case .success(let urls):
-            guard let url = urls.first, !importingSave else { return }
-            let scoped = url.startAccessingSecurityScopedResource()
+            guard let picked = urls.first, !importingSave else { return }
+            let scoped = picked.startAccessingSecurityScopedResource()
+            // Logged (access, alias, readable); an alias is read where it points. The scope
+            // stays on the picked URL until the import has finished or failed.
+            let url = SaveImportPick.resolved(picked, granted: scoped)
             let importer = saveImporter
             let game = game
             // Planning reads the file (and walks a PSP folder in coordinated reads), so it runs
@@ -901,15 +907,17 @@ public struct PlayView: View {
                 importingSave = false
                 switch planned {
                 case .success(let plan):
-                    let pending = PendingSaveImport(url: url, plan: plan, securityScoped: scoped)
+                    let pending = PendingSaveImport(url: url, scopedURL: picked, plan: plan, securityScoped: scoped)
                     if plan.replacesExisting {
                         pendingImport = pending
                     } else {
                         commitSaveImport(pending, overwrite: false)
                     }
                 case .failure(let error):
-                    if scoped { url.stopAccessingSecurityScopedResource() }
+                    if scoped { picked.stopAccessingSecurityScopedResource() }
+                    // Said when Files didn't grant access, so the alert tells the whole story.
                     saveImportError = error.localizedDescription
+                        + (scoped ? "" : " Files didn't give RetroPlay access to it.")
                 }
             }
         }
@@ -917,7 +925,7 @@ public struct PlayView: View {
 
     private func cancelPendingImport() {
         if let pending = pendingImport, pending.securityScoped {
-            pending.url.stopAccessingSecurityScopedResource()
+            pending.scopedURL.stopAccessingSecurityScopedResource()
         }
         pendingImport = nil
     }
@@ -931,7 +939,7 @@ public struct PlayView: View {
         importingSave = true
         defer {
             importingSave = false
-            if pending.securityScoped { pending.url.stopAccessingSecurityScopedResource() }
+            if pending.securityScoped { pending.scopedURL.stopAccessingSecurityScopedResource() }
         }
         guard await BatterySaveReload.waitForSaveIdle(isSaveBusy: { busy }) else {
             saveImportError = BatterySaveReload.saveIdleTimeoutNotice

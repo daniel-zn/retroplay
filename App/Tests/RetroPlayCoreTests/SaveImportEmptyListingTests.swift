@@ -11,6 +11,7 @@ final class SaveImportEmptyListingTests: XCTestCase {
     private let fm = FileManager.default
     private var root: URL!
     private var paths: SavePaths!
+    private var locked: URL?
 
     override func setUpWithError() throws {
         root = fm.temporaryDirectory.appendingPathComponent("rp-empty-listing-\(UUID().uuidString)", isDirectory: true)
@@ -20,6 +21,8 @@ final class SaveImportEmptyListingTests: XCTestCase {
     }
 
     override func tearDownWithError() throws {
+        // An unreadable folder made for a test, readable again so it can be removed.
+        if let locked { try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path) }
         FolderWalk.bulkListing = nil
         FolderWalk.plainListing = nil
         FolderWalk.pathListing = nil
@@ -150,5 +153,54 @@ final class SaveImportEmptyListingTests: XCTestCase {
         let found = batch([empty])
         XCTAssertEqual(found.items, [])
         XCTAssertEqual(found.skipped, [])
+    }
+
+    // MARK: Listings that fail aren't empty folders
+
+    func testAFolderNoListingCanReadIsAnErrorNotEmpty() throws {
+        // The enumerator lists nothing (as on the device) and every other listing is refused
+        // by the file system: that's a read failure, not a slot without PARAM.SFO.
+        let slot = try makeSlot()
+        bulkListsNothing(for: ["UCUS98648PROFILE00"])
+        try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: slot.path)
+        locked = slot
+        XCTAssertThrowsError(try SaveGameImporter.validatePSPFolderContents(slot, fileManager: fm)) { error in
+            let text = error.localizedDescription
+            XCTAssertFalse(text.contains("PARAM.SFO"), "a refused listing read as an empty slot: \(text)")
+            XCTAssertTrue(text.contains("Couldn't list UCUS98648PROFILE00"), text)
+            XCTAssertTrue(text.lowercased().contains("permission denied"), text)
+        }
+        let found = batch([slot])
+        XCTAssertEqual(found.items, [])
+        let reason = try XCTUnwrap(found.skipped.first?.reason)
+        XCTAssertTrue(reason.contains("Couldn't list UCUS98648PROFILE00"), reason)
+    }
+
+    func testEveryMethodAndItsErrorIsNamed() throws {
+        let slot = try makeSlot()
+        bulkListsNothing(for: ["UCUS98648PROFILE00"])
+        let denied: @Sendable (URL) throws -> [URL]? = { url in
+            guard url.lastPathComponent == "UCUS98648PROFILE00" else { return nil }
+            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadNoPermissionError,
+                          userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))])
+        }
+        FolderWalk.plainListing = denied
+        FolderWalk.pathListing = denied
+        FolderWalk.uncoordinatedListing = denied
+        XCTAssertThrowsError(try SaveGameImporter.validatePSPFolderContents(slot, fileManager: fm)) { error in
+            XCTAssertTrue(error.localizedDescription.contains(
+                "Couldn't list UCUS98648PROFILE00: enumerator 0, contents Operation not permitted, path Operation not permitted, picked URL Operation not permitted"
+            ), error.localizedDescription)
+        }
+    }
+
+    func testOneMethodFailingAnotherFindingEntriesUsesTheEntries() throws {
+        let slot = try makeSlot()
+        bulkListsNothing(for: ["UCUS98648PROFILE00"])
+        FolderWalk.plainListing = { url in
+            guard url.lastPathComponent == "UCUS98648PROFILE00" else { return nil }
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))
+        }
+        XCTAssertNoThrow(try SaveGameImporter.validatePSPFolderContents(slot, fileManager: fm))
     }
 }
