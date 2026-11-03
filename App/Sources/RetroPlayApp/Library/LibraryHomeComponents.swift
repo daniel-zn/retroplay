@@ -180,6 +180,8 @@ struct LibraryImportMenu: View {
         } label: {
             LibraryTopBarIcon(symbol: "plus")
         }
+        // iOS draws the menu: its own font and case, not the capitals we set for our text.
+        .textCase(nil)
         .menuOrder(.fixed)
         .accessibilityLabel("Import")
         .accessibilityIdentifier("library.import")
@@ -227,6 +229,8 @@ struct LibraryFilterMenu: View {
                     : "line.3.horizontal.decrease.circle.fill"
             )
         }
+        // iOS draws the menu: its own font and case, not the capitals we set for our text.
+        .textCase(nil)
         .menuOrder(.fixed)
         .accessibilityLabel("Filter")
         .accessibilityIdentifier("library.filter")

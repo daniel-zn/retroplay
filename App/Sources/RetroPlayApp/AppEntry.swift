@@ -485,9 +485,13 @@ public struct RetroPlayRootView: View {
                     if saveImports.phase == .scanning {
                         // A big folder can take a while, and games can't start meanwhile.
                         Menu {
-                            Button("Stop Finding Saves", systemImage: "xmark", role: .destructive) {
-                                cancelSaveScan()
+                            // iOS draws the menu: its own case, not our capitals.
+                            Group {
+                                Button("Stop Finding Saves", systemImage: "xmark", role: .destructive) {
+                                    cancelSaveScan()
+                                }
                             }
+                            .textCase(nil)
                         } label: {
                             HStack(spacing: 6) {
                                 ProgressView()

@@ -35,6 +35,9 @@ struct LibraryCoverFlowView<Header: View>: View {
     @State private var listKey: ListKey?
     @State private var headerHeight: CGFloat = 0
     @State private var captionHeight: CGFloat = 0
+    /// The free room under the caption's place (portrait), so the caption shown is centred in
+    /// all the room below the covers.
+    @State private var roomBelowCaption: CGFloat = 0
     /// Where the row is right now, for the snapping to know where a swipe was let go.
     @State private var tracker = CoverFlowScrollTracker()
     @State private var scene = CoverFlowScene()
@@ -85,12 +88,23 @@ struct LibraryCoverFlowView<Header: View>: View {
                         carousel(metrics: metrics, width: outer.size.width)
                             .padding(.top, landscape ? 4 : 8 + overhang)
                             .padding(.bottom, (landscape ? 6 : 12) + overhang)
-                        caption
+                        // The covers are laid out around the caption as it was before it grew
+                        // (kept in place, unseen), so they neither move nor shrink; the caption
+                        // shown is drawn over that room, centred in all the room below them.
+                        caption(shown: false)
+                            .hidden()
                             .padding(.horizontal, 24)
                             .padding(.bottom, landscape ? 14 : 16)
                             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
+                            .overlay {
+                                caption(shown: true)
+                                    .padding(.horizontal, 24)
+                                    .offset(y: landscape ? -4 : roomBelowCaption / 2)
+                            }
+                            .zIndex(1)
                         if !landscape {
                             Spacer(minLength: 0)
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { roomBelowCaption = $0 }
                         }
                     }
                 }
@@ -235,18 +249,22 @@ struct LibraryCoverFlowView<Header: View>: View {
         .accessibilityHint(missing ? "The game file was removed in Files" : "Starts the game")
         .modifier(LibraryTileDeleteAccessibilityAction(game: game, onRequestDelete: onRequestDelete))
         .contextMenu {
-            Button {
-                onSelect(game)
-            } label: {
-                Label(lastPlayed[game.id] == nil ? "Play" : "Continue", systemImage: "play.fill")
-            }
-            if onRequestDelete != nil {
-                Button(role: .destructive) {
-                    onRequestDelete?(game)
+            // iOS draws the menu: its own case, not our capitals.
+            Group {
+                Button {
+                    onSelect(game)
                 } label: {
-                    Label("Delete", systemImage: "trash")
+                    Label(lastPlayed[game.id] == nil ? "Play" : "Continue", systemImage: "play.fill")
+                }
+                if onRequestDelete != nil {
+                    Button(role: .destructive) {
+                        onRequestDelete?(game)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
             }
+            .textCase(nil)
         } preview: {
             // The cover facing front, whichever way it's turned in the row.
             CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing, shadow: false)
@@ -256,21 +274,28 @@ struct LibraryCoverFlowView<Header: View>: View {
 
     // MARK: Caption
 
-    /// Title, system and last played for the middle game. Two title lines are always
-    /// reserved so the covers don't jump as names change length.
-    private var caption: some View {
-        ZStack {
+    /// Title, system and last played for the middle game. `shown: false` is the caption as it
+    /// was before it grew, which the covers are laid out around; `shown: true` is the one drawn:
+    /// a headline-sized title (two lines in portrait, then "…"; one in landscape) over a
+    /// readable system / last-played line. Two title lines are always reserved in portrait so
+    /// the covers don't jump as names change length.
+    private func caption(shown: Bool) -> some View {
+        let titleFont = shown ? (compactCaption ? RetroPlayFont.headline : RetroPlayFont.title3) : RetroPlayFont.subheadline
+        let detailFont = shown ? RetroPlayFont.subheadline : RetroPlayFont.footnote
+        let spacing: CGFloat = compactCaption ? (shown ? 4 : 3) : (shown ? 10 : 8)
+        return ZStack {
             if let game = focusedGame {
                 // Landscape has the width for one line: no second line held empty between
                 // the name and the system.
-                VStack(spacing: compactCaption ? 3 : 8) {
+                VStack(spacing: spacing) {
                     Text(game.displayName)
-                        .font(RetroPlayFont.subheadline)
+                        .font(titleFont)
                         .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                         .multilineTextAlignment(.center)
                         .lineSpacing(0)
                         .lineLimit(compactCaption ? 1 : 2, reservesSpace: !compactCaption)
-                        .minimumScaleFactor(0.7)
+                        .truncationMode(.tail)
+                        .minimumScaleFactor(shown ? 1 : 0.7)
                     HStack(spacing: 8) {
                         Text(game.systemID.displayName)
                             .foregroundStyle(RetroPlayTheme.systemTint(game.systemID))
@@ -283,7 +308,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                                     : RetroPlayTheme.secondaryText(for: colorScheme)
                             )
                     }
-                    .font(RetroPlayFont.footnote)
+                    .font(detailFont)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 }
@@ -293,8 +318,9 @@ struct LibraryCoverFlowView<Header: View>: View {
         }
         .frame(maxWidth: 560)
         .animation(.easeOut(duration: 0.18), value: focusedGame?.id)
-        // VoiceOver reads the same on each cover.
+        // VoiceOver reads the same on each cover; UI tests find the drawn caption by its id.
         .accessibilityHidden(true)
+        .accessibilityIdentifier(shown ? "coverFlow.caption" : "")
     }
 
     private var compactCaption: Bool { verticalSizeClass == .compact }

@@ -66,6 +66,33 @@ final class LibraryTopBarUITests: XCTestCase {
         add(shot)
     }
 
+    /// Menus iOS draws itself keep its look: normal case, not the capitals the app's own text
+    /// is set in (the "+" menu, and a game's long-press menu).
+    @MainActor
+    func testSystemMenusKeepTheirOwnCase() {
+        let app = launch(["-retroplay.libraryLayout", "grid"])
+        let plus = app.buttons["library.import"].firstMatch
+        XCTAssertTrue(plus.waitForExistence(timeout: 30))
+        plus.tap()
+        let games = app.buttons["library.import.games"].firstMatch
+        let saves = app.buttons["library.import.saves"].firstMatch
+        XCTAssertTrue(games.waitForExistence(timeout: 5), "no Games in the + menu")
+        // Case-sensitive on purpose.
+        XCTAssertTrue(games.label.hasPrefix("Games"), "the + menu says “\(games.label)”")
+        XCTAssertTrue(saves.label.hasPrefix("Saves"), "the + menu says “\(saves.label)”")
+        attach(app, "plus-menu-case")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
+
+        let tile = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", ", ")).element(boundBy: 0)
+        XCTAssertTrue(tile.waitForExistence(timeout: 10), "no game in the grid")
+        tile.press(forDuration: 1.2)
+        let play = app.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "Play", "Continue")).firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 5), "the game's menu has no “Play” / “Continue” in normal case")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == %@", "Delete")).firstMatch.exists, "no “Delete” in normal case")
+        attach(app, "context-menu-case")
+        app.terminate()
+    }
+
     /// Settings is a swipe-down sheet: no Done button, and a swipe down from its top closes it.
     @MainActor
     func testSettingsHasNoDoneButtonAndSwipesClosed() {

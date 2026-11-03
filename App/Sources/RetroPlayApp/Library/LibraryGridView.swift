@@ -98,18 +98,22 @@ struct LibraryGridView<Header: View>: View {
                         .accessibilityHint(missingGameIDs.contains(game.id) ? "The game file was removed in Files" : "Starts the game")
                         .modifier(LibraryTileDeleteAccessibilityAction(game: game, onRequestDelete: onRequestDelete))
                         .contextMenu {
-                            Button {
-                                onSelect(game)
-                            } label: {
-                                Label(lastPlayed[game.id] == nil ? "Play" : "Continue", systemImage: "play.fill")
-                            }
-                            if onRequestDelete != nil {
-                                Button(role: .destructive) {
-                                    onRequestDelete?(game)
+                            // iOS draws the menu: its own case, not our capitals.
+                            Group {
+                                Button {
+                                    onSelect(game)
                                 } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    Label(lastPlayed[game.id] == nil ? "Play" : "Continue", systemImage: "play.fill")
+                                }
+                                if onRequestDelete != nil {
+                                    Button(role: .destructive) {
+                                        onRequestDelete?(game)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
                                 }
                             }
+                            .textCase(nil)
                         }
                     }
                 }
