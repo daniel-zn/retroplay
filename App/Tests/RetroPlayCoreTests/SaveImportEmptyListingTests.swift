@@ -22,6 +22,8 @@ final class SaveImportEmptyListingTests: XCTestCase {
     override func tearDownWithError() throws {
         FolderWalk.bulkListing = nil
         FolderWalk.plainListing = nil
+        FolderWalk.pathListing = nil
+        FolderWalk.uncoordinatedListing = nil
         DirectoryMetadata.stat = nil
         try? fm.removeItem(at: root)
     }
@@ -68,6 +70,8 @@ final class SaveImportEmptyListingTests: XCTestCase {
         _ = try makeSlot()
         FolderWalk.bulkListing = { $0.lastPathComponent == "SAVEDATA" ? [] : nil }
         FolderWalk.plainListing = { $0.lastPathComponent == "SAVEDATA" ? [] : nil }
+        FolderWalk.pathListing = { $0.lastPathComponent == "SAVEDATA" ? [] : nil }
+        FolderWalk.uncoordinatedListing = { $0.lastPathComponent == "SAVEDATA" ? [] : nil }
         let found = batch([root.appendingPathComponent("Pick", isDirectory: true)])
         XCTAssertEqual(found.items, [])
         let row = try XCTUnwrap(found.skipped.first { $0.name == "Pick/PSP/SAVEDATA" }, "\(found.skipped)")
@@ -78,6 +82,8 @@ final class SaveImportEmptyListingTests: XCTestCase {
         let slot = try makeSlot()
         FolderWalk.bulkListing = { $0 == slot ? [] : nil }
         FolderWalk.plainListing = { $0 == slot ? [] : nil }
+        FolderWalk.pathListing = { $0 == slot ? [] : nil }
+        FolderWalk.uncoordinatedListing = { $0 == slot ? [] : nil }
         DirectoryMetadata.stat = { $0 == slot ? (links: 2, dataless: true) : nil }
         let found = batch([slot])
         XCTAssertEqual(found.items, [])
@@ -110,5 +116,39 @@ final class SaveImportEmptyListingTests: XCTestCase {
             let found = batch([spelling])
             XCTAssertEqual(found.items.map(\.game.displayName), ["ATV Offroad Fury Pro"], "\(spelling.path): \(found.skipped)")
         }
+    }
+
+    // MARK: Folders whose metadata doesn't count entries (SMB, File Provider)
+
+    /// An SMB share or File Provider folder reports a link count of 1 or 2 whatever it holds.
+    private func metadataCountsNothing() {
+        DirectoryMetadata.stat = { _ in (links: 2, dataless: false) }
+    }
+
+    func testOnAShareTheEnumeratorsEmptyListingIsCheckedAgainstAPlainRead() throws {
+        let slot = try makeSlot()
+        metadataCountsNothing()
+        bulkListsNothing(for: ["UCUS98648PROFILE00"])
+        let found = batch([slot])
+        XCTAssertEqual(found.items.map(\.game.displayName), ["ATV Offroad Fury Pro"], "\(found.skipped)")
+    }
+
+    func testOnAShareTheOriginalURLIsListedOutsideTheCoordinatorToo() throws {
+        let slot = try makeSlot()
+        metadataCountsNothing()
+        bulkListsNothing(for: ["UCUS98648PROFILE00"])
+        FolderWalk.plainListing = { $0.lastPathComponent == "UCUS98648PROFILE00" ? [] : nil }
+        FolderWalk.pathListing = { $0.lastPathComponent == "UCUS98648PROFILE00" ? [] : nil }
+        let found = batch([slot])
+        XCTAssertEqual(found.items.map(\.game.displayName), ["ATV Offroad Fury Pro"], "\(found.skipped)")
+    }
+
+    func testAFolderEveryListingAgreesIsEmptyIsJustEmpty() throws {
+        let empty = root.appendingPathComponent("Pick/Empty", isDirectory: true)
+        try fm.createDirectory(at: empty, withIntermediateDirectories: true)
+        metadataCountsNothing()
+        let found = batch([empty])
+        XCTAssertEqual(found.items, [])
+        XCTAssertEqual(found.skipped, [])
     }
 }

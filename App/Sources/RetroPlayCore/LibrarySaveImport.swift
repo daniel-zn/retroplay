@@ -1125,6 +1125,10 @@ enum FolderWalk {
     /// on disk yet can list nothing through the first.
     nonisolated(unsafe) static var bulkListing: (@Sendable (URL) -> [URL]?)?
     nonisolated(unsafe) static var plainListing: (@Sendable (URL) -> [URL]?)?
+    /// Tests: stand in for `contentsOfDirectory(atPath:)`, and for the listing of the picked URL
+    /// outside the coordinated read (nil: the real ones).
+    nonisolated(unsafe) static var pathListing: (@Sendable (URL) -> [URL]?)?
+    nonisolated(unsafe) static var uncoordinatedListing: (@Sendable (URL) -> [URL]?)?
 
     /// A folder that listed nothing though its metadata says it holds entries.
     struct EmptyListing: LocalizedError {
@@ -1204,15 +1208,36 @@ enum FolderWalk {
         fileManager: FileManager,
         cancellation: ImportCancellation
     ) throws -> (children: [Child], exhausted: Bool, error: Error?) {
-        try CoordinatedRead.run(url, cancellation) { url in
-            var failure: Error?
+        var children: [Child] = []
+        var pulled = 0
+        var failure: Error?
+        defer { listed?(url, pulled) }
+        /// One more entry; non-nil when the listing has to stop there.
+        func take(_ next: URL) throws -> (children: [Child], exhausted: Bool, error: Error?)? {
+            pulled += 1
+            try cancellation.check()
+            guard children.count < budget else { return (children, true, nil) }
+            // Listed but not looked at (no search permission): the folder can't be read.
+            guard let item = try? item(next) else {
+                return ([], false, failure ?? CocoaError(.fileReadNoPermission))
+            }
+            children.append(Child(url: next, name: next.lastPathComponent, item: item))
+            return nil
+        }
+        // Inside the folder's coordinated read: the enumerator, and when it lists nothing, the
+        // plain directory reads (a provider's folder, an SMB share, can list nothing through
+        // one and everything through another, with no error).
+        let inside: (children: [Child], exhausted: Bool, error: Error?)? = try CoordinatedRead.run(url, cancellation) { readURL in
+            if readURL != url {
+                scanLog.notice("RP_SCAN the coordinator gave another URL to read than the one picked")
+            }
             let nextEntry: () -> URL?
-            if let given = bulkListing?(url) {
+            if let given = bulkListing?(readURL) {
                 var remaining = given.makeIterator()
                 nextEntry = { remaining.next() }
             } else {
                 guard let entries = fileManager.enumerator(
-                    at: url,
+                    at: readURL,
                     includingPropertiesForKeys: Array(keys),
                     options: [.skipsSubdirectoryDescendants],
                     errorHandler: { _, error in
@@ -1222,39 +1247,42 @@ enum FolderWalk {
                 ) else { return ([], false, CocoaError(.fileReadUnknown)) }
                 nextEntry = { entries.nextObject() as? URL }
             }
-            var children: [Child] = []
-            var pulled = 0
-            defer { listed?(url, pulled) }
-            func take(_ next: URL) throws -> (children: [Child], exhausted: Bool, error: Error?)? {
-                pulled += 1
-                try cancellation.check()
-                guard children.count < budget else { return (children, true, nil) }
-                // Listed but not looked at (no search permission): the folder can't be read.
-                guard let item = try? item(next) else {
-                    return ([], false, failure ?? CocoaError(.fileReadNoPermission))
-                }
-                children.append(Child(url: next, name: next.lastPathComponent, item: item))
-                return nil
-            }
             while let next = nextEntry() {
                 if let early = try take(next) { return early }
             }
             if let failure { return ([], false, failure) }
-            if pulled == 0, let held = DirectoryMetadata.heldEntries(url) {
-                // Nothing listed, but the folder's own metadata says it holds entries (or that
-                // its contents aren't on disk yet): ask again with a plain directory read, and
-                // if that lists nothing too, say so rather than call it empty.
-                scanLog.notice("RP_SCAN listed 0 entries where the folder holds \(held.map { String($0) } ?? "unknown (dataless)", privacy: .public); reading it again")
-                let again = plainListing?(url) ?? (try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
-                for next in again {
-                    if let early = try take(next) { return early }
-                }
-                if children.isEmpty {
-                    return ([], false, EmptyListing(heldEntries: held))
-                }
+            guard pulled == 0 else { return nil }
+            let plain = plainListing?(readURL) ?? (try? fileManager.contentsOfDirectory(at: readURL, includingPropertiesForKeys: nil)) ?? []
+            scanLog.notice("RP_SCAN the enumerator listed 0 entries; contentsOfDirectory(at:) lists \(plain.count, privacy: .public)")
+            var again = plain
+            if again.isEmpty {
+                let names = pathListing.map { $0(readURL)?.map(\.lastPathComponent) ?? [] }
+                    ?? (try? fileManager.contentsOfDirectory(atPath: readURL.path)) ?? []
+                scanLog.notice("RP_SCAN contentsOfDirectory(atPath:) lists \(names.count, privacy: .public)")
+                again = names.map { readURL.appendingPathComponent($0) }
             }
-            return (children.sorted { $0.name < $1.name }, false, nil)
+            for next in again {
+                if let early = try take(next) { return early }
+            }
+            return nil
         }
+        if let inside { return inside }
+        if pulled == 0 {
+            // Every listing in the coordinated read came back empty: the picked URL itself, as
+            // the picker handed it over (its security scope), outside the coordinator.
+            let outside = uncoordinatedListing?(url) ?? (try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
+            scanLog.notice("RP_SCAN the picked URL, outside the coordinated read, lists \(outside.count, privacy: .public)")
+            for next in outside {
+                if let early = try take(next) { return early }
+            }
+            if children.isEmpty, let held = DirectoryMetadata.heldEntries(url) {
+                // Nothing listed by any means, though the folder's metadata says it holds
+                // entries (or that they aren't on disk yet): said, not taken for empty.
+                scanLog.notice("RP_SCAN every listing is empty where the folder holds \(held.map { String($0) } ?? "unknown (dataless)", privacy: .public)")
+                return ([], false, EmptyListing(heldEntries: held))
+            }
+        }
+        return (children.sorted { $0.name < $1.name }, false, nil)
     }
 }
 
