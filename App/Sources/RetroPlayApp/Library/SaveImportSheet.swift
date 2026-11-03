@@ -32,6 +32,13 @@ struct SaveImportSheet: View {
                         footer: "These games already have a save on this iPhone. Replacing it can't be undone."
                     )
                 }
+                if !batch.forMissingGames.isEmpty {
+                    itemSection(
+                        "For Games Not in Your Library Yet",
+                        items: batch.forMissingGames,
+                        footer: "Kept under their own names, so each game finds its save once you add it."
+                    )
+                }
                 if !batch.skipped.isEmpty {
                     skippedSection
                 }
@@ -54,10 +61,17 @@ struct SaveImportSheet: View {
     }
 
     private var summaryText: String {
-        let found = batch.items.count
-        var text = found == 0
-            ? "No saves to import."
-            : "Found \(found == 1 ? "1 save" : "\(found) saves") for \(gameCountText(batch.gameCount))."
+        let missing = batch.forMissingGames.count
+        let found = batch.items.count - missing
+        var text: String
+        if found > 0 {
+            text = "Found \(found == 1 ? "1 save" : "\(found) saves") for \(gameCountText(batch.gameCount))."
+            if missing > 0 { text += " \(missing) for games not in your library yet." }
+        } else if missing > 0 {
+            text = "Found \(missing == 1 ? "1 save" : "\(missing) saves") for games not in your library yet."
+        } else {
+            text = "No saves to import."
+        }
         if !batch.skipped.isEmpty {
             text += " \(batch.skipped.count) skipped."
         }
@@ -95,15 +109,32 @@ struct SaveImportSheet: View {
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(item.game.displayName)
+                        // A game not in the library yet is named by its product ID.
+                        Text(item.forMissingGame ? "Product ID \(item.game.displayName)" : item.game.displayName)
                             .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                         Spacer(minLength: 4)
                         SystemBadge(system: item.game.systemID)
+                    }
+                    if !item.addedParts.isEmpty {
+                        Text("Adds \(item.addedParts.joined(separator: ", "))")
+                            .font(RetroPlayFont.footnote)
+                            .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                    }
+                    if item.forMissingGame, item.replacesExisting {
+                        Text("Replaces a save here")
+                            .font(RetroPlayFont.footnote)
+                            .foregroundStyle(.orange)
                     }
                     Text(item.sourceName)
                         .font(RetroPlayFont.footnote)
                         .lineSpacing(2)
                         .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
+                    if let note = item.plan.warning {
+                        Text(note)
+                            .font(RetroPlayFont.footnote)
+                            .lineSpacing(2)
+                            .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
+                    }
                 }
                 .padding(.vertical, 2)
                 .accessibilityElement(children: .combine)
@@ -148,8 +179,10 @@ struct SaveImportSheet: View {
     /// One button when nothing would be replaced; otherwise replace-all first and, when there
     /// are new saves too, a way to add only those.
     private var actions: some View {
-        let replacing = batch.replacements.count
-        let adding = batch.newSaves.count
+        // Every save counts, those for games not in the library too: none replaces one here
+        // without the player's choice.
+        let replacing = batch.items.filter(\.replacesExisting).count
+        let adding = batch.items.count - replacing
         return VStack(spacing: 10) {
             Button {
                 onImport(true)

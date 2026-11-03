@@ -80,19 +80,37 @@ public struct SaveImportItem: Sendable, Equatable, Identifiable {
     public let sourceName: String
     public let plan: SaveGameImportPlan
     /// Every library entry that reads this save: the game, or for PSP each copy of the title
-    /// (an ISO and a CSO share the memory stick folder).
+    /// (an ISO and a CSO share the memory stick folder). None for a game not in the library.
     public let gameIDs: [UUID]
+    /// N64 loose saves (.eep, .mpk, .sra, .fla): the regions of the game's combined save they
+    /// write, merged into it at commit; the save's other regions are kept. Empty otherwise.
+    public let n64Parts: [N64CombinedSave.Part]
+    /// A PSP save for a game that isn't in the library yet: installed under its own folder
+    /// name so the game finds it once it's added; `game` only names it (its product ID).
+    public let forMissingGame: Bool
+    /// What the item adds, for the summary ("EEPROM, Controller Pak 1"); empty for a whole save.
+    public var addedParts: [String] { n64Parts.map(\.region.title) }
     /// The destination, in its exact spelling (spellings of one PSP slot are settled before
     /// copies are compared; see `LibrarySaveImporter.plan`).
     public var id: String { plan.destinationURL.path }
     public var replacesExisting: Bool { plan.replacesExisting }
 
-    public init(game: LibraryGame, sourceURL: URL, sourceName: String, plan: SaveGameImportPlan, gameIDs: [UUID]? = nil) {
+    public init(
+        game: LibraryGame,
+        sourceURL: URL,
+        sourceName: String,
+        plan: SaveGameImportPlan,
+        gameIDs: [UUID]? = nil,
+        n64Parts: [N64CombinedSave.Part] = [],
+        forMissingGame: Bool = false
+    ) {
         self.game = game
         self.sourceURL = sourceURL
         self.sourceName = sourceName
         self.plan = plan
-        self.gameIDs = gameIDs ?? [game.id]
+        self.gameIDs = gameIDs ?? (forMissingGame ? [] : [game.id])
+        self.n64Parts = n64Parts
+        self.forMissingGame = forMissingGame
     }
 }
 
@@ -121,9 +139,12 @@ public struct SaveImportBatch: Sendable, Equatable {
         self.truncated = truncated
     }
 
-    public var gameCount: Int { Set(items.map(\.game.id)).count }
-    public var replacements: [SaveImportItem] { items.filter(\.replacesExisting) }
-    public var newSaves: [SaveImportItem] { items.filter { !$0.replacesExisting } }
+    /// Games in the library the saves are for (saves for games not in it aren't counted).
+    public var gameCount: Int { Set(items.filter { !$0.forMissingGame }.map(\.game.id)).count }
+    public var replacements: [SaveImportItem] { items.filter { $0.replacesExisting && !$0.forMissingGame } }
+    public var newSaves: [SaveImportItem] { items.filter { !$0.replacesExisting && !$0.forMissingGame } }
+    /// PSP saves kept for games not in the library yet (their own summary section).
+    public var forMissingGames: [SaveImportItem] { items.filter(\.forMissingGame) }
 }
 
 public struct SaveImportOutcome: Sendable, Equatable {
@@ -470,7 +491,15 @@ public struct LibrarySaveImporter: Sendable {
 
         guard !scan.cancelled else { return SaveImportBatch() }
         var planned: [(item: SaveImportItem, modified: Date?)] = []
-        for candidate in scan.candidates {
+        // N64 loose saves (.eep, .mpk, .sra, .fla): matched like any save, then one item per
+        // game holding every region they write.
+        let n64Games = games.filter { $0.systemID == .n64 }
+        let isLooseN64: (SaveImportCandidate) -> Bool = { candidate in
+            guard case .file(let ext, _) = candidate.kind, N64CombinedSave.looseExtensions.contains(ext) else { return false }
+            return candidate.folderHints.isEmpty || candidate.folderHints.contains(.n64)
+        }
+        planned += planLooseN64(scan.candidates.filter(isLooseN64), games: n64Games, skipped: &batch.skipped, paths: paths, fileManager: fileManager)
+        for candidate in scan.candidates where !isLooseN64(candidate) {
             if Task.isCancelled { return SaveImportBatch() }
             let outcome: Result<SaveImportItem, SkippedSave>
             switch candidate.kind {
@@ -508,7 +537,8 @@ public struct LibrarySaveImporter: Sendable {
                     reason: "Another copy of \(winner.game.displayName)'s save is newer (\(winner.sourceName))."
                 ))
             }
-            if winner.replacesExisting, Self.sameContents(winner.sourceURL, winner.plan.destinationURL, fileManager: fileManager) {
+            if winner.replacesExisting, winner.n64Parts.isEmpty,
+               Self.sameContents(winner.sourceURL, winner.plan.destinationURL, fileManager: fileManager) {
                 batch.skipped.append(SkippedSave(name: winner.sourceName, reason: "\(winner.game.displayName) already has this save."))
                 continue
             }
@@ -554,6 +584,97 @@ public struct LibrarySaveImporter: Sendable {
             ))
             return false
         }
+    }
+
+    /// N64 loose saves, matched to a game by name (a Controller Pak's "…_2" names pak 2), read
+    /// and put in the core's order (`N64CombinedSave.parts`), then one item per game. Two files
+    /// for one region: the newer is used. A file that fits no game, or isn't what its
+    /// extension says, is reported.
+    private func planLooseN64(
+        _ candidates: [SaveImportCandidate],
+        games: [LibraryGame],
+        skipped: inout [SkippedSave],
+        paths: SavePaths,
+        fileManager: FileManager
+    ) -> [(item: SaveImportItem, modified: Date?)] {
+        guard !candidates.isEmpty else { return [] }
+        let index = TitleIndex(games: games)
+        struct Found { let candidate: SaveImportCandidate; let part: N64CombinedSave.Part }
+        var byGame: [UUID: (game: LibraryGame, found: [Found])] = [:]
+        for candidate in candidates {
+            guard case .file(let ext, let size) = candidate.kind else { continue }
+            let base = (candidate.url.lastPathComponent as NSString).deletingPathExtension
+            let title = ext == "mpk" ? N64CombinedSave.pakTitle(fromName: base) : base
+            var matched: [LibraryGame] = []
+            for tier in TitleIndex.Tier.allCases {
+                matched = index.games(named: title, tier: tier, saveExtension: ext)
+                if !matched.isEmpty { break }
+            }
+            guard matched.count == 1, let game = matched.first else {
+                skipped.append(SkippedSave(
+                    name: candidate.displayPath,
+                    reason: matched.isEmpty
+                        ? "No N64 game in your library has this name. Import the game first, or rename the save to match its file."
+                        : "Fits more than one game: \(matched.prefix(4).map(\.displayName).joined(separator: ", ")). Rename it to match one game's file."
+                ))
+                continue
+            }
+            guard size <= N64CombinedSave.pakCount * N64CombinedSave.pakSize else {
+                skipped.append(SkippedSave(name: candidate.displayPath, reason: "Too large to be an N64 save."))
+                continue
+            }
+            do {
+                let data = try CoordinatedRead.run(candidate.url) { try Data(contentsOf: $0) }
+                let folders = candidate.displayPath.split(separator: "/").dropLast().map(String.init)
+                let parts = try N64CombinedSave.parts(extension: ext, data: data, name: base, folders: folders)
+                var entry = byGame[game.id] ?? (game, [])
+                entry.found += parts.map { Found(candidate: candidate, part: $0) }
+                byGame[game.id] = entry
+            } catch let error as N64CombinedSave.ImportError {
+                skipped.append(SkippedSave(name: candidate.displayPath, reason: error.localizedDescription))
+            } catch {
+                skipped.append(SaveFolderScanner.readError(candidate.displayPath, error))
+            }
+        }
+        var planned: [(item: SaveImportItem, modified: Date?)] = []
+        for (game, found) in byGame.values.sorted(by: { $0.game.displayName < $1.game.displayName }) {
+            // One file per region: the newest.
+            var chosen: [N64CombinedSave.Region: Found] = [:]
+            for entry in found {
+                let region = entry.part.region
+                if let current = chosen[region] {
+                    let newer = (entry.candidate.modified ?? .distantPast) > (current.candidate.modified ?? .distantPast)
+                    let (kept, dropped) = newer ? (entry, current) : (current, entry)
+                    chosen[region] = kept
+                    skipped.append(SkippedSave(
+                        name: dropped.candidate.displayPath,
+                        reason: "Another \(region.title) for \(game.displayName) is newer (\(kept.candidate.displayPath))."
+                    ))
+                } else {
+                    chosen[region] = entry
+                }
+            }
+            let regions = chosen.keys.sorted()
+            let used = regions.compactMap { chosen[$0] }
+            let sources = Array(Set(used.map(\.candidate.displayPath))).sorted()
+            let dest = SaveFormat.of(.n64).destination(for: game, paths: paths)
+            let plan = importer.plan(
+                dest: dest,
+                source: sources.joined(separator: ", "),
+                fileManager: fileManager,
+                warning: used.compactMap(\.part.note).first,
+                check: .batteryFile(system: .n64, extension: "srm", lenient: false)
+            )
+            let item = SaveImportItem(
+                game: game,
+                sourceURL: used[0].candidate.url,
+                sourceName: sources.joined(separator: ", "),
+                plan: plan,
+                n64Parts: regions.compactMap { chosen[$0]?.part }
+            )
+            planned.append((item, used.compactMap(\.candidate.modified).max()))
+        }
+        return planned
     }
 
     private func planFile(
@@ -660,11 +781,22 @@ public struct LibrarySaveImporter: Sendable {
         // and all of them boot fresh.
         let owners = games.filter { SaveGameImporter.pspSaveFolder(name, belongsTo: $0.pspProductID!) }
         guard let game = owners.first else {
+            // Kept for when the game is added: installed under its own name, as PPSSPP looks
+            // it up, with the same checks and the same replace / keep choice.
             let id = PSPSavedataInventory.leadingProductID(of: name.uppercased())
-            return .failure(SkippedSave(
-                name: candidate.displayPath,
-                reason: "No PSP game in your library has product ID \(id). Import the game first."
-            ))
+            let placeholder = LibraryGame(displayName: id, systemID: .psp, relativePath: "", pspProductID: id)
+            do {
+                let plan = try importer.planPSPFolderImport(from: candidate.url, for: nil, paths: paths, fileManager: fileManager)
+                return .success(SaveImportItem(
+                    game: placeholder,
+                    sourceURL: candidate.url,
+                    sourceName: candidate.displayPath,
+                    plan: plan,
+                    forMissingGame: true
+                ))
+            } catch {
+                return .failure(SkippedSave(name: candidate.displayPath, reason: error.localizedDescription))
+            }
         }
         do {
             // The check walks the slot folder by folder, each in its own coordinated read.
@@ -717,10 +849,26 @@ public struct LibrarySaveImporter: Sendable {
                 check: item.plan.check
             )
             do {
-                try Self.install(
-                    plan, from: item.sourceURL, overwrite: replaceExisting, gameIDs: item.gameIDs,
-                    paths: paths, fileManager: fileManager, cancellation: cancellation
-                )
+                if item.n64Parts.isEmpty {
+                    try Self.install(
+                        plan, from: item.sourceURL, overwrite: replaceExisting, gameIDs: item.gameIDs,
+                        paths: paths, fileManager: fileManager, cancellation: cancellation
+                    )
+                } else {
+                    // The game's save with only these regions changed (or a blank one).
+                    let existing = exists ? try? Data(contentsOf: plan.destinationURL) : nil
+                    let merged = N64CombinedSave.merge(item.n64Parts, into: existing)
+                    let staged = fileManager.temporaryDirectory
+                        .appendingPathComponent("rp-n64-\(UUID().uuidString)", isDirectory: true)
+                    try fileManager.createDirectory(at: staged, withIntermediateDirectories: true)
+                    defer { try? fileManager.removeItem(at: staged) }
+                    let file = staged.appendingPathComponent(plan.destinationURL.lastPathComponent)
+                    try merged.write(to: file)
+                    try Self.install(
+                        plan, from: file, overwrite: true, gameIDs: item.gameIDs,
+                        paths: paths, fileManager: fileManager, cancellation: cancellation
+                    )
+                }
                 outcome.imported.append(item)
             } catch {
                 outcome.failed.append(SkippedSave(name: item.sourceName, reason: error.localizedDescription))

@@ -80,8 +80,9 @@ public struct SaveFormat: Sendable {
     /// empty or absurd files are refused.
     private static let cartridgeRange = [1...(1 << 20)]
 
+    /// In-game import takes the combined .srm only; the library's import merges loose parts.
     private static let n64PackHint =
-        "must be packed into a 290 KiB Mupen64Plus-Next .srm (RetroArch export or ra_mp64_srm_convert) before importing."
+        "go into the game's combined save: import them from the library (+ → Saves), which merges them in."
 
     public static let all: [SystemID: SaveFormat] = {
         let formats = [

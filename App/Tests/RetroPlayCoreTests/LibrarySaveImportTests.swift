@@ -197,10 +197,11 @@ final class LibrarySaveImportTests: XCTestCase {
         XCTAssertEqual(skipReason("Zelda.srm", in: batch), SaveGameImportError.compressedRetroArchSave.localizedDescription)
     }
 
-    func testLooseN64FilesExplainThePacking() throws {
+    func testLooseN64FilesAreImportedIntoTheCombinedSave() throws {
         try file("Mario.eep", size: 512)
-        let batch = plan(games: [game("Mario.z64", .n64)])
-        XCTAssertTrue(try XCTUnwrap(skipReason("Mario.eep", in: batch)).contains("290 KiB"))
+        let mario = game("Mario.z64", .n64)
+        let batch = plan(games: [mario])
+        XCTAssertEqual(item(for: mario, in: batch)?.addedParts, ["EEPROM"], "\(batch.skipped)")
     }
 
     func testPS1MemoryCardsIncludingDuckStationSlotNames() throws {
@@ -230,11 +231,12 @@ final class LibrarySaveImportTests: XCTestCase {
         let batch = plan(games: [gow])
 
         XCTAssertEqual(
-            Set(batch.items.map(\.plan.destinationURL.lastPathComponent)),
+            Set(batch.items.filter { !$0.forMissingGame }.map(\.plan.destinationURL.lastPathComponent)),
             ["UCUS98737DATA00", "UCUS98737SYSTEM"]
         )
-        XCTAssertTrue(batch.items.allSatisfy { $0.game.id == gow.id })
-        XCTAssertTrue(try XCTUnwrap(skipReason("ULUS10041DATA00", in: batch)).contains("ULUS10041"))
+        XCTAssertTrue(batch.items.filter { !$0.forMissingGame }.allSatisfy { $0.game.id == gow.id })
+        // A game not in the library: kept under its own name, for when it's added.
+        XCTAssertEqual(batch.forMissingGames.map(\.plan.destinationURL.lastPathComponent), ["ULUS10041DATA00"])
         XCTAssertTrue(try XCTUnwrap(skipReason("UCUS98737DATA01", in: batch)).hasPrefix(SaveGameImportError.missingPSPMetadata.localizedDescription))
         // The slot's own files aren't looked at as loose saves.
         XCTAssertFalse(batch.skipped.contains { $0.name.hasSuffix("DATA.BIN") })

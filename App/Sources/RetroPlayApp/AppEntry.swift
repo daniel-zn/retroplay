@@ -907,10 +907,17 @@ public struct RetroPlayRootView: View {
 
     private static func saveImportResult(_ outcome: SaveImportOutcome) -> ImportResultAlert {
         var lines: [String] = []
-        let games = Set(outcome.imported.map(\.game.id)).count
-        if !outcome.imported.isEmpty {
-            let saves = outcome.imported.count == 1 ? "1 save" : "\(outcome.imported.count) saves"
+        let forLibrary = outcome.imported.filter { !$0.forMissingGame }
+        let games = Set(forLibrary.map(\.game.id)).count
+        if !forLibrary.isEmpty {
+            let saves = forLibrary.count == 1 ? "1 save" : "\(forLibrary.count) saves"
             lines.append("Imported \(saves) for \(gameCountText(games)). Each game starts fresh the next time you play it, so it loads the imported save.")
+        }
+        let kept = outcome.imported.count - forLibrary.count
+        if kept > 0 {
+            lines.append(kept == 1
+                ? "1 PSP save is ready for its game: add the game and it's there."
+                : "\(kept) PSP saves are ready for their games: add the games and they're there.")
         }
         if !outcome.kept.isEmpty {
             lines.append(outcome.kept.count == 1
@@ -1014,7 +1021,10 @@ private extension SaveImportBatch {
     /// Sample rows for `-RetroPlaySmokeSaveImport` screenshots.
     static var smokeSample: SaveImportBatch {
         let saves = SavePaths().savesDirectory
-        func item(_ name: String, _ system: SystemID, _ source: String, replaces: Bool) -> SaveImportItem {
+        func item(
+            _ name: String, _ system: SystemID, _ source: String, replaces: Bool,
+            parts: [N64CombinedSave.Region] = [], note: String? = nil, missing: Bool = false
+        ) -> SaveImportItem {
             let game = LibraryGame(displayName: name, systemID: system, relativePath: "\(name).rom")
             return SaveImportItem(
                 game: game,
@@ -1023,16 +1033,21 @@ private extension SaveImportBatch {
                 plan: SaveGameImportPlan(
                     sourceDescription: source,
                     destinationURL: saves.appendingPathComponent("\(name).sav"),
-                    replacesExisting: replaces
-                )
+                    replacesExisting: replaces,
+                    warning: note
+                ),
+                n64Parts: parts.map { N64CombinedSave.Part(region: $0, bytes: Data()) },
+                forMissingGame: missing
             )
         }
         return SaveImportBatch(
             items: [
                 item("Golden Sun", .gba, "saves/mGBA/Golden Sun (USA).srm", replaces: false),
-                item("Super Mario 64", .n64, "saves/Mupen64Plus-Next/Super Mario 64 (USA).srm", replaces: false),
+                item("Super Mario 64", .n64, "Project64/Save/SUPER MARIO 64.eep, Project64/Save/SUPER MARIO 64.mpk",
+                     replaces: false, parts: [.eeprom, .controllerPak(1)]),
                 item("Final Fantasy VII", .ps1, "memcards/Final Fantasy VII (USA)_1.mcd", replaces: true),
                 item("Patapon", .psp, "PSP/SAVEDATA/UCUS98711DATA00", replaces: false),
+                item("ULUS10041", .psp, "PSP/SAVEDATA/ULUS10041SAVE00", replaces: false, missing: true),
             ],
             skipped: [
                 SkippedSave(name: "states/mGBA/Golden Sun (USA).state", reason: "Save states only work in the emulator that made them; import the battery save (.sav/.srm) instead."),

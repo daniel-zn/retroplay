@@ -396,7 +396,7 @@ public struct SaveGameImporter: Sendable {
 
     func planPSPFolderImport(
         from folderURL: URL,
-        for game: LibraryGame,
+        for game: LibraryGame?,
         paths: SavePaths,
         fileManager: FileManager
     ) throws -> SaveGameImportPlan {
@@ -417,7 +417,7 @@ public struct SaveGameImporter: Sendable {
             throw SaveGameImportError.invalidPSPGameID(folderName)
         }
 
-        if let expectedID = game.pspProductID, !Self.pspSaveFolder(folderName, belongsTo: expectedID) {
+        if let expectedID = game?.pspProductID, !Self.pspSaveFolder(folderName, belongsTo: expectedID) {
             throw SaveGameImportError.pspTitleMismatch(expected: expectedID, imported: folderName)
         }
 

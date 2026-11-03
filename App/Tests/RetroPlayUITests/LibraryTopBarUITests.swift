@@ -166,7 +166,17 @@ final class LibraryTopBarUITests: XCTestCase {
             ])
             let summary = app.staticTexts["saveImport.summary"].firstMatch
             XCTAssertTrue(summary.waitForExistence(timeout: 30), "\(size): no summary sheet")
-            XCTAssertEqual(summary.label, "Found 4 saves for 4 games. 2 skipped.")
+            XCTAssertEqual(summary.label.lowercased(), "found 4 saves for 4 games. 1 for games not in your library yet. 2 skipped.")
+            // An N64 game's loose saves say what they add; a PSP save for a game not in the
+            // library has its own section, named by product ID.
+            func shows(_ text: String) -> Bool {
+                app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", text)).firstMatch.exists
+            }
+            XCTAssertTrue(shows("Adds EEPROM, Controller Pak 1"), "\(size): the N64 row doesn't say what it adds")
+            app.swipeUp()
+            XCTAssertTrue(shows("For games not in your library yet"), "\(size): no section for games not in the library")
+            XCTAssertTrue(shows("Product ID ULUS10041"), "\(size): the save for a game not in the library isn't listed")
+            app.swipeDown()
             XCTAssertTrue(app.buttons["saveImport.import"].exists)
             XCTAssertTrue(app.buttons["saveImport.keepExisting"].exists)
             attach(app, "save-import-\(appearance)-\(size)")
