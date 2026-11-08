@@ -131,9 +131,7 @@ struct LibraryTopBarButton: View {
     }
 }
 
-/// A top-bar icon, built as system toolbars expect: a plain symbol in a 44 pt frame, side by
-/// side in one toolbar item, so the bar's one glass capsule holds them close together. (A
-/// `Label`, even icon-only, gets the bar's label padding and spreads them out.)
+/// A top-bar icon: the plain symbol, laid out and spaced by the bar itself.
 @available(iOS 18.0, *)
 struct LibraryTopBarIcon: View {
     let symbol: String
@@ -146,12 +144,31 @@ struct LibraryTopBarIcon: View {
             // The bar's scrolled look recolours plain tinted items white; an explicit style
             // keeps the accent.
             .foregroundStyle(RetroPlayTheme.accent)
-            .frame(minWidth: 44, minHeight: 44)
+    }
+}
+
+/// The bottom bar's status while something imports: a spinner and what it's doing.
+@available(iOS 18.0, *)
+struct LibraryImportStatus: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(text)
+                .font(RetroPlayFont.footnote)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
 }
 
 /// "+": add games, or saves for games already in the library. A menu like the filter's, so
-/// both open the same way from the same capsule.
+/// both open the same way from the same bar.
 @available(iOS 18.0, *)
 struct LibraryImportMenu: View {
     let onImportGames: () -> Void
@@ -180,8 +197,6 @@ struct LibraryImportMenu: View {
         } label: {
             LibraryTopBarIcon(symbol: "plus")
         }
-        // iOS draws the menu: its own font and case, not the capitals we set for our text.
-        .textCase(nil)
         .menuOrder(.fixed)
         .accessibilityLabel("Import")
         .accessibilityIdentifier("library.import")
@@ -229,8 +244,6 @@ struct LibraryFilterMenu: View {
                     : "line.3.horizontal.decrease.circle.fill"
             )
         }
-        // iOS draws the menu: its own font and case, not the capitals we set for our text.
-        .textCase(nil)
         .menuOrder(.fixed)
         .accessibilityLabel("Filter")
         .accessibilityIdentifier("library.filter")

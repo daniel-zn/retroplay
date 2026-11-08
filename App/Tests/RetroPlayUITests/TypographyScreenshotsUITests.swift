@@ -15,6 +15,7 @@ final class TypographyScreenshotsUITests: XCTestCase {
 
     override func setUp() {
         continueAfterFailure = true
+        XCUIDevice.shared.orientation = .portrait
     }
 
     @MainActor
@@ -29,7 +30,8 @@ final class TypographyScreenshotsUITests: XCTestCase {
 
     @MainActor
     private func shoot(_ app: XCUIApplication, _ name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
+        // The screen, not the app: in landscape app.screenshot() comes out rotated twice.
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = "type-\(name)"
         shot.lifetime = .keepAlways
         add(shot)
@@ -61,6 +63,27 @@ final class TypographyScreenshotsUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 2)
             shoot(flow, "library-coverflow-\(look.name)")
             flow.terminate()
+        }
+    }
+
+    /// Cover Flow in landscape, and the library while saves are found (the status in the
+    /// bottom bar).
+    @MainActor
+    func testLibraryLandscapeAndImporting() {
+        for look in looks {
+            XCUIDevice.shared.orientation = .landscapeLeft
+            let landscape = launch(look, ["-retroplay.libraryLayout", "coverFlow"])
+            XCTAssertTrue(landscape.buttons["library.settings"].firstMatch.waitForExistence(timeout: 30), "landscape \(look.name): no top bar")
+            Thread.sleep(forTimeInterval: 2)
+            shoot(landscape, "library-landscape-\(look.name)")
+            landscape.terminate()
+            XCUIDevice.shared.orientation = .portrait
+
+            let importing = launch(look, ["-retroplay.libraryLayout", "coverFlow", "-RetroPlaySmokeSaveScan", "YES"])
+            XCTAssertTrue(importing.descendants(matching: .any)["library.findingSaves"].firstMatch.waitForExistence(timeout: 30), "importing \(look.name): no status")
+            Thread.sleep(forTimeInterval: 1)
+            shoot(importing, "library-importing-\(look.name)")
+            importing.terminate()
         }
     }
 

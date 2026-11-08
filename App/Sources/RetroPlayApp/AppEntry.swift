@@ -195,6 +195,11 @@ public struct RetroPlayRootView: View {
                 try? Data(count: 8_192).write(to: save)
                 handleSaveImport(.success([folder]))
             }
+            // `-RetroPlaySmokeSaveScan YES`: a save scan that runs until it's stopped, to see
+            // the library while saves are found.
+            if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSaveScan"), let id = saveImports.beginScan() {
+                saveImportID = id
+            }
             // `-RetroPlaySmokeSaveImport YES`: the save import summary with sample rows.
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSaveImport") {
                 if let id = saveImports.beginScan(), saveImports.scanFinished(id) {
@@ -461,7 +466,7 @@ public struct RetroPlayRootView: View {
                 }
             }
             .background(RetroPlayTheme.canvas(for: colorScheme))
-            .navigationTitle(showsInlineTitle ? retroPlayDisplayString("RetroPlay") : "")
+            .navigationTitle(showsInlineTitle ? "RetroPlay" : "")
             .onChange(of: layoutRaw) { libraryTitleCollapsed = false }
             .navigationBarTitleDisplayMode(.inline)
             .retroPlayLibraryInlineNav()
@@ -488,69 +493,49 @@ public struct RetroPlayRootView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(.isHeader)
                 }
-                ToolbarItemGroup(placement: .primaryAction) {
-                    if saveImports.phase == .scanning {
-                        // A big folder can take a while, and games can't start meanwhile.
-                        Menu {
-                            // iOS draws the menu: its own case, not our capitals.
-                            Group {
-                                Button("Stop Finding Saves", systemImage: "xmark", role: .destructive) {
-                                    cancelSaveScan()
-                                }
-                            }
-                            .textCase(nil)
-                        } label: {
-                            HStack(spacing: 6) {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("Finding saves")
-                                    .font(RetroPlayFont.caption)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .retroPlayGlassChrome()
-                        }
-                        .accessibilityLabel("Finding saves")
-                        .accessibilityHint("Opens a menu to stop")
-                        .accessibilityIdentifier("library.findingSaves")
-                    } else if store.importsInProgress > 0 {
-                        HStack(spacing: 6) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Importing \(store.importsInProgress)")
-                                .font(RetroPlayFont.caption)
-                                .monospacedDigit()
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .retroPlayGlassChrome()
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Importing \(gameCountText(store.importsInProgress))")
+                // Import first (adds to the library), then the two ways to find a game (filter,
+                // search) side by side, and Settings at the edge, as across iOS: the system's
+                // own items, one glass group. It never changes while something imports (that
+                // shows in the bottom bar).
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    LibraryImportMenu(
+                        onImportGames: { openImporter(.games) },
+                        onImportSaves: { openImporter(.saves) }
+                    )
+                    .disabled(!saveImports.allowsImporting)
+                    LibraryFilterMenu(
+                        selection: $systemTab,
+                        sort: sortBinding,
+                        tabs: offeredTabs,
+                        counts: tabCounts
+                    )
+                    .disabled(store.games.isEmpty)
+                    LibraryTopBarButton(title: "Search", symbol: "magnifyingglass") {
+                        openSearch()
+                    }
+                    LibraryTopBarButton(title: "Settings", symbol: "gearshape") {
+                        showSettings = true
                     }
                 }
-                // Import first (adds to the library), then the two ways to find a game (filter,
-                // search) side by side, and Settings at the edge, as across iOS. One item, so
-                // the four share one glass capsule, close together.
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 0) {
-                        LibraryImportMenu(
-                            onImportGames: { openImporter(.games) },
-                            onImportSaves: { openImporter(.saves) }
-                        )
-                        .disabled(!saveImports.allowsImporting)
-                        LibraryFilterMenu(
-                            selection: $systemTab,
-                            sort: sortBinding,
-                            tabs: offeredTabs,
-                            counts: tabCounts
-                        )
-                        .disabled(store.games.isEmpty)
-                        LibraryTopBarButton(title: "Search", symbol: "magnifyingglass") {
-                            openSearch()
+                // What's importing, as Mail shows its status: the bottom bar's status item, with
+                // Stop beside it while saves are found (a big folder can take a while, and games
+                // can't start meanwhile). Games copy without a stop.
+                if saveImports.phase == .scanning {
+                    ToolbarItem(placement: .status) {
+                        LibraryImportStatus(text: "Finding saves")
+                            .accessibilityIdentifier("library.findingSaves")
+                    }
+                    ToolbarItem(placement: .bottomBar) {
+                        Button("Stop", systemImage: "xmark", role: .cancel) {
+                            cancelSaveScan()
                         }
-                        LibraryTopBarButton(title: "Settings", symbol: "gearshape") {
-                            showSettings = true
-                        }
+                        .accessibilityLabel("Stop Finding Saves")
+                        .accessibilityIdentifier("library.stopFindingSaves")
+                    }
+                } else if store.importsInProgress > 0 {
+                    ToolbarItem(placement: .status) {
+                        LibraryImportStatus(text: "Importing \(gameCountText(store.importsInProgress))")
+                            .accessibilityIdentifier("library.importingGames")
                     }
                 }
             }
@@ -576,7 +561,7 @@ public struct RetroPlayRootView: View {
                 // With the filter chips gone, the title says which games are showing.
                 Text(systemTab == .all
                     ? gameCountText(store.games.count)
-                    : "\(systemTab.title) / \(filteredGames.count) of \(gameCountText(store.games.count))")
+                    : "\(systemTab.title) · \(filteredGames.count) of \(gameCountText(store.games.count))")
                     .font(RetroPlayFont.footnote)
                     .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
             }
@@ -663,7 +648,7 @@ public struct RetroPlayRootView: View {
         .onScrollPhaseChange { _, phase in
             searchDragStart = phase == .interacting ? searchScrollOffset : nil
         }
-        .navigationTitle(retroPlayDisplayString("Search"))
+        .navigationTitle("Search")
         .navigationBarTitleDisplayMode(.large)
         // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
         .toolbarColorScheme(colorScheme, for: .navigationBar)
@@ -672,11 +657,8 @@ public struct RetroPlayRootView: View {
             text: $searchQuery,
             isPresented: $isSearchPresented,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: retroPlayDisplayString("Games")
+            prompt: "Games"
         )
-        // Typed text shows as typed (a text field has no display case), and the face's lowercase
-        // are display variants, so the keyboard starts in capitals; search ignores case.
-        .textInputAutocapitalization(.characters)
         .searchFocused($searchFocused)
         .onSubmit(of: .search) { recordSearch() }
         .navigationDestination(item: $searchPlayGame) { game in

@@ -1,53 +1,95 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import XCTest
 
-/// The library's top-right buttons: in order, close together in one capsule, each still a full
-/// touch target, at the default text size and at a large one.
+/// The library's top-right buttons: the system's own toolbar items, in order in one row at the
+/// top, at the default text size and at a large one; and the bar
+/// keeps its width while saves import (the status is in the bottom bar).
 final class LibraryTopBarUITests: XCTestCase {
+    private let ids = ["library.import", "library.filter", "library.search", "library.settings"]
+
     override func setUp() {
         continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+    }
+
+    /// The four buttons, once laid out and touchable (the bar settles after launch).
+    @MainActor
+    private func topBar(_ app: XCUIApplication, _ context: String) -> [XCUIElement] {
+        // In the navigation bar itself: bar items, not views drawn over it.
+        let buttons = ids.map { app.navigationBars.buttons[$0].firstMatch }
+        for (id, button) in zip(ids, buttons) {
+            XCTAssertTrue(button.waitForExistence(timeout: 30), "\(context): no \(id) in the navigation bar")
+        }
+        let settled = buttons.map {
+            XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: $0)
+        }
+        XCTAssertEqual(XCTWaiter().wait(for: settled, timeout: 10), .completed, "\(context): buttons not hittable")
+        return buttons
+    }
+
+    /// The bar's span, from the first button's leading edge to the last one's trailing edge.
+    @MainActor
+    private func span(_ buttons: [XCUIElement]) -> CGRect {
+        buttons.map(\.frame).reduce(CGRect.null) { $0.union($1) }
     }
 
     @MainActor
-    func testTopBarButtonsSitCloseTogether() {
-        let ids = ["library.import", "library.filter", "library.search", "library.settings"]
+    func testTopBarIsOneRowOfSystemItems() {
         for size in ["UICTContentSizeCategoryL", "UICTContentSizeCategoryXXXL"] {
-            let app = XCUIApplication()
-            app.launchArguments = ["-UIPreferredContentSizeCategoryName", size]
-            // Xcode points test launches at the build folder for frameworks, where the
-            // emulator cores sit unsigned; the app's own signed copies are the ones to load.
-            app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-            app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-            app.launch()
-            let buttons = ids.map { app.buttons[$0].firstMatch }
-            for (id, button) in zip(ids, buttons) {
-                XCTAssertTrue(button.waitForExistence(timeout: 30), "\(size): no \(id)")
-            }
-            // Laid out and touchable (the bar settles after launch), not a fixed wait.
-            let settled = buttons.map {
-                XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: $0)
-            }
-            XCTAssertEqual(XCTWaiter().wait(for: settled, timeout: 10), .completed, "\(size): buttons not hittable")
-            let frames = buttons.map { $0.frame }
-            // Icon centres no more than 48 pt apart (a toolbar group, or icons built as labels,
-            // put 55-66 pt between them), each at least 44 pt wide to touch.
+            let app = launch(["-UIPreferredContentSizeCategoryName", size])
+            let frames = topBar(app, size).map(\.frame)
             let steps = zip(frames.dropFirst(), frames).map { $0.midX - $1.midX }
             print("[top-bar] \(size): \(frames), centres \(steps) pt apart")
             for step in steps {
                 XCTAssertGreaterThan(step, 0, "\(size): the buttons are out of order: \(steps)")
-                XCTAssertLessThanOrEqual(step, 48, "\(size): the icons are \(steps) pt apart")
             }
+            let window = app.windows.firstMatch.frame
             for (id, frame) in zip(ids, frames) {
-                XCTAssertGreaterThanOrEqual(frame.width, 44, "\(size): \(id) is \(frame.size), under 44 pt wide")
+                // The bar reports the symbol's frame; its touch area is the system's own.
+                XCTAssertGreaterThanOrEqual(frame.width, 24, "\(size): \(id) is \(frame.size)")
                 XCTAssertEqual(frame.midY, frames[0].midY, accuracy: 2, "\(size): \(id) isn't in the row")
                 XCTAssertLessThan(frame.maxY, 140, "\(size): \(id) isn't at the top")
             }
-            let shot = XCTAttachment(screenshot: app.screenshot())
-            shot.name = "top-bar-\(size)"
-            shot.lifetime = .keepAlways
-            add(shot)
+            // Trailing: the system grows its items with Dynamic Type, so at XXXL the group of four
+            // reaches past the centre; it still ends at the bar's trailing edge.
+            XCTAssertLessThan(window.maxX - frames[frames.count - 1].maxX, 40, "\(size): the bar isn't on the trailing edge")
+            XCTAssertGreaterThan(frames[0].minX, window.width * 0.35, "\(size): the bar reaches into the title")
+            attach(app, "top-bar-\(size)")
             app.terminate()
         }
+    }
+
+    /// While saves are found the top bar keeps its four buttons and its width; the status and
+    /// Stop are in the bottom bar, and Stop ends the scan. Portrait and landscape.
+    @MainActor
+    func testTopBarKeepsItsWidthWhileSavesImport() {
+        for orientation in ["portrait", "landscape"] {
+            XCUIDevice.shared.orientation = orientation == "landscape" ? .landscapeLeft : .portrait
+            let app = launch(["-RetroPlaySmokeSaveScan", "YES"])
+            let status = app.descendants(matching: .any)["library.findingSaves"].firstMatch
+            XCTAssertTrue(status.waitForExistence(timeout: 30), "\(orientation): no import status")
+            let during = topBar(app, "\(orientation) importing")
+            let importing = span(during)
+            let window = app.windows.firstMatch.frame
+            XCTAssertGreaterThan(status.frame.midY, window.midY, "\(orientation): the status isn't at the bottom: \(status.frame)")
+            XCTAssertFalse(during[0].isEnabled, "\(orientation): + takes a second import while saves are found")
+            XCTAssertFalse(app.navigationBars.descendants(matching: .any)["library.findingSaves"].exists, "\(orientation): the status is in the top bar")
+            attach(app, "mid-import-\(orientation)")
+
+            let stop = app.buttons["library.stopFindingSaves"].firstMatch
+            XCTAssertTrue(stop.waitForExistence(timeout: 5) && stop.isHittable, "\(orientation): Stop can't be reached")
+            stop.tap()
+            XCTAssertTrue(status.waitForNonExistence(timeout: 10), "\(orientation): Stop didn't end the scan")
+            let after = topBar(app, "\(orientation) after")
+            let idle = span(after)
+            XCTAssertTrue(after[0].isEnabled, "\(orientation): + stays off after the scan stopped")
+            print("[top-bar] \(orientation): importing \(importing), idle \(idle)")
+            XCTAssertEqual(importing.width, idle.width, accuracy: 0.5, "\(orientation): the bar's width changed while importing")
+            XCTAssertEqual(importing.minX, idle.minX, accuracy: 0.5, "\(orientation): the bar moved while importing")
+            attach(app, "library-\(orientation)")
+            app.terminate()
+        }
+        XCUIDevice.shared.orientation = .portrait
     }
 
     private func launch(_ arguments: [String]) -> XCUIApplication {
@@ -60,14 +102,15 @@ final class LibraryTopBarUITests: XCTestCase {
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
+        // The screen, not the app: in landscape app.screenshot() comes out rotated twice.
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = name
         shot.lifetime = .keepAlways
         add(shot)
     }
 
-    /// Menus iOS draws itself keep its look: normal case, not the capitals the app's own text
-    /// is set in (the "+" menu, and a game's long-press menu).
+    /// Menus iOS draws itself keep its look: normal case and the system font (the "+" menu,
+    /// and a game's long-press menu).
     @MainActor
     func testSystemMenusKeepTheirOwnCase() {
         let app = launch(["-retroplay.libraryLayout", "grid"])

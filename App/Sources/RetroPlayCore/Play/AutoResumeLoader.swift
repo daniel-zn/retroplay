@@ -31,7 +31,7 @@ public enum AutoResumeLoader: Sendable {
         switch status {
         case .loaded: return "Resumed from quick save"
         case .firstRun: return "Waiting for first frame…"
-        case .failed: return "Auto-load failed. Starting fresh"
+        case .failed: return "Auto-load failed — starting fresh"
         case .cancelled: return "Waiting for first frame…"
         }
     }

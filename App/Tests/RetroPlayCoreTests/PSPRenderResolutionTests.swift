@@ -36,6 +36,8 @@ final class PSPRenderResolutionTests: XCTestCase {
 
     func testSavedSettingReadsBackAndUnknownValuesAreAuto() {
         let defaults = UserDefaults(suiteName: "PSPRenderResolutionTests")!
+        // A run stopped midway leaves its value behind on the Simulator.
+        defaults.removePersistentDomain(forName: "PSPRenderResolutionTests")
         defer { defaults.removePersistentDomain(forName: "PSPRenderResolutionTests") }
         XCTAssertEqual(PSPRenderResolution.current(defaults), .auto)
         defaults.set(2, forKey: PSPRenderResolution.defaultsKey)

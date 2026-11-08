@@ -42,7 +42,7 @@ struct SettingsView: View {
             }
             .scrollContentBackground(.hidden)
             .background(RetroPlayTheme.canvas(for: colorScheme))
-            .navigationTitle(retroPlayDisplayString("Settings"))
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
             // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
             .toolbarColorScheme(colorScheme, for: .navigationBar)
@@ -63,7 +63,7 @@ struct SettingsView: View {
                 SettingsIconLabel("Appearance", symbol: "circle.lefthalf.filled", color: .indigo)
                 Picker("Appearance", selection: appearanceBinding) {
                     ForEach(AppearancePreference.allCases) { pref in
-                        Text(retroPlayDisplayString(pref.title)).tag(pref)
+                        Text(pref.title).tag(pref)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -118,7 +118,7 @@ struct SettingsView: View {
                 SettingsIconLabel("Library Layout", symbol: "rectangle.stack.fill", color: .mint)
                 Picker("Library Layout", selection: layoutBinding) {
                     ForEach(LibraryLayout.allCases) { layout in
-                        Text(retroPlayDisplayString(layout.title)).tag(layout)
+                        Text(layout.title).tag(layout)
                     }
                 }
                 .pickerStyle(.segmented)

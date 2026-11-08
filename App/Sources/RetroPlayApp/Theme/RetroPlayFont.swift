@@ -4,7 +4,7 @@ import RetroPlayCore
 import SwiftUI
 import UIKit
 
-/// The app's fonts, all Game Of Squids, from the one type scale (`RetroPlayTextStyle`).
+/// The app's fonts, all You're Gone, from the one type scale (`RetroPlayTextStyle`).
 /// Every font scales with Dynamic Type from its system text style; the bundled file is
 /// registered on first use, and if it's missing the system face stands in at the same style.
 /// The face has one weight: no style asks for bold (iOS would thicken the outlines itself).
@@ -84,7 +84,7 @@ enum RetroPlayFont {
     static func applyUIKitAppearance() {
         registerBundledFont()
         let bodyFont = uiFont(.body)
-        // Capped near its XXXL size: the face is wide, and a segment's label would truncate.
+        // Capped near its XXXL size, so a segment's label doesn't truncate.
         let segmentFont = uiFont(size: RetroPlayTextStyle.subheadline.size, textStyle: .subheadline, maximumPointSize: 17)
         for state in [UIControl.State.normal, .highlighted, .disabled, .selected] {
             UIBarButtonItem.appearance().setTitleTextAttributes([.font: bodyFont, .kern: uiKern], for: state)
@@ -97,17 +97,14 @@ enum RetroPlayFont {
     }
 }
 
-/// The face's settings for every text below: capitals (its lowercase are display variants,
-/// `RetroPlayTypeface.showsCapitalsOnly`) and its letter spacing, growing with Dynamic Type.
-/// Set at each root: the app, and each sheet and full-screen cover.
+/// The face's letter spacing for every text below, growing with Dynamic Type. Set at each
+/// root: the app, and each sheet and full-screen cover.
 @available(iOS 18.0, *)
 private struct RetroPlayTypography: ViewModifier {
     @ScaledMetric(relativeTo: .body) private var tracking = RetroPlayTypeface.tracking
 
     func body(content: Content) -> some View {
-        content
-            .tracking(tracking)
-            .textCase(RetroPlayTypeface.showsCapitalsOnly ? .uppercase : nil)
+        content.tracking(tracking)
     }
 }
 
@@ -116,12 +113,6 @@ extension View {
     func retroPlayTypography() -> some View {
         modifier(RetroPlayTypography())
     }
-}
-
-/// A string UIKit draws itself (navigation titles, segmented controls, search prompts), where
-/// SwiftUI's text case doesn't reach: in capitals when the face needs them.
-func retroPlayDisplayString(_ text: String) -> String {
-    RetroPlayTypeface.showsCapitalsOnly ? text.uppercased() : text
 }
 
 @available(iOS 18.0, *)

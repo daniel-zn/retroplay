@@ -26,9 +26,9 @@ public enum PSPRenderResolution: Int, CaseIterable, Sendable, Identifiable {
     public var title: String {
         switch self {
         case .auto: "Auto"
-        case .native: "1x"
-        case .double: "2x"
-        case .triple: "3x"
+        case .native: "1×"
+        case .double: "2×"
+        case .triple: "3×"
         }
     }
 

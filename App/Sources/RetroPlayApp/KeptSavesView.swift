@@ -36,7 +36,7 @@ struct KeptSavesView: View {
         }
         .scrollContentBackground(.hidden)
         .background(RetroPlayTheme.canvas(for: colorScheme))
-        .navigationTitle(retroPlayDisplayString(Self.title))
+        .navigationTitle(Self.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { if !saves.isEmpty { EditButton() } }
         .retroPlayAlert(

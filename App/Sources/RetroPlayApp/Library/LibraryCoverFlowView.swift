@@ -249,22 +249,18 @@ struct LibraryCoverFlowView<Header: View>: View {
         .accessibilityHint(missing ? "The game file was removed in Files" : "Starts the game")
         .modifier(LibraryTileDeleteAccessibilityAction(game: game, onRequestDelete: onRequestDelete))
         .contextMenu {
-            // iOS draws the menu: its own case, not our capitals.
-            Group {
-                Button {
-                    onSelect(game)
+            Button {
+                onSelect(game)
+            } label: {
+                Label(lastPlayed[game.id] == nil ? "Play" : "Continue", systemImage: "play.fill")
+            }
+            if onRequestDelete != nil {
+                Button(role: .destructive) {
+                    onRequestDelete?(game)
                 } label: {
-                    Label(lastPlayed[game.id] == nil ? "Play" : "Continue", systemImage: "play.fill")
-                }
-                if onRequestDelete != nil {
-                    Button(role: .destructive) {
-                        onRequestDelete?(game)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
+                    Label("Delete", systemImage: "trash")
                 }
             }
-            .textCase(nil)
         } preview: {
             // The cover facing front, whichever way it's turned in the row.
             CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing, shadow: false)
@@ -302,7 +298,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                     HStack(spacing: 8) {
                         Text(game.systemID.displayName)
                             .foregroundStyle(RetroPlayTheme.systemTint(game.systemID))
-                        Text("/")
+                        Text("·")
                             .foregroundStyle(RetroPlayTheme.secondaryText(for: colorScheme))
                         Text(subtitle(game))
                             .foregroundStyle(

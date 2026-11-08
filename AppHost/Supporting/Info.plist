@@ -41,7 +41,7 @@
 	<true/>
 	<key>UIAppFonts</key>
 	<array>
-		<string>GameOfSquids-1GMVL.ttf</string>
+		<string>YoureGone-Regular.otf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
