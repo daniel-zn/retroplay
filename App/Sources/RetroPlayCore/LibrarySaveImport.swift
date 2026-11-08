@@ -85,8 +85,9 @@ public struct SaveImportItem: Sendable, Equatable, Identifiable {
     /// N64 loose saves (.eep, .mpk, .sra, .fla): the regions of the game's combined save they
     /// write, merged into it at commit; the save's other regions are kept. Empty otherwise.
     public let n64Parts: [N64CombinedSave.Part]
-    /// A PSP save for a game that isn't in the library yet: installed under its own folder
-    /// name so the game finds it once it's added; `game` only names it (its product ID).
+    /// A save for a game that isn't in the library yet: a PSP slot installed under its own
+    /// folder name, or a battery file kept under its own name (`KeptSaves`), so the game finds
+    /// it once it's added; `game` only names it (its product ID, or the file's name).
     public let forMissingGame: Bool
     /// What the item adds, for the summary ("EEPROM, Controller Pak 1"); empty for a whole save.
     public var addedParts: [String] { n64Parts.map(\.region.title) }
@@ -143,7 +144,7 @@ public struct SaveImportBatch: Sendable, Equatable {
     public var gameCount: Int { Set(items.filter { !$0.forMissingGame }.map(\.game.id)).count }
     public var replacements: [SaveImportItem] { items.filter { $0.replacesExisting && !$0.forMissingGame } }
     public var newSaves: [SaveImportItem] { items.filter { !$0.replacesExisting && !$0.forMissingGame } }
-    /// PSP saves kept for games not in the library yet (their own summary section).
+    /// Saves kept for games not in the library yet (their own summary section).
     public var forMissingGames: [SaveImportItem] { items.filter(\.forMissingGame) }
 }
 
@@ -749,12 +750,16 @@ public struct LibrarySaveImporter: Sendable {
             return .success(SaveImportItem(game: game, sourceURL: candidate.url, sourceName: name, plan: plan))
         }
         guard let other = otherSystemMatch else {
-            return .failure(SkippedSave(
-                name: name,
-                reason: eligible.isEmpty
-                    ? SaveFolderScanner.otherSystemReason
-                    : "No game in your library has this name. Import the game first, or rename the save to match its file."
-            ))
+            guard !eligible.isEmpty else {
+                return .failure(SkippedSave(name: name, reason: SaveFolderScanner.otherSystemReason))
+            }
+            guard eligible.count == 1, let system = eligible.first else {
+                return .failure(SkippedSave(
+                    name: name,
+                    reason: "No game in your library has this name, and nothing says which system it's for. Import the game first, or keep the save in a folder named after its system (GBA, SNES…) and import it again."
+                ))
+            }
+            return keep(candidate, ext: ext, size: size, system: system, paths: paths, fileManager: fileManager)
         }
         if !hinted.isEmpty, !hinted.contains(other.systemID) {
             return .failure(SkippedSave(
@@ -763,6 +768,49 @@ public struct LibrarySaveImporter: Sendable {
             ))
         }
         return .failure(SkippedSave(name: name, reason: rejection(ext: ext, size: size, system: other.systemID)))
+    }
+
+    /// A save for a game not in the library, whose system is known: kept under its own name
+    /// (`KeptSaves`) with the same checks and the same replace / keep choice, and moved to the
+    /// game's save when the game is added.
+    private func keep(
+        _ candidate: SaveImportCandidate,
+        ext: String,
+        size: Int,
+        system: SystemID,
+        paths: SavePaths,
+        fileManager: FileManager
+    ) -> Result<SaveImportItem, SkippedSave> {
+        let name = candidate.displayPath
+        let fileName = candidate.url.lastPathComponent
+        guard SavePaths.isSafeFileName(fileName) else {
+            return .failure(SkippedSave(name: name, reason: "No game in your library has this name. Import the game first."))
+        }
+        let header: Data
+        do {
+            header = try CoordinatedRead.run(candidate.url) { try Self.readHeader($0) }
+        } catch {
+            return .failure(SaveFolderScanner.readError(name, error))
+        }
+        do {
+            try SaveGameImporter.validateBatteryFile(extension: ext, size: size, header: header, system: system)
+        } catch {
+            return .failure(SkippedSave(name: name, reason: error.localizedDescription))
+        }
+        let base = (fileName as NSString).deletingPathExtension
+        let plan = importer.plan(
+            dest: KeptSaves.url(system: system, fileName: fileName, paths: paths),
+            source: fileName,
+            fileManager: fileManager,
+            check: .batteryFile(system: system, extension: ext, lenient: false)
+        )
+        return .success(SaveImportItem(
+            game: LibraryGame(displayName: base, systemID: system, relativePath: ""),
+            sourceURL: candidate.url,
+            sourceName: name,
+            plan: plan,
+            forMissingGame: true
+        ))
     }
 
     private func rejection(ext: String, size: Int, system: SystemID) -> String {

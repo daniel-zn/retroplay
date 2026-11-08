@@ -7,6 +7,8 @@ public enum PlaySavesMenuContent {
     public static let resetTitle = "Reset"
     public static let importTitle = "Import Battery Save…"
     public static let emptyTitle = "No saves yet"
+    /// The game's own save (battery or PSP SAVEDATA), which it loads by itself.
+    public static let inGameTitle = "In-Game Save"
 
     public static func name(for entry: SaveStateStore.Entry) -> String {
         entry.slot == 0 ? "Latest Save" : "Previous Save \(entry.slot)"

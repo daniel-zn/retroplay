@@ -145,9 +145,14 @@ public struct SaveGameImporter: Sendable {
             )
         }
 
+        // The name the library import would match it by: "Pac-Man (USA, Europe).srm" is
+        // "Pac-Man.gba"'s save, as other emulators name saves after the full No-Intro name.
         let romBase = Self.romBasename(for: game)
         let saveBase = (sourceURL.lastPathComponent as NSString).deletingPathExtension
-        if saveBase != romBase {
+        let index = TitleIndex(games: [game])
+        guard TitleIndex.Tier.allCases.contains(where: {
+            !index.games(named: saveBase, tier: $0, saveExtension: ext).isEmpty
+        }) else {
             throw SaveGameImportError.basenameMismatch(expected: romBase, got: saveBase)
         }
 

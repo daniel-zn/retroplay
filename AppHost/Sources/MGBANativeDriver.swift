@@ -28,7 +28,7 @@ public final class MGBANativeDriver: NativeEmulatorDriver {
 
     public func load(romURL url: URL, saves: SavePaths) throws {
         tearDown()
-        let sram = saves.sramURL(forRelativeROMPath: saves.relativeROMPath(fromAbsoluteROMURL: url))
+        let sram = saves.batterySaveURL(system: .gba, romURL: url)
         try? FileManager.default.createDirectory(
             at: sram.deletingLastPathComponent(),
             withIntermediateDirectories: true

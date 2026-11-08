@@ -84,7 +84,9 @@ final class SaveImportHardeningTests: XCTestCase {
         let sequel = game("Crash 1.cue", .ps1)
         try file("Crash_1.mcd", size: 131_072)
         let batch = plan(games: [sequel])
-        XCTAssertTrue(batch.items.isEmpty, "Crash_1.mcd is card 1 of “Crash”, not a save for “Crash 1”")
+        XCTAssertFalse(batch.items.contains { $0.gameIDs.contains(sequel.id) }, "Crash_1.mcd is card 1 of “Crash”, not a save for “Crash 1”")
+        // Kept for "Crash" (a PS1 memory card), until that game is added.
+        XCTAssertEqual(batch.forMissingGames.map(\.game.systemID), [.ps1])
     }
 
     // MARK: 5. Links
@@ -166,7 +168,9 @@ final class SaveImportHardeningTests: XCTestCase {
 
     func testInGameImportTakesEveryExtensionItTookBefore() throws {
         let legacy = ["sav", "srm", "eep", "fla", "sra", "mpk", "mcr"]
-        for system in SystemID.allCases where system != .psp && system != .n64 {
+        // The 7800 core keeps no battery save at all (SaveFormatPerCoreTests): an import there
+        // never did anything.
+        for system in SystemID.allCases where system != .psp && system != .n64 && system != .atari7800 {
             // A size every system's rules took before.
             let size = 8_192
             for ext in legacy {

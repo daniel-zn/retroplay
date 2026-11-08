@@ -27,7 +27,7 @@ public struct SaveFormat: Sendable {
     /// table existed: any of `legacyExtensions`, and for the libretro cartridge systems any
     /// size up to 1 MiB. Kept so nothing that imported before is refused now.
     public var lenientExtensions: Set<String> {
-        layout == .batteryFile && system != .n64 ? extensions.union(Self.legacyExtensions) : extensions
+        layout == .batteryFile && system != .n64 && !extensions.isEmpty ? extensions.union(Self.legacyExtensions) : extensions
     }
     public let lenientSizeRanges: [ClosedRange<Int>]
 
@@ -53,13 +53,19 @@ public struct SaveFormat: Sendable {
 
     /// Where `game`'s save lives in the sandbox (the SAVEDATA root for PSP).
     public func destination(for game: LibraryGame, paths: SavePaths) -> URL {
+        destination(forRelativeROMPath: game.relativePath, paths: paths)
+    }
+
+    /// Where the save of the ROM at `relativePath` (under Games/) lives: the path the core
+    /// reads at boot (`SavePaths.batterySaveURL(system:romURL:)`).
+    public func destination(forRelativeROMPath relativePath: String, paths: SavePaths) -> URL {
         switch system {
         case .n64:
-            return paths.n64SRAMURL(forRelativeROMPath: game.relativePath)
+            return paths.n64SRAMURL(forRelativeROMPath: relativePath)
         case .psp:
             return paths.pspSavedataDirectory
         case .gba, .nds, .nes, .snes, .genesis, .atari7800, .ps1:
-            return paths.sramURL(forRelativeROMPath: game.relativePath)
+            return paths.sramURL(forRelativeROMPath: relativePath)
         }
     }
 
@@ -79,6 +85,9 @@ public struct SaveFormat: Sendable {
     /// The libretro cores keep one SAVE_RAM block whose size depends on the cartridge; only
     /// empty or absurd files are refused.
     private static let cartridgeRange = [1...(1 << 20)]
+
+    private static let atari7800Reason =
+        "The Atari 7800 core (ProSystem) keeps no in-game saves, only save states."
 
     /// In-game import takes the combined .srm only; the library's import merges loose parts.
     private static let n64PackHint =
@@ -145,15 +154,22 @@ public struct SaveFormat: Sendable {
             ),
             SaveFormat(
                 system: .genesis, layout: .batteryFile,
-                extensions: ["sav", "srm"], sizes: [], sizeRanges: cartridgeRange,
+                // clownmdemu's SAVE_RAM is the 64 KiB cartridge RAM window at 0x200000, by bus
+                // address (odd-byte SRAM on odd offsets), as Genesis Plus GX writes it; a
+                // bigger file would be cut off. Its EEPROM games keep no save yet.
+                extensions: ["sav", "srm"], sizes: [], sizeRanges: [1...65_536],
                 unusableExtensions: [:],
                 lenientSizeRanges: [],
-                folderHints: ["genesis plus gx", "picodrive", "blastem", "clownmdemu", "genesis", "megadrive", "md"]
+                folderHints: ["genesis plus gx", "genesis plus", "picodrive", "blastem", "clownmdemu", "genesis", "megadrive", "md"]
             ),
             SaveFormat(
                 system: .atari7800, layout: .batteryFile,
-                extensions: ["sav", "srm"], sizes: [], sizeRanges: cartridgeRange,
-                unusableExtensions: [:],
+                // ProSystem has no SAVE_RAM (retro_get_memory_size is 0): nothing to import.
+                extensions: [], sizes: [], sizeRanges: [],
+                unusableExtensions: [
+                    "sav": atari7800Reason,
+                    "srm": atari7800Reason,
+                ],
                 lenientSizeRanges: [],
                 folderHints: ["prosystem", "a7800", "atari7800", "atari 7800"]
             ),

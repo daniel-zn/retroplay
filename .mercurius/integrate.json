@@ -52,12 +52,23 @@
             "paths": [
               "App/Sources/RetroPlayCore/LibrarySaveImport.swift",
               "App/Sources/RetroPlayCore/SaveGameImporter.swift",
+              "App/Sources/RetroPlayCore/KeptSaves.swift",
               "App/Sources/RetroPlayApp/Library/SaveImportSheet.swift"
             ],
             "tests": [
               "LibraryTopBarUITests",
               "FilesPickerSaveImportUITests",
               "SaveImportSMBUITests"
+            ]
+          },
+          {
+            "paths": [
+              "App/Sources/RetroPlayApp/SettingsView.swift",
+              "App/Sources/RetroPlayApp/KeptSavesView.swift",
+              "App/Sources/RetroPlayCore/KeptSaves.swift"
+            ],
+            "tests": [
+              "SettingsKeptSavesUITests"
             ]
           },
           {

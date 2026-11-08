@@ -177,6 +177,12 @@ public struct RetroPlayRootView: View {
             // optionally -RetroPlaySmokeGame <part of the title> to pick one of that system's games.
             // simctl launch maps "-Key value" into UserDefaults as well as argv.
             // `-RetroPlaySmokeSettings YES`: open Settings, for screenshots.
+            // `-RetroPlaySmokeKeptSave YES`: a GBA save waiting for its game (Settings → Saves).
+            if UserDefaults.standard.bool(forKey: "RetroPlaySmokeKeptSave") {
+                let kept = KeptSaves.url(system: .gba, fileName: "Smoke Waiting Game (USA).srm", paths: SavePaths())
+                try? FileManager.default.createDirectory(at: kept.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? Data(count: 8_192).write(to: kept)
+            }
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSettings") {
                 showSettings = true
             }
@@ -313,6 +319,7 @@ public struct RetroPlayRootView: View {
                 appearanceRaw: $appearanceRaw,
                 gameCounts: tabCounts,
                 storageDirectories: store.storageDirectoryURLs,
+                games: store.games,
                 onImport: {
                     importAfterSettingsDismiss = true
                     showSettings = false
@@ -918,8 +925,8 @@ public struct RetroPlayRootView: View {
         let kept = outcome.imported.count - forLibrary.count
         if kept > 0 {
             lines.append(kept == 1
-                ? "1 PSP save is ready for its game: add the game and it's there."
-                : "\(kept) PSP saves are ready for their games: add the games and they're there.")
+                ? "1 save is waiting for its game: add the game and it's there. Settings → Saves lists it."
+                : "\(kept) saves are waiting for their games: add the games and they're there. Settings → Saves lists them.")
         }
         if !outcome.kept.isEmpty {
             lines.append(outcome.kept.count == 1
@@ -1053,7 +1060,7 @@ private extension SaveImportBatch {
             ],
             skipped: [
                 SkippedSave(name: "states/mGBA/Golden Sun (USA).state", reason: "Save states only work in the emulator that made them; import the battery save (.sav/.srm) instead."),
-                SkippedSave(name: "saves/Snes9x/Chrono Trigger.srm", reason: "No game in your library has this name. Import the game first, or rename the save to match its file."),
+                SkippedSave(name: "saves/Chrono Trigger.srm", reason: "No game in your library has this name, and nothing says which system it's for. Import the game first, or keep the save in a folder named after its system (GBA, SNES…) and import it again."),
             ],
             ignoredFiles: 12
         )

@@ -10,6 +10,9 @@ struct PlayMenuView: View {
     let supportsSaveState: Bool
     /// Newest first; slot 0 is the latest save.
     let saveEntries: [SaveStateStore.Entry]
+    /// When the game's own in-game save (battery or PSP SAVEDATA) was last written; nil if it
+    /// has none. Shown as a row the game loads by itself.
+    var inGameSaveDate: Date? = nil
     let busy: Bool
     /// Quit was chosen and the exit save is running: the menu is locked and says so.
     let leaving: Bool
@@ -341,11 +344,15 @@ extension PlayMenuView {
         }
     }
 
-    /// Saves dropdown: every save state (newest first), Reset, battery-save import.
+    /// Saves dropdown: the game's in-game save, every save state (newest first), Reset,
+    /// battery-save import.
     private var savesGroup: some View {
         DisclosureGroup(isExpanded: $showSaves) {
             VStack(spacing: 8) {
-                if saveEntries.isEmpty {
+                if let inGameSaveDate {
+                    InGameSaveRow(date: inGameSaveDate)
+                }
+                if saveEntries.isEmpty, inGameSaveDate == nil {
                     Text(PlaySavesMenuContent.emptyTitle)
                         .font(RetroPlayFont.subheadline)
                         .foregroundStyle(.white.opacity(0.6))
@@ -399,6 +406,42 @@ extension PlayMenuView {
         }
         .font(RetroPlayFont.headline)
         .padding(.horizontal, 4)
+    }
+}
+
+/// The game's own save: not a button (the game loads it when it boots), just that it's there
+/// and when it was last written.
+@available(iOS 18.0, *)
+private struct InGameSaveRow: View {
+    let date: Date
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "memorychip")
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 22)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(PlaySavesMenuContent.inGameTitle)
+                    .font(RetroPlayFont.callout)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                if date != .distantPast {
+                    Text(date, format: .dateTime.month(.abbreviated).day().hour().minute())
+                        .font(RetroPlayFont.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("pauseMenu.inGameSave")
     }
 }
 

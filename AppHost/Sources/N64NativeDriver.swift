@@ -30,7 +30,7 @@ public final class N64NativeDriver: NativeEmulatorDriver {
             throw EmulatorCoreError.romLoadFailed("The N64 core could not start")
         }
         handle = h
-        let sram = saves.n64SRAMURL(forRelativeROMPath: saves.relativeROMPath(fromAbsoluteROMURL: url))
+        let sram = saves.batterySaveURL(system: .n64, romURL: url)
         let ok = url.withUnsafeFileSystemRepresentation { path -> Bool in
             guard let path else { return false }
             return sram.withUnsafeFileSystemRepresentation { sramPath in

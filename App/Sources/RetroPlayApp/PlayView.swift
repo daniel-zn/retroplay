@@ -65,6 +65,8 @@ public struct PlayView: View {
     @State private var sawFirstFrame = false
     @State private var slowStartHint = false
     @State private var saveEntries: [SaveStateStore.Entry] = []
+    /// When the game's own in-game save was last written; nil if it has none.
+    @State private var inGameSaveDate: Date?
     @State private var loadCoordinator = PlayLoadActionCoordinator()
     /// Bumped on quit / restart so in-flight boot or load work abandons.
     @State private var sessionToken = PlaySessionToken(rawValue: 0)
@@ -267,6 +269,7 @@ public struct PlayView: View {
             if open {
                 input.releaseAll()
                 core?.pause()
+                inGameSaveDate = InGameSave.lastSaved(for: game, paths: SavePaths())
             } else if scenePhase == .active {
                 core?.resume()
             }
@@ -753,6 +756,7 @@ public struct PlayView: View {
                 systemName: system.displayName,
                 supportsSaveState: core?.supportsSaveState ?? false,
                 saveEntries: saveEntries,
+                inGameSaveDate: inGameSaveDate,
                 busy: busy || leaving || importingSave,
                 leaving: leaving,
                 hasController: controllers.hasController,
@@ -797,6 +801,7 @@ public struct PlayView: View {
 
     private func refreshSaveEntries() {
         saveEntries = SaveStateStore.resolvedEntries(system: system, gameID: game.id)
+        inGameSaveDate = InGameSave.lastSaved(for: game, paths: SavePaths())
     }
 
     /// Writes to a staging file, then rotates it in as the newest of five saves.

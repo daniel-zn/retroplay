@@ -591,6 +591,7 @@ public final class LibraryStore: ObservableObject {
             Self.rollBack(staged, paths: savePaths)
             throw error
         }
+        KeptSaves.attach(to: summary.added, library: games, paths: savePaths, fileManager: fileManager)
         return summary
     }
 
@@ -665,6 +666,7 @@ public final class LibraryStore: ObservableObject {
             if !fresh.isEmpty {
                 games.insert(contentsOf: fresh, at: 0)
                 try? save()
+                KeptSaves.attach(to: fresh, library: games, paths: savePaths, fileManager: fileManager)
             }
         }
         applyFolderCovers()

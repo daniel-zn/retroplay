@@ -9,6 +9,14 @@ public enum PSPParamSFO: Sendable {
         return PSPProductIDNormalizer.normalize(raw)
     }
 
+    /// The save's title (TITLE: the game's name as the PSP shows it), nil if absent.
+    static func title(from sfoData: Data) -> String? {
+        guard let value = value(forKey: "TITLE", in: sfoData) else { return nil }
+        let text = String(decoding: value.prefix(while: { $0 != 0 }), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
     /// The data files a save slot's PARAM.SFO lists (SAVEDATA_FILE_LIST: 32-byte entries, a
     /// 13-byte NUL-padded name then a hash). Only plain names: nothing with a path in it.
     static func saveDataFiles(from sfoData: Data) -> [String] {

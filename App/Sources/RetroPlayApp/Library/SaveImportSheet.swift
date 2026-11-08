@@ -36,7 +36,7 @@ struct SaveImportSheet: View {
                     itemSection(
                         "For Games Not in Your Library Yet",
                         items: batch.forMissingGames,
-                        footer: "Kept under their own names, so each game finds its save once you add it."
+                        footer: "Kept under their own names, so each game finds its save once you add it. Settings lists them."
                     )
                 }
                 if !batch.skipped.isEmpty {
@@ -109,8 +109,8 @@ struct SaveImportSheet: View {
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        // A game not in the library yet is named by its product ID.
-                        Text(item.forMissingGame ? "Product ID \(item.game.displayName)" : item.game.displayName)
+                        // A PSP game not in the library yet is named by its product ID.
+                        Text(item.forMissingGame && item.game.systemID == .psp ? "Product ID \(item.game.displayName)" : item.game.displayName)
                             .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                         Spacer(minLength: 4)
                         SystemBadge(system: item.game.systemID)

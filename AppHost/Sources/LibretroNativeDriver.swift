@@ -45,8 +45,7 @@ public final class LibretroNativeDriver: NativeEmulatorDriver {
             throw EmulatorCoreError.romLoadFailed("\(system.displayName) has no core")
         }
         let fileManager = FileManager.default
-        let relative = saves.relativeROMPath(fromAbsoluteROMURL: url)
-        let sram = saves.sramURL(forRelativeROMPath: relative)
+        let sram = saves.batterySaveURL(system: system, romURL: url)
         let coreSaves = saves.savesDirectory.appendingPathComponent(system.rawValue, isDirectory: true)
         for directory in [saves.biosDirectory, coreSaves, sram.deletingLastPathComponent()] {
             try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)

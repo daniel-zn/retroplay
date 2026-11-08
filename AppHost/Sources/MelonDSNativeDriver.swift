@@ -21,7 +21,7 @@ public final class MelonDSNativeDriver: NativeEmulatorDriver {
             throw EmulatorCoreError.romLoadFailed("melonDS could not start")
         }
         handle = h
-        let save = saves.sramURL(forRelativeROMPath: saves.relativeROMPath(fromAbsoluteROMURL: url))
+        let save = saves.batterySaveURL(system: .nds, romURL: url)
         try? FileManager.default.createDirectory(
             at: save.deletingLastPathComponent(),
             withIntermediateDirectories: true

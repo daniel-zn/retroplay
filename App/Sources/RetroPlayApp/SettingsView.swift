@@ -8,6 +8,8 @@ struct SettingsView: View {
     let gameCounts: [SystemTab: Int]
     /// Games, Saves (incl. the PSP memory stick) and States — everything a user's library occupies.
     let storageDirectories: [URL]
+    /// The library, so a PSP save a game owns isn't listed as waiting.
+    let games: [LibraryGame]
     let onImport: () -> Void
 
     @AppStorage(PlaySettingsKey.sound) private var soundOn = true
@@ -19,6 +21,7 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var storageUsed: Int64?
+    @State private var keptSaves: [KeptSave] = []
 
     private var appearanceBinding: Binding<AppearancePreference> {
         Binding(
@@ -34,6 +37,7 @@ struct SettingsView: View {
                 soundSection
                 controlsSection
                 librarySection
+                savesSection
                 aboutSection
             }
             .scrollContentBackground(.hidden)
@@ -44,6 +48,7 @@ struct SettingsView: View {
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .retroPlayNavigationTitleChrome(for: colorScheme)
             .task { await measureStorage() }
+            .task { await loadKeptSaves() }
         }
         .environment(\.font, RetroPlayFont.body)
         .retroPlayTypography()
@@ -142,6 +147,33 @@ struct SettingsView: View {
             sectionHeader("Library")
         }
         .listRowBackground(RetroPlayTheme.card(for: colorScheme))
+    }
+
+    /// Saves imported for games not in the library, waiting for their game.
+    private var savesSection: some View {
+        Section {
+            NavigationLink {
+                KeptSavesView(games: games, saves: $keptSaves)
+            } label: {
+                LabeledContent {
+                    Text("\(keptSaves.count)")
+                        .font(RetroPlayFont.body)
+                } label: {
+                    SettingsIconLabel(KeptSavesView.title, symbol: "tray.full.fill", color: .orange)
+                }
+            }
+            .accessibilityIdentifier("settings.keptSaves")
+        } header: {
+            sectionHeader("Saves")
+        }
+        .listRowBackground(RetroPlayTheme.card(for: colorScheme))
+    }
+
+    private func loadKeptSaves() async {
+        let games = games
+        keptSaves = await Task.detached(priority: .utility) {
+            KeptSaves.list(games: games, paths: SavePaths())
+        }.value
     }
 
     private var aboutSection: some View {

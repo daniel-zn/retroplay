@@ -182,6 +182,12 @@ public struct SavePaths: Sendable {
         SaveFormat.of(game.systemID).destination(for: game, paths: self)
     }
 
+    /// The battery save the core for `system` reads at boot and writes back, for the ROM at
+    /// `romURL`. The drivers boot from it and the importers install to it, so they can't drift.
+    public func batterySaveURL(system: SystemID, romURL: URL) -> URL {
+        SaveFormat.of(system).destination(forRelativeROMPath: relativeROMPath(fromAbsoluteROMURL: romURL), paths: self)
+    }
+
     /// Set when saves were imported for a game from the library: its next launch boots fresh
     /// instead of resuming the quick save, which still holds the old save in memory and would
     /// write it back over the imported one.
