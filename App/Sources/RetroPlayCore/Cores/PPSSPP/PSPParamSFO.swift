@@ -4,6 +4,26 @@ import Foundation
 /// Parses PSP `PARAM.SFO` bytes and reads the `DISC_ID` product/title identifier.
 public enum PSPParamSFO: Sendable {
     public static func discID(from sfoData: Data) -> String? {
+        guard let value = value(forKey: "DISC_ID", in: sfoData) else { return nil }
+        guard let raw = String(bytes: value.prefix(while: { $0 != 0 }), encoding: .ascii), !raw.isEmpty else { return nil }
+        return PSPProductIDNormalizer.normalize(raw)
+    }
+
+    /// The data files a save slot's PARAM.SFO lists (SAVEDATA_FILE_LIST: 32-byte entries, a
+    /// 13-byte NUL-padded name then a hash). Only plain names: nothing with a path in it.
+    static func saveDataFiles(from sfoData: Data) -> [String] {
+        guard let list = value(forKey: "SAVEDATA_FILE_LIST", in: sfoData) else { return [] }
+        let bytes = [UInt8](list)
+        return stride(from: 0, to: bytes.count, by: 32).compactMap { start in
+            let name = bytes[start..<min(start + 13, bytes.count)].prefix(while: { $0 != 0 })
+            guard let text = String(bytes: name, encoding: .ascii), !text.isEmpty,
+                  text != ".", text != "..", !text.contains("/") else { return nil }
+            return text
+        }
+    }
+
+    /// The bytes stored under `key` (its used length), nil if absent or malformed.
+    static func value(forKey wanted: String, in sfoData: Data) -> Data? {
         guard sfoData.count >= 20 else { return nil }
         guard sfoData.u32LE(at: 0) == 0x46535000 else { return nil } // "\0PSF"
 
@@ -25,15 +45,12 @@ public enum PSPParamSFO: Sendable {
             guard keyStart < sfoData.count else { continue }
             guard let keyEnd = sfoData[keyStart...].firstIndex(of: 0) else { continue }
             let key = String(data: sfoData[keyStart..<keyEnd], encoding: .ascii) ?? ""
-            guard key == "DISC_ID" else { continue }
+            guard key == wanted else { continue }
 
             let valueStart = dataTableOffset + dataOffset
             guard valueStart < sfoData.count, dataLength > 0 else { return nil }
             let valueEnd = min(valueStart + dataLength, sfoData.count)
-            let valueBytes = sfoData[valueStart..<valueEnd]
-            let trimmed = valueBytes.prefix(while: { $0 != 0 })
-            guard let raw = String(bytes: trimmed, encoding: .ascii), !raw.isEmpty else { return nil }
-            return PSPProductIDNormalizer.normalize(raw)
+            return Data(sfoData[valueStart..<valueEnd])
         }
         return nil
     }

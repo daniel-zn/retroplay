@@ -283,7 +283,11 @@ public enum SaveFolderScanner {
     }
 
     static func readError(_ name: String, _ error: Error?) -> SkippedSave {
-        SkippedSave(name: name, reason: "Couldn't read it: \(error?.localizedDescription ?? "its contents can't be looked at").")
+        // A slot that listed empty says so itself.
+        if case .pspSlotListedEmpty? = error as? SaveGameImportError {
+            return SkippedSave(name: name, reason: error!.localizedDescription)
+        }
+        return SkippedSave(name: name, reason: "Couldn't read it: \(error?.localizedDescription ?? "its contents can't be looked at").")
     }
 
     private static func walk(
@@ -1478,15 +1482,45 @@ enum FolderWalk {
                 if attempts.contains(where: { $0.error != nil }) {
                     return ([], false, ListingFailed(folder: url.lastPathComponent, attempts: attempts))
                 }
+                let slot = SaveGameImporter.isValidPSPSaveFolderName(url.lastPathComponent.uppercased())
+                if slot {
+                    // iOS's SMB client can list a save slot as empty though it holds the save:
+                    // its files are opened by name, from what its PARAM.SFO lists.
+                    for next in pspSlotByName(url, fileManager: fileManager, cancellation: cancellation) {
+                        if let early = try take(next) { return early }
+                    }
+                    if !children.isEmpty { return (children.sorted { $0.name < $1.name }, false, nil) }
+                }
                 if let held = DirectoryMetadata.heldEntries(url) {
                     // Nothing listed by any means, though the folder's metadata says it holds
                     // entries (or that they aren't on disk yet): said, not taken for empty.
                     scanLog.notice("RP_SCAN every listing is empty where the folder holds \(held.map { String($0) } ?? "unknown (dataless)", privacy: .public)")
                     return ([], false, EmptyListing(heldEntries: held))
                 }
+                if slot { return ([], false, SaveGameImportError.pspSlotListedEmpty(url.lastPathComponent)) }
             }
         }
         return (children.sorted { $0.name < $1.name }, false, nil)
+    }
+
+    /// Files a PSP save slot holds, found by name rather than listed: its PARAM.SFO (read in a
+    /// coordinated read), the data files that lists and the standard optional files that exist.
+    /// Empty if PARAM.SFO can't be read.
+    static func pspSlotByName(_ slot: URL, fileManager: FileManager, cancellation: ImportCancellation) -> [URL] {
+        let param = slot.appendingPathComponent("PARAM.SFO")
+        let sfo: Data
+        do {
+            sfo = try CoordinatedRead.run(param, cancellation) { try Data(contentsOf: $0) }
+        } catch {
+            scanLog.notice("RP_SCAN PARAM.SFO by name failed: \(shortReason(error), privacy: .public)")
+            return []
+        }
+        var seen: Set<String> = ["PARAM.SFO"]
+        let names = (PSPParamSFO.saveDataFiles(from: sfo) + ["ICON0.PNG", "ICON1.PMF", "ICON1.PNG", "PIC1.PNG", "SND0.AT3"])
+            .filter { seen.insert($0.uppercased()).inserted }
+        let found = names.map { slot.appendingPathComponent($0) }.filter { fileManager.fileExists(atPath: $0.path) }
+        scanLog.notice("RP_SCAN slot read by name: PARAM.SFO and \(found.count, privacy: .public) of \(names.count, privacy: .public) files")
+        return [param] + found
     }
 }
 

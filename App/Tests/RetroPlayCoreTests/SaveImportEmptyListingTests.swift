@@ -88,6 +88,8 @@ final class SaveImportEmptyListingTests: XCTestCase {
         FolderWalk.pathListing = { $0 == slot ? [] : nil }
         FolderWalk.uncoordinatedListing = { $0 == slot ? [] : nil }
         DirectoryMetadata.stat = { $0 == slot ? (links: 2, dataless: true) : nil }
+        // Its files aren't there to open by name either.
+        try fm.removeItem(at: slot.appendingPathComponent("PARAM.SFO"))
         let found = batch([slot])
         XCTAssertEqual(found.items, [])
         XCTAssertTrue(found.skipped.first?.reason.contains("contents aren't on this iPhone yet") == true, "\(found.skipped)")

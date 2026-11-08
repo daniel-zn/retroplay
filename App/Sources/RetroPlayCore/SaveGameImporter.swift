@@ -8,6 +8,8 @@ public enum SaveGameImportError: LocalizedError, Equatable, Sendable {
     case basenameMismatch(expected: String, got: String)
     case invalidSize(system: SystemID, bytes: Int)
     case missingPSPMetadata
+    /// A slot every listing showed as empty whose PARAM.SFO couldn't be opened by name either.
+    case pspSlotListedEmpty(String)
     case invalidPSPGameID(String)
     case pspTitleMismatch(expected: String, imported: String)
     case destinationExists(URL)
@@ -28,6 +30,8 @@ public enum SaveGameImportError: LocalizedError, Equatable, Sendable {
             return "Invalid \(system.displayName) save size (\(bytes) bytes)."
         case .missingPSPMetadata:
             return "PSP save folders must include PARAM.SFO."
+        case .pspSlotListedEmpty(let name):
+            return "PSP save folders must include PARAM.SFO. iOS listed “\(name)” as empty and its PARAM.SFO couldn't be opened by name. Copy the folder to On My iPhone in Files and import it from there."
         case .invalidPSPGameID(let id):
             return "“\(id)” is not a valid PSP SAVEDATA folder name."
         case .pspTitleMismatch(let expected, let imported):
@@ -361,6 +365,7 @@ public struct SaveGameImporter: Sendable {
             fileManager: fileManager,
             cancellation: cancellation,
             unreadable: { folder, error in
+                if let error = error as? SaveGameImportError { throw error }
                 throw SaveGameImportError.copyFailed(
                     "\(folder.path.joined(separator: "/")) couldn't be read\(error.map { ": \($0.localizedDescription)" } ?? ".")"
                 )
