@@ -3,7 +3,8 @@ import CoreText
 import XCTest
 @testable import RetroPlayCore
 
-/// Every text in the app is set in You're Gone: the one bundled face is the one Info.plist
+/// Every text in the app is set in You're Gone Thin (You're Gone by Ray Larabie, slightly
+/// lighter; built in the fonts repo): the one bundled face is the one Info.plist
 /// lists, it registers, and every style resolves to it (not a fallback, and not a synthesised
 /// bold or italic: the app uses its one upright weight). It's a capitals face (its lowercase
 /// keys draw the capitals), so text needs no case change, and it has the characters the app's
@@ -19,26 +20,47 @@ final class TypeScaleTests: XCTestCase {
 
     override class func setUp() {
         super.setUp()
-        let url = supporting.appendingPathComponent(RetroPlayTypeface.fileName) as CFURL
-        CTFontManagerRegisterFontsForURL(url, .process, nil)
+        for file in RetroPlayTypeface.fileNames {
+            CTFontManagerRegisterFontsForURL(supporting.appendingPathComponent(file) as CFURL, .process, nil)
+        }
     }
 
     func testTheFaceIsBundledAndTheOnlyFontInInfoPlist() throws {
         let plist = try XCTUnwrap(NSDictionary(contentsOf: Self.supporting.appendingPathComponent("Info.plist")))
         let fonts = try XCTUnwrap(plist["UIAppFonts"] as? [String])
-        XCTAssertTrue(FileManager.default.fileExists(atPath: Self.supporting.appendingPathComponent(RetroPlayTypeface.fileName).path))
-        XCTAssertEqual(fonts, [RetroPlayTypeface.fileName])
+        XCTAssertEqual(RetroPlayTypeface.fileNames, ["YoureGoneThin-Regular.otf", "YoureGoneThin-Italic.otf"])
+        for file in RetroPlayTypeface.fileNames {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: Self.supporting.appendingPathComponent(file).path), file)
+        }
+        XCTAssertEqual(fonts, RetroPlayTypeface.fileNames)
     }
 
-    func testEveryStyleResolvesToYoureGoneWithoutSyntheticTraits() {
-        XCTAssertEqual(RetroPlayTypeface.postScriptName, "YoureGone-Regular")
+    func testEveryStyleResolvesToYoureGoneThinWithoutSyntheticTraits() {
+        XCTAssertEqual(RetroPlayTypeface.postScriptName, "YoureGoneThin-Regular")
+        XCTAssertEqual(RetroPlayTypeface.fileName, "YoureGoneThin-Regular.otf")
         for style in RetroPlayTextStyle.all {
             let font = CTFontCreateWithName(RetroPlayTypeface.postScriptName as CFString, style.size, nil)
-            XCTAssertEqual(CTFontCopyFamilyName(font) as String, "You're Gone", style.name)
-            XCTAssertEqual(CTFontCopyPostScriptName(font) as String, "YoureGone-Regular", style.name)
+            XCTAssertEqual(CTFontCopyFamilyName(font) as String, "You're Gone Thin", style.name)
+            XCTAssertEqual(CTFontCopyPostScriptName(font) as String, "YoureGoneThin-Regular", style.name)
             let traits = CTFontGetSymbolicTraits(font)
             XCTAssertFalse(traits.contains(.traitBold), "\(style.name) is bold")
             XCTAssertFalse(traits.contains(.traitItalic), "\(style.name) is italic")
+        }
+    }
+
+    /// Titles are set in the family's italic: the real one (its own outlines), not a slanted upright.
+    func testTitlesUseTheThinItalic() {
+        XCTAssertEqual(RetroPlayTypeface.titlePostScriptName, "YoureGoneThin-Italic")
+        let font = CTFontCreateWithName(RetroPlayTypeface.titlePostScriptName as CFString, 34, nil)
+        XCTAssertEqual(CTFontCopyPostScriptName(font) as String, "YoureGoneThin-Italic")
+        XCTAssertEqual(CTFontCopyFamilyName(font) as String, "You're Gone Thin")
+        XCTAssertTrue(CTFontGetSymbolicTraits(font).contains(.traitItalic))
+        XCTAssertFalse(CTFontGetSymbolicTraits(font).contains(.traitBold))
+        XCTAssertLessThan(CTFontGetSlantAngle(font), -5, "the italic leans right")
+        for character in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 '&:-–—…’" {
+            var units = Array(String(character).utf16)
+            var glyphs = [CGGlyph](repeating: 0, count: units.count)
+            XCTAssertTrue(CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count), "no “\(character)” in the italic")
         }
     }
 

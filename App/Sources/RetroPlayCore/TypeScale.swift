@@ -1,14 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import CoreGraphics
 
-/// RetroPlay's one typeface: You're Gone by Ray Larabie (CC0; see YoureGone-SOURCE.md), its
-/// upright weight, bundled unchanged in AppHost/Supporting and listed in Info.plist's UIAppFonts.
+/// RetroPlay's one typeface: You're Gone Thin, You're Gone by Ray Larabie slightly lighter (CC0;
+/// see YoureGoneThin-SOURCE.md), bundled in AppHost/Supporting and listed in Info.plist's
+/// UIAppFonts. Text is set in its upright; titles in its italic (with the title glitch).
 /// A capitals face: its lowercase keys draw the capitals, so text is shown as written (no case
 /// change) and still reads in capitals.
 public enum RetroPlayTypeface {
-    public static let family = "You're Gone"
-    public static let postScriptName = "YoureGone-Regular"
-    public static let fileName = "YoureGone-Regular.otf"
+    public static let family = "You're Gone Thin"
+    public static let postScriptName = "YoureGoneThin-Regular"
+    public static let fileName = "YoureGoneThin-Regular.otf"
+    /// The titles' face: the family's italic.
+    public static let titlePostScriptName = "YoureGoneThin-Italic"
+    public static let titleFileName = "YoureGoneThin-Italic.otf"
+    /// Every bundled file, as Info.plist lists them.
+    public static let fileNames = [fileName, titleFileName]
     /// Extra space between letters: none, the face is spaced for text already.
     public static let tracking: CGFloat = 0
 }

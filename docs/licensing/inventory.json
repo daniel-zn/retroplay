@@ -161,13 +161,13 @@
   },
   {
     "project": "RetroPlay app resources",
-    "component": "You're Gone font (YoureGone-Regular.otf)",
-    "version": "5.002 (you-re-gone.zip from 1001fonts.com, SHA-256 9acd7561cca69258b7d1bdd6ea908b5bf94abd7cfcfa51f1f85d52db73c3c092; YoureGone-Regular.otf SHA-256 1e1a01c9760372d50ba233822df234fe982552feb861aff585edcfb070f7066d)",
+    "component": "You're Gone Thin font (YoureGoneThin-Regular.otf, YoureGoneThin-Italic.otf)",
+    "version": "5.002, thinned (fonts repo youre-gone-thin, commit e545e6b; from you-re-gone.zip, 1001fonts.com, SHA-256 9acd7561cca69258b7d1bdd6ea908b5bf94abd7cfcfa51f1f85d52db73c3c092; YoureGoneThin-Regular.otf SHA-256 c3c51c01b492a8216a72ba1e1901e746fd894e72f6e294427228e25a6c427663, YoureGoneThin-Italic.otf SHA-256 d9b085ba43cca0be3c898ce8d1b9e27e2d49e8d67f66ca7115133b8ad3701b31)",
     "spdx": "CC0-1.0",
     "copyright": "Released in 2024 under CC0 license. No rights reserved. Ray Larabie",
-    "licenseFile": "retroplay/AppHost/Supporting/YoureGone-LICENSE.txt",
+    "licenseFile": "retroplay/AppHost/Supporting/YoureGoneThin-LICENSE.txt",
     "requiresNoticeText": false,
-    "evidence": "project.yml copies AppHost/Supporting as resources; shasum matches YoureGone-SOURCE.md. CC0 needs no notice; the font's license record is bundled (YoureGone-LICENSE.txt) and listed in in-app licenses"
+    "evidence": "project.yml copies AppHost/Supporting as resources; shasums match YoureGoneThin-SOURCE.md. CC0 needs no notice; the license, with the original font's license record and credit, is bundled (YoureGoneThin-LICENSE.txt) and listed in in-app licenses"
   },
   {
     "project": "mupen64plus-next",

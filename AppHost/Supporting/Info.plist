@@ -41,7 +41,8 @@
 	<true/>
 	<key>UIAppFonts</key>
 	<array>
-		<string>YoureGone-Regular.otf</string>
+		<string>YoureGoneThin-Regular.otf</string>
+		<string>YoureGoneThin-Italic.otf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

@@ -97,8 +97,9 @@ struct SectionHeading: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title.uppercased())
-                .font(RetroPlayFont.caption)
+                .font(RetroPlayFont.titleFace(.caption))
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                .retroPlayTitleGlitch(title)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
             if let trailing {
@@ -279,8 +280,9 @@ struct LibraryOnboardingView: View {
                     .foregroundStyle(RetroPlayTheme.accent)
                     .symbolEffect(.pulse, options: .repeating)
                 Text("INSERT GAME")
-                    .font(RetroPlayFont.title3)
+                    .font(RetroPlayFont.titleFace(.title3))
                     .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                    .retroPlayTitleGlitch("INSERT GAME")
                 Text("Import games you own from Files. RetroPlay picks the system and core for you.")
                     .font(RetroPlayFont.subheadline)
                     .lineSpacing(2)

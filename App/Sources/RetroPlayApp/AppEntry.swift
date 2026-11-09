@@ -477,10 +477,11 @@ public struct RetroPlayRootView: View {
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
                         Text("RetroPlay")
-                            .font(RetroPlayFont.headline)
+                            .font(RetroPlayFont.titleFace(.headline))
                             .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
+                            .retroPlayTitleGlitch("RetroPlay inline")
                         // The filter, when the big title (which names it) is out of sight.
                         if systemTab != .all {
                             Text(systemTab.title)
@@ -551,11 +552,12 @@ public struct RetroPlayRootView: View {
     private var libraryTitle: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("RetroPlay")
-                .font(RetroPlayFont.largeTitle)
+                .font(RetroPlayFont.titleFace(.largeTitle))
                 // One line: at accessibility sizes the title would otherwise split the word.
                 .lineLimit(1)
                 .minimumScaleFactor(0.4)
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                .retroPlayTitleGlitch("RetroPlay")
                 .accessibilityAddTraits(.isHeader)
             if !store.games.isEmpty {
                 // With the filter chips gone, the title says which games are showing.

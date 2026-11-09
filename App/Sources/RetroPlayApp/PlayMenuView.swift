@@ -120,9 +120,10 @@ struct PlayMenuView: View {
         VStack(spacing: 12) {
             VStack(spacing: 4) {
                 Text(title)
-                    .font(RetroPlayFont.title3)
+                    .font(RetroPlayFont.titleFace(.title3))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
+                    .retroPlayTitleGlitch(title)
                 Text(systemName)
                     .font(RetroPlayFont.subheadline)
                     .foregroundStyle(.secondary)

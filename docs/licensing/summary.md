@@ -13,7 +13,7 @@ Top-level license texts:
 | GPL-2.0 | `ppsspp-GPL-2.0-or-later.txt` (PPSSPP `LICENSE.TXT`, which also carries the PSPSDK BSD-3 notice) and `mupen64plus-next-GPL-2.0-or-later.txt` |
 | MPL-2.0 | `mgba-MPL-2.0.txt` |
 | LGPL-2.1 | `ffmpeg-LGPL-2.1-or-later.txt` and `blip_buf-LGPL-2.1-or-later.txt` |
-| CC0-1.0 | `YoureGone-CC0-1.0.txt` (the font's own license record) |
+| CC0-1.0 | `YoureGoneThin-CC0-1.0.txt` (the thin font's license, with the original's license record) |
 
 ## Per core: what is actually in the binaries
 
@@ -93,7 +93,7 @@ Built by `App/Vendor/build-libretro-cores-ios.sh` from unmodified checkouts (com
 **Compatibility.** Every new license combines with GPL-3.0: the GPL-2.0-or-later and LGPL cores upgrade to v3, bsnes is GPL-3.0 itself, and GPLv3 s.13 explicitly allows linking with AGPLv3 code (clownmdemu). The AGPL's extra s.13 duty (offer source to users who interact over a network) does not apply to an offline emulator, and the app already publishes its complete source. Nothing is non-commercial. See red flags 9-11.
 
 ### App resources
-- **You're Gone** (CC0-1.0), its upright weight. The SHA-256 matches `YoureGone-SOURCE.md`. CC0 needs no notice; the font's license record is bundled as `YoureGone-LICENSE.txt`.
+- **You're Gone Thin** (CC0-1.0), upright and italic: You're Gone by Ray Larabie made slightly lighter (the fonts repo's `youre-gone-thin`). The SHA-256s match `YoureGoneThin-SOURCE.md`. CC0 needs no notice; the license, with the original's license record and Ray Larabie's credit, is bundled as `YoureGoneThin-LICENSE.txt`.
 - **PPSSPP assets.** All are byte-identical to ppsspp@98e70c8ca3. Provenance is in `notes-ppsspp.md`.
 
 ## Red flags

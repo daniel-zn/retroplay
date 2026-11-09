@@ -4,7 +4,8 @@ import RetroPlayCore
 import SwiftUI
 import UIKit
 
-/// The app's fonts, all You're Gone, from the one type scale (`RetroPlayTextStyle`).
+/// The app's fonts, all You're Gone Thin, from the one type scale (`RetroPlayTextStyle`): text
+/// in its upright, titles in its italic (`titleFace(_:)`, with `retroPlayTitleGlitch`).
 /// Every font scales with Dynamic Type from its system text style; the bundled file is
 /// registered on first use, and if it's missing the system face stands in at the same style.
 /// The face has one weight: no style asks for bold (iOS would thicken the outlines itself).
@@ -30,6 +31,15 @@ enum RetroPlayFont {
         sized(style.size, relativeTo: style.relativeTo.swiftUI)
     }
 
+    /// A title's font: the italic at `style`'s size, scaling as it does (the upright if the
+    /// italic is missing).
+    static func titleFace(_ style: RetroPlayTextStyle) -> Font {
+        registerBundledFont()
+        let italic = RetroPlayTypeface.titlePostScriptName
+        guard UIFont(name: italic, size: style.size) != nil else { return font(style) }
+        return .custom(italic, size: style.size, relativeTo: style.relativeTo.swiftUI)
+    }
+
     /// A size off the scale (drawn labels, controls), still scaling with `relativeTo`.
     static func sized(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
         registerBundledFont()
@@ -48,12 +58,15 @@ enum RetroPlayFont {
     static func registerBundledFont() {
         guard !didAttemptRegistration else { return }
         didAttemptRegistration = true
-        guard UIFont(name: name, size: 17) == nil else { return }
-        let file = RetroPlayTypeface.fileName as NSString
-        guard let url = Bundle.main.url(forResource: file.deletingPathExtension, withExtension: file.pathExtension) else { return }
-        var error: Unmanaged<CFError>?
-        if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
-            NSLog("RetroPlay font registration failed: %@", String(describing: error?.takeRetainedValue()))
+        for (postScript, fileName) in [(name, RetroPlayTypeface.fileName),
+                                       (RetroPlayTypeface.titlePostScriptName, RetroPlayTypeface.titleFileName)] {
+            guard UIFont(name: postScript, size: 17) == nil else { continue }
+            let file = fileName as NSString
+            guard let url = Bundle.main.url(forResource: file.deletingPathExtension, withExtension: file.pathExtension) else { continue }
+            var error: Unmanaged<CFError>?
+            if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
+                NSLog("RetroPlay font registration failed: %@", String(describing: error?.takeRetainedValue()))
+            }
         }
     }
 
@@ -61,9 +74,15 @@ enum RetroPlayFont {
         uiFont(size: style.size, textStyle: style.relativeTo.uiKit)
     }
 
-    static func uiFont(size: CGFloat, textStyle: UIFont.TextStyle, maximumPointSize: CGFloat? = nil) -> UIFont {
+    /// A title's font for UIKit (the navigation bar's): the italic, as `titleFace(_:)`.
+    static func uiTitleFont(_ style: RetroPlayTextStyle) -> UIFont {
+        uiFont(size: style.size, textStyle: style.relativeTo.uiKit, face: RetroPlayTypeface.titlePostScriptName)
+    }
+
+    static func uiFont(size: CGFloat, textStyle: UIFont.TextStyle, maximumPointSize: CGFloat? = nil,
+                       face: String = RetroPlayTypeface.postScriptName) -> UIFont {
         registerBundledFont()
-        guard let base = UIFont(name: name, size: size) else {
+        guard let base = UIFont(name: face, size: size) ?? UIFont(name: name, size: size) else {
             // preferredFont is already scaled; scaling it again would magnify
             // the fallback twice at non-default Dynamic Type sizes.
             return UIFont.preferredFont(forTextStyle: textStyle)

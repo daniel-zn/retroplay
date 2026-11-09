@@ -276,7 +276,7 @@ struct LibraryCoverFlowView<Header: View>: View {
     /// readable system / last-played line. The unseen one always holds two title lines in
     /// portrait, so the covers don't jump as names change length.
     private func caption(shown: Bool) -> some View {
-        let titleFont = shown ? (compactCaption ? RetroPlayFont.headline : RetroPlayFont.title3) : RetroPlayFont.subheadline
+        let titleFont = shown ? (compactCaption ? RetroPlayFont.titleFace(.headline) : RetroPlayFont.titleFace(.title3)) : RetroPlayFont.titleFace(.subheadline)
         let detailFont = shown ? RetroPlayFont.subheadline : RetroPlayFont.footnote
         let spacing: CGFloat = compactCaption ? (shown ? 4 : 3) : (shown ? 10 : 8)
         return ZStack {
@@ -295,6 +295,8 @@ struct LibraryCoverFlowView<Header: View>: View {
                         .lineLimit(compactCaption ? 1 : 2, reservesSpace: !compactCaption && !shown)
                         .truncationMode(.tail)
                         .minimumScaleFactor(shown ? 1 : 0.7)
+                        // Glitches soon after the covers settle on it, then now and then.
+                        .retroPlayTitleGlitch(game.displayName)
                     HStack(spacing: 8) {
                         Text(game.systemID.displayName)
                             .foregroundStyle(RetroPlayTheme.systemTint(game.systemID))

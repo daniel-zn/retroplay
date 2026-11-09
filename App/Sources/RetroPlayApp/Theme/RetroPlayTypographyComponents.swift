@@ -49,8 +49,9 @@ private struct RetroPlayAlertModifier: ViewModifier {
 
                         VStack(spacing: 14) {
                             Text(title)
-                                .font(RetroPlayFont.title3)
+                                .font(RetroPlayFont.titleFace(.title3))
                                 .multilineTextAlignment(.center)
+                                .retroPlayTitleGlitch(title)
 
                             // A long message scrolls inside the card so the buttons always stay
                             // on screen (the views behind are disabled while this is up).
@@ -149,8 +150,9 @@ struct RetroPlayUnavailableView: View {
                 .imageScale(.large)
                 .foregroundStyle(.secondary)
             Text(title)
-                .font(RetroPlayFont.title3)
+                .font(RetroPlayFont.titleFace(.title3))
                 .multilineTextAlignment(.center)
+                .retroPlayTitleGlitch(title)
             Text(description)
                 .font(RetroPlayFont.body)
                 .foregroundStyle(.secondary)

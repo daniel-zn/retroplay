@@ -5,6 +5,8 @@ import XCTest
 /// and dark at the larger sizes players use (XXXL and an accessibility size). Each screen
 /// checks its key text is on screen and inside it; the screenshots are attached. Run by the
 /// on-request "screenshots" integration check (type, theme and layout changes name it).
+/// The titles' glitch is off in these (`-RetroPlayTitleGlitchFrame -1`) so the screens are
+/// steady, except in `testTitleGlitchFrames`, which shows each frame of a burst held still.
 final class TypographyScreenshotsUITests: XCTestCase {
     private let looks: [(name: String, appearance: String, size: String)] = [
         ("dark", "dark", "UICTContentSizeCategoryL"),
@@ -19,9 +21,10 @@ final class TypographyScreenshotsUITests: XCTestCase {
     }
 
     @MainActor
-    private func launch(_ look: (name: String, appearance: String, size: String), _ extra: [String]) -> XCUIApplication {
+    private func launch(_ look: (name: String, appearance: String, size: String), _ extra: [String], glitchFrame: Int = -1) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-UIPreferredContentSizeCategoryName", look.size, "-retroplay.appearance", look.appearance] + extra
+        app.launchArguments = ["-UIPreferredContentSizeCategoryName", look.size, "-retroplay.appearance", look.appearance,
+                               "-RetroPlayTitleGlitchFrame", String(glitchFrame)] + extra
         app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
         app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
         app.launch()
@@ -130,6 +133,22 @@ final class TypographyScreenshotsUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 1)
             shoot(play, "play-menu-\(look.name)")
             play.terminate()
+        }
+    }
+
+    /// The titles' glitch, each frame of a burst held still (dark and light): the large title
+    /// and the section headings hacked in lime and violet, still read as themselves (VoiceOver
+    /// and the tests see the plain title throughout).
+    @MainActor
+    func testTitleGlitchFrames() {
+        for look in looks.prefix(2) {
+            for frame in 0..<6 {
+                let app = launch(look, ["-retroplay.libraryLayout", "grid"], glitchFrame: frame)
+                expectVisible(app, "RetroPlay", "glitch frame \(frame) \(look.name)", timeout: 30)
+                Thread.sleep(forTimeInterval: 1)
+                shoot(app, "glitch-\(look.name)-frame\(frame)")
+                app.terminate()
+            }
         }
     }
 }

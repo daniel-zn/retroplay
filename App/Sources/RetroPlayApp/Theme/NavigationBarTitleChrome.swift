@@ -22,12 +22,12 @@ enum RetroPlayNavigationBarChrome {
         standard.shadowColor = .clear
         standard.titleTextAttributes = [
             .foregroundColor: foreground,
-            .font: RetroPlayFont.uiFont(.headline),
+            .font: RetroPlayFont.uiTitleFont(.headline),
             .kern: RetroPlayFont.uiKern
         ]
         standard.largeTitleTextAttributes = [
             .foregroundColor: foreground,
-            .font: RetroPlayFont.uiFont(.largeTitle),
+            .font: RetroPlayFont.uiTitleFont(.largeTitle),
             .kern: RetroPlayFont.uiKern
         ]
 
@@ -64,8 +64,8 @@ enum RetroPlayNavigationBarChrome {
     }
 
     static func applyTitleFonts(to item: UINavigationItem, bar: UINavigationBar) {
-        let titleFont = RetroPlayFont.uiFont(.headline)
-        let largeTitleFont = RetroPlayFont.uiFont(.largeTitle)
+        let titleFont = RetroPlayFont.uiTitleFont(.headline)
+        let largeTitleFont = RetroPlayFont.uiTitleFont(.largeTitle)
         func patched(_ appearance: UINavigationBarAppearance?) -> UINavigationBarAppearance? {
             guard let copy = appearance?.copy() else { return nil }
             copy.titleTextAttributes[.font] = titleFont
