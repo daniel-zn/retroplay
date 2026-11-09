@@ -119,6 +119,9 @@ public struct TitleGlitch: Sendable, Equatable {
     /// else the next burst's start. The view sleeps until then (nil: never, frozen or Reduce Motion).
     public func nextChange(after t: Double, reduceMotion: Bool) -> Double? {
         guard !reduceMotion, frozen == nil else { return nil }
+        // Asked at a boundary (as a view that just woke for it is), the sums behind burst
+        // starts can round either side of it: look just past it, so the answer is always later.
+        let t = t + 1e-6
         if let (_, into) = burst(at: t) {
             let index = min(Self.frames - 1, Int(into / Self.cycle))
             return t - into + Double(index + 1) * Self.cycle
