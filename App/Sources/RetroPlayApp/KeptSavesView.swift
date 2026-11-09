@@ -16,10 +16,10 @@ struct KeptSavesView: View {
     var body: some View {
         List {
             if saves.isEmpty {
-                ContentUnavailableView(
-                    "No Waiting Saves",
+                RetroPlayUnavailableView(
+                    title: "No Waiting Saves",
                     systemImage: "tray",
-                    description: Text("Saves you import for games that aren't in your library wait here until you add the game.")
+                    description: "Saves you import for games that aren't in your library wait here until you add the game."
                 )
                 .listRowBackground(Color.clear)
             } else {

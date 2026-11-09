@@ -354,8 +354,9 @@ struct EmptyFilterView: View {
     var body: some View {
         VStack(spacing: 14) {
             Text("NO \(tab.title) GAMES")
-                .font(RetroPlayFont.headline)
+                .font(RetroPlayFont.titleFace(.headline))
                 .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+                .retroPlayTitleGlitch("NO \(tab.title) GAMES")
             if let system = tab.systemID {
                 Text("Import \(LibraryOnboardingView.formats(system)) files to play \(system.displayName) games.")
                     .font(RetroPlayFont.subheadline)

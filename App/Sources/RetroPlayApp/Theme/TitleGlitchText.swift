@@ -5,7 +5,8 @@ import SwiftUI
 extension View {
     /// The title glitch on the Text in this view: now and then, for a moment, a few letters drawn
     /// hacked in lime and violet and the line smeared (`TitleGlitch` says when). For titles only;
-    /// body text stays plain. `text` seeds its rhythm, so each title flickers on its own. It
+    /// body text stays plain. `text` seeds its rhythm, so each title flickers on its own, with a
+    /// fresh random number each time it appears, so it's never the same twice. It
     /// draws over the text as laid out (nothing moves, VoiceOver reads the text as it is) and
     /// sleeps between bursts; with Reduce Motion it never glitches.
     @available(iOS 18.0, *)
@@ -32,9 +33,11 @@ private struct TitleGlitchModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     /// Seconds since the title appeared, as of the last change.
     @State private var time = 0.0
+    /// A fresh random number each time the title appears (mixed into its text's seed).
+    @State private var appearance: UInt64 = 0
 
     private var off: Bool { TitleGlitchLaunch.frame.map { $0 < 0 } ?? false }
-    private var glitch: TitleGlitch { TitleGlitch(text: text, frozen: TitleGlitchLaunch.frame) }
+    private var glitch: TitleGlitch { TitleGlitch(text: text, appearance: appearance, frozen: TitleGlitchLaunch.frame) }
 
     func body(content: Content) -> some View {
         content
@@ -48,7 +51,11 @@ private struct TitleGlitchModifier: ViewModifier {
     private func run(reduceMotion: Bool) async {
         let clock = ContinuousClock()
         let start = clock.now
+        let fresh = UInt64.random(in: .min ... .max)
+        appearance = fresh
         time = 0
+        // The timing this appearance draws (the renderer's, from the same state).
+        let glitch = TitleGlitch(text: text, appearance: fresh, frozen: TitleGlitchLaunch.frame)
         while !Task.isCancelled, let next = glitch.nextChange(after: time, reduceMotion: reduceMotion) {
             do { try await clock.sleep(until: start + .milliseconds(Int((next * 1000).rounded(.up)) + 1)) } catch { return }
             let elapsed = start.duration(to: clock.now)

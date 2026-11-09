@@ -106,6 +106,8 @@ public struct ExternalGameDisplayView: View {
                         .font(.system(size: 42))
                         .accessibilityHidden(true)
                     Text(casting.gameTitle ?? "RetroPlay")
+                        .font(RetroPlayFont.titleFace(.title2))
+                        .retroPlayTitleGlitch(casting.gameTitle ?? "RetroPlay")
                     Text(casting.gameTitle == nil ? "Choose a game on iPhone" : "Waiting for video…")
                         .foregroundStyle(.secondary)
                 }

@@ -136,6 +136,28 @@ final class TypographyScreenshotsUITests: XCTestCase {
         }
     }
 
+    /// Saves Waiting for Games with none waiting: its empty state's title in the italic, a
+    /// burst's first and a later frame held still (dark and light).
+    @MainActor
+    func testWaitingSavesEmptyTitleGlitch() {
+        for look in looks.prefix(2) {
+            for frame in [0, 3] {
+                let app = launch(look, ["-retroplay.libraryLayout", "grid", "-RetroPlaySmokeSettings", "YES"], glitchFrame: frame)
+                // Settings is a lazy List: the row exists only once it's scrolled into view.
+                let settings = app.collectionViews.firstMatch
+                XCTAssertTrue(settings.waitForExistence(timeout: 30), "waiting saves \(look.name): Settings didn't open")
+                let row = app.buttons["settings.keptSaves"].firstMatch
+                for _ in 0..<8 where !(row.exists && row.isHittable) { settings.swipeUp() }
+                XCTAssertTrue(row.waitForExistence(timeout: 5), "waiting saves \(look.name): no row")
+                row.tap()
+                expectVisible(app, "No Waiting Saves", "waiting saves \(look.name)", timeout: 10)
+                Thread.sleep(forTimeInterval: 1)
+                shoot(app, "glitch-waiting-saves-empty-\(look.name)-frame\(frame)")
+                app.terminate()
+            }
+        }
+    }
+
     /// The titles' glitch, each frame of a burst held still (dark and light): the large title
     /// and the section headings hacked in lime and violet, still read as themselves (VoiceOver
     /// and the tests see the plain title throughout).

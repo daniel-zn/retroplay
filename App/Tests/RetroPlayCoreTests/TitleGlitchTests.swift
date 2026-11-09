@@ -32,13 +32,15 @@ final class TitleGlitchTests: XCTestCase {
             for (t, frame) in seen where frame != nil {
                 if let last = runs.last, t - last.end <= step * 1.5 { runs[runs.count - 1].end = t } else { runs.append((t, t)) }
             }
-            XCTAssertGreaterThanOrEqual(runs.count, 10, "seed \(seed): too few bursts in 2 minutes")
+            XCTAssertGreaterThanOrEqual(runs.count, 9, "seed \(seed): too few bursts in 2 minutes")
             XCTAssertLessThanOrEqual(runs.count, 25, "seed \(seed): too many bursts in 2 minutes")
             let first = try! XCTUnwrap(runs.first)
             XCTAssertTrue(first.start >= TitleGlitch.firstAfter.lowerBound - step && first.start <= TitleGlitch.firstAfter.upperBound + step,
                           "seed \(seed): first burst at \(first.start)")
             for run in runs {
                 XCTAssertLessThanOrEqual(run.end - run.start, TitleGlitch.burst + step, "seed \(seed): a burst at \(run.start) runs long")
+                XCTAssertGreaterThanOrEqual(run.end - run.start, TitleGlitch.cycle * Double(TitleGlitch.frameCounts.lowerBound - 1) - step,
+                                            "seed \(seed): a burst at \(run.start) is too short to see")
             }
             for (a, b) in zip(runs, runs.dropFirst()) {
                 XCTAssertGreaterThanOrEqual(b.start - a.start, TitleGlitch.gaps.lowerBound - step * 1.5, "seed \(seed)")
@@ -52,16 +54,19 @@ final class TitleGlitchTests: XCTestCase {
     func testABurstShowsEachOfItsFramesAndTheTitleStillReads() {
         let glitch = TitleGlitch(seed: 5)
         let start = glitch.burstStart(0)
+        let count = glitch.frameCount(0)
+        XCTAssertTrue(TitleGlitch.frameCounts.contains(count))
         var indices: [Int] = []
-        for f in 0..<TitleGlitch.frames {
+        for f in 0..<count {
             let frame = try! XCTUnwrap(glitch.frame(at: start + (Double(f) + 0.5) * TitleGlitch.cycle, glyphs: 9, reduceMotion: false))
             indices.append(frame.index)
         }
-        XCTAssertEqual(indices, Array(0..<TitleGlitch.frames))
+        XCTAssertEqual(indices, Array(0..<count))
+        XCTAssertNil(glitch.frame(at: start + (Double(count) + 0.5) * TitleGlitch.cycle, glyphs: 9, reduceMotion: false), "the burst ends after its frames")
 
         for seed in UInt64(0)..<200 {
             for glyphs in [1, 2, 5, 9, 24] {
-                for index in 0..<TitleGlitch.frames {
+                for index in 0..<TitleGlitch.frameCounts.upperBound {
                     let frame = TitleGlitch(seed: seed).frame(burst: Int(seed % 3), index: index, glyphs: glyphs)
                     XCTAssertEqual(frame.shapes.count, glyphs)
                     let changed = frame.shapes.filter { $0 != .plain }.count
@@ -76,6 +81,48 @@ final class TitleGlitchTests: XCTestCase {
                 }
             }
         }
+    }
+
+    /// Each time a title appears it flickers anew: other moments, other letters.
+    func testTwoAppearancesOfTheSameTitleDiffer() {
+        let a = TitleGlitch(text: "RetroPlay", appearance: 1), b = TitleGlitch(text: "RetroPlay", appearance: 2)
+        XCTAssertNotEqual(a.burstStart(0), b.burstStart(0))
+        XCTAssertNotEqual((0..<5).map(a.burstStart), (0..<5).map(b.burstStart))
+        XCTAssertNotEqual(a.frame(burst: 0, index: 1, glyphs: 9), b.frame(burst: 0, index: 1, glyphs: 9))
+        // Fresh random appearances: their first bursts spread over the whole window.
+        let firsts = (0..<200).map { _ in TitleGlitch(text: "RetroPlay", appearance: .random(in: .min ... .max)).burstStart(0) }
+        XCTAssertGreaterThan(Set(firsts).count, 150)
+        XCTAssertTrue(firsts.allSatisfy(TitleGlitch.firstAfter.contains))
+        XCTAssertLessThan(firsts.min()!, TitleGlitch.firstAfter.lowerBound + 0.3)
+        XCTAssertGreaterThan(firsts.max()!, TitleGlitch.firstAfter.upperBound - 0.3)
+        // Two titles on screen together in the same appearance still keep out of step.
+        XCTAssertNotEqual(TitleGlitch(text: "RetroPlay", appearance: 7).burstStart(0), TitleGlitch(text: "All Games", appearance: 7).burstStart(0))
+    }
+
+    /// The timing is a little wider than a steady beat, but never busy: the first burst comes in
+    /// 0.6–2.5 s, then one every 4–12 s, each 5–7 frames.
+    func testTheTimingStaysInItsRange() {
+        XCTAssertEqual(TitleGlitch.firstAfter, 0.6...2.5)
+        XCTAssertEqual(TitleGlitch.gaps, 4.0...12.0)
+        var gaps: [Double] = [], counts = Set<Int>()
+        for appearance in UInt64(0)..<100 {
+            let glitch = TitleGlitch(text: "Saves Waiting for Games", appearance: appearance)
+            for k in 0..<20 {
+                gaps.append(glitch.burstStart(k + 1) - glitch.burstStart(k))
+                counts.insert(glitch.frameCount(k))
+            }
+        }
+        XCTAssertTrue(gaps.allSatisfy { TitleGlitch.gaps.contains($0) })
+        XCTAssertLessThan(gaps.min()!, 4.5)
+        XCTAssertGreaterThan(gaps.max()!, 11.5)
+        XCTAssertEqual(counts, Set(TitleGlitch.frameCounts))
+    }
+
+    /// The screenshot tests' frozen frame is the same whatever the appearance.
+    func testAFrozenTitleIgnoresTheAppearance() {
+        XCTAssertEqual(TitleGlitch(text: "RetroPlay", appearance: 1, frozen: 2).frame(at: 0, glyphs: 9, reduceMotion: false),
+                       TitleGlitch(text: "RetroPlay", appearance: 99, frozen: 2).frame(at: 0, glyphs: 9, reduceMotion: false))
+        XCTAssertEqual(TitleGlitch(text: "RetroPlay", appearance: 1, frozen: 2), TitleGlitch(text: "RetroPlay", frozen: 2))
     }
 
     func testTheSameTitleGlitchesTheSameWayAndTitlesDiffer() {
@@ -105,7 +152,7 @@ final class TitleGlitchTests: XCTestCase {
                 }
             }
             for (k, indices) in shown where glitch.burstStart(k) + TitleGlitch.burst < 60 {
-                XCTAssertEqual(indices, Set(0..<TitleGlitch.frames), "seed \(seed): burst \(k) missed a frame")
+                XCTAssertEqual(indices, Set(0..<glitch.frameCount(k)), "seed \(seed): burst \(k) missed a frame")
             }
             XCTAssertLessThan(wakes, 120, "seed \(seed): woke \(wakes) times in a minute")
         }
@@ -117,6 +164,6 @@ final class TitleGlitchTests: XCTestCase {
         XCTAssertEqual(frame?.index, 2)
         XCTAssertEqual(glitch.frame(at: 37.3, glyphs: 9, reduceMotion: false), frame)
         XCTAssertNil(glitch.nextChange(after: 0, reduceMotion: false), "a frozen title never needs waking")
-        XCTAssertEqual(TitleGlitch(seed: 9, frozen: 99).frozen, TitleGlitch.frames - 1)
+        XCTAssertEqual(TitleGlitch(seed: 9, frozen: 99).frozen, TitleGlitch.frameCounts.upperBound - 1)
     }
 }

@@ -5,24 +5,26 @@ import Foundation
 /// "hacked" (sliced into three bands, one slid sideways, with lime and violet copies split off
 /// around it) and the whole line smears sideways in lime and violet, then it's plain again
 /// for several seconds. The look of the decode in the Mercurius apps, as an occasional flicker
-/// on RetroPlay's titles only (body text never glitches). Pure timing, from a seed, so the same
-/// title flickers the same way and tests can check it; the app's `GlitchTitleRenderer` draws
-/// what `frame(at:)` says over the text as laid out, so nothing moves or reflows.
+/// on RetroPlay's titles only (body text never glitches). Pure timing, from a seed: the title's
+/// text (so titles on screen together keep out of step) mixed with a fresh random number each
+/// time it appears (so it never flickers the same way twice), and tests can check it; the app's
+/// `GlitchTitleRenderer` draws what `frame(at:)` says over the text as laid out, so nothing
+/// moves or reflows.
 ///
-/// Light by design: a burst is `burst` long (six frames of `cycle`), the first comes
+/// Light by design: a burst is five to seven frames of `cycle` (`frameCounts`), the first comes
 /// `firstAfter` after the title appears, then one every `gaps`; between bursts the view sleeps
 /// until the next one (`nextChange`). With Reduce Motion there are none.
 public struct TitleGlitch: Sendable, Equatable {
     /// How long each frame of a burst shows (20 a second, as the decode's beat).
     public static let cycle = 0.05
-    /// A burst's frames.
-    public static let frames = 6
-    /// How long a burst lasts.
-    public static var burst: Double { cycle * Double(frames) }
+    /// How many frames a burst has (each its own).
+    public static let frameCounts = 5...7
+    /// How long the longest burst lasts.
+    public static var burst: Double { cycle * Double(frameCounts.upperBound) }
     /// The first burst, this long after the title appears: soon, so it's seen.
-    public static let firstAfter = 0.8...2.0
-    /// From one burst's start to the next.
-    public static let gaps = 5.0...10.0
+    public static let firstAfter = 0.6...2.5
+    /// From one burst's start to the next: never so often that it's busy.
+    public static let gaps = 4.0...12.0
     /// Variants of the hacked slicing (as the decode's: so a few hacked letters don't look stamped).
     public static let variants = 5
 
@@ -39,7 +41,7 @@ public struct TitleGlitch: Sendable, Equatable {
     public struct Frame: Sendable, Equatable {
         public let shapes: [Shape]
         public let smear: Bool
-        /// Which frame of its burst (0 ..< frames).
+        /// Which frame of its burst (0 ..< its `frameCount`).
         public let index: Int
     }
 
@@ -49,14 +51,22 @@ public struct TitleGlitch: Sendable, Equatable {
 
     public init(seed: UInt64, frozen: Int? = nil) {
         self.seed = seed
-        self.frozen = frozen.map { min(max($0, 0), Self.frames - 1) }
+        self.frozen = frozen.map { min(max($0, 0), Self.frameCounts.upperBound - 1) }
     }
 
-    /// A seed from the title's text, so each title flickers on its own rhythm.
-    public init(text: String, frozen: Int? = nil) {
+    /// A seed from the title's text, so each title flickers on its own rhythm, mixed with
+    /// `appearance` (the app's: a fresh random number each time the title appears), so it's
+    /// never the same twice. A frozen frame ignores `appearance`, so screenshots are steady.
+    public init(text: String, appearance: UInt64 = 0, frozen: Int? = nil) {
         var hash: UInt64 = 0xCBF2_9CE4_8422_2325
         for byte in text.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100_0000_01B3 }
-        self.init(seed: hash, frozen: frozen)
+        self.init(seed: frozen == nil ? hash ^ Self.mix(appearance) : hash, frozen: frozen)
+    }
+
+    /// How many frames burst `k` shows (`frameCounts`).
+    public func frameCount(_ k: Int) -> Int {
+        let n = UInt64(Self.frameCounts.count)
+        return Self.frameCounts.lowerBound + Int(Self.mix(seed ^ (UInt64(k) &* 0xA24B_AED4_963E_E407)) % n)
     }
 
     /// When burst `k` starts, in seconds after the title appeared.
@@ -75,7 +85,7 @@ public struct TitleGlitch: Sendable, Equatable {
         var start = burstStart(0)
         while true {
             if t < start { return nil }
-            if t < start + Self.burst { return (k, t - start) }
+            if t < start + Self.cycle * Double(frameCount(k)) { return (k, t - start) }
             k += 1
             start += Self.roll(seed, UInt64(k), in: Self.gaps)
         }
@@ -86,7 +96,7 @@ public struct TitleGlitch: Sendable, Equatable {
         guard !reduceMotion, glyphs > 0 else { return nil }
         if let frozen { return frame(burst: 0, index: frozen, glyphs: glyphs) }
         guard let (k, into) = burst(at: t) else { return nil }
-        return frame(burst: k, index: min(Self.frames - 1, Int(into / Self.cycle)), glyphs: glyphs)
+        return frame(burst: k, index: min(frameCount(k) - 1, Int(into / Self.cycle)), glyphs: glyphs)
     }
 
     /// Frame `index` of burst `k`: about a third of the glyphs hacked (at least one, at most
@@ -122,8 +132,8 @@ public struct TitleGlitch: Sendable, Equatable {
         // Asked at a boundary (as a view that just woke for it is), the sums behind burst
         // starts can round either side of it: look just past it, so the answer is always later.
         let t = t + 1e-6
-        if let (_, into) = burst(at: t) {
-            let index = min(Self.frames - 1, Int(into / Self.cycle))
+        if let (k, into) = burst(at: t) {
+            let index = min(frameCount(k) - 1, Int(into / Self.cycle))
             return t - into + Double(index + 1) * Self.cycle
         }
         var k = 0
