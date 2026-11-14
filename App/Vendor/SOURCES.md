@@ -10,7 +10,7 @@ with this repository they are the complete corresponding source for a RetroPlay 
 | mGBA | https://github.com/mgba-emu/mgba | `aa6394c93ca24b0ff40dc9231bdb0533f415e0be` (2026-09-06) | MPL-2.0 | none |
 | melonDS | https://github.com/melonDS-emu/melonDS | `906e9ebb27da8c6a715cd7abab4abfe8a8d29427` (2026-08-24) | GPL-3.0-or-later | none |
 | mupen64plus-next | https://github.com/libretro/mupen64plus-libretro-nx | `f275caf4b2bfa1e6d1c51636746ea793f3d80320` (authored 2026-05-25, committed 2026-08-06) | GPL-2.0-or-later; bundled GLideN64 is GPL-2.0-only (see below) | `patches/mupen64plus-next-ios-headers.patch` |
-| PPSSPP | https://github.com/hrydgard/ppsspp | `98e70c8ca3435d532a059add0b4fb90a4a091248` (2026-09-07) | GPL-2.0-or-later | none (submodules at the commits PPSSPP records, listed in `pins/ppsspp-submodules.txt`) |
+| PPSSPP | https://github.com/hrydgard/ppsspp | `98e70c8ca3435d532a059add0b4fb90a4a091248` (2026-09-07) | GPL-2.0-or-later | `patches/ppsspp-tex-lod-slope.patch` (hardware renderers sample slope-mode textures at the PSP's per-pixel mip level; each change marked "Modified by RetroPlay"); submodules at the commits PPSSPP records, listed in `pins/ppsspp-submodules.txt` |
 | MoltenVK (Vulkan on Metal, for PPSSPP's GPU renderer) | https://github.com/KhronosGroup/MoltenVK | release `v1.4.2` (`db66022459ffb663aa2b50f6b018bc2e124f5edf`) | Apache-2.0 (bundles SPIRV-Cross, SPIRV-Tools: Apache-2.0; cereal: BSD-3-Clause) | none: the official release's static libraries, unmodified, fetched and checked by `fetch-moltenvk.sh` |
 | Nestopia UE (NES) | https://github.com/libretro/nestopia | `135dfa6dfda5e7603d61e751b9ddd0cc42546bc3` (2026-10-11) | GPL-2.0-or-later | none |
 | bsnes (SNES) | https://github.com/libretro/bsnes | `63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7` (2026-09-04) | GPL-3.0-only ("version 3 of the License and no other version") | none (one extra compiler flag, see below) |
@@ -47,8 +47,17 @@ library reports version `0.11-1-aa6394c`, matching the commit above.
 **melonDS.** `build-melonds-ios.sh` (JIT, OpenGL and Qt off), from an unmodified checkout at
 the commit above.
 
-**PPSSPP.** `build-ppsspp-ios.sh` with submodules at the commits PPSSPP records. The core
-reports `v1.20.4-1645-g98e70c8ca3` at boot (no `-dirty` suffix). FFmpeg is PPSSPP's prebuilt
+**PPSSPP.** `build-ppsspp-ios.sh` with submodules at the commits PPSSPP records and
+`patches/ppsspp-tex-lod-slope.patch` applied. The core reports `v1.20.4-1645-g98e70c8ca3` at boot
+(`git describe --always`, so no `-dirty` suffix). The shipped device library was rebuilt with the
+patch on 2026-11-14 (Xcode 27.2, iPhoneOS 27.2 SDK): CMake `-G Xcode` with PPSSPP's iOS toolchain
+(`IOS_PLATFORM=OS`, `USE_FFMPEG=ON`, `USE_SYSTEM_FFMPEG=OFF`, `USE_MINIUPNPC=ON`, `USE_SYSTEM_LIBPNG=ON`,
+`ARMIPS_LIBRARY_ONLY=ON`), `xcodebuild -target ALL_BUILD -configuration Release
+IPHONEOS_DEPLOYMENT_TARGET=15.0` (Xcode 27 rejects the toolchain's 13.0; pre-create
+`git-version.cpp` as PPSSPP's `b-ios.sh` does), then `libtool -static` over `lib/Release/*.a`
+except `libfreetype`, `libspirv-cross-{cpp,hlsl,msl}` (not linked), plus the arm64 slices of
+`ffmpeg/ios/universal/lib/*.a`. The result has the same 1326 members as the previous build. The
+Simulator slice is still the unpatched development build from 2026-09-07. FFmpeg is PPSSPP's prebuilt
 LGPL-2.1-or-later build from the `ffmpeg` submodule, whose repository also holds the FFmpeg
 source and the iOS build script; because the whole app's source is published, users can
 rebuild and relink it as the LGPL requires.

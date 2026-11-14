@@ -1,0 +1,258 @@
+diff --git a/GPU/Common/FragmentShaderGenerator.cpp b/GPU/Common/FragmentShaderGenerator.cpp
+index ab51b2a2..17a6c7ad 100644
+--- a/GPU/Common/FragmentShaderGenerator.cpp
++++ b/GPU/Common/FragmentShaderGenerator.cpp
+@@ -70,6 +70,9 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, const ShaderLangu
+ 
+ 	bool texture3D = id.Bit(FS_BIT_3D_TEXTURE);
+ 	bool arrayTexture = id.Bit(FS_BIT_SAMPLE_ARRAY_TEXTURE);
++	// Modified by RetroPlay: explicit PSP slope LOD (GLSL only, see GPU_USE_SHADER_TEX_LOD_SLOPE).
++	bool texLodSlope = id.Bit(FS_BIT_TEX_LOD_SLOPE) && (compat.shaderLanguage == GLSL_VULKAN ||
++		(compat.shaderLanguage == GLSL_3xx && (compat.gles ? compat.glslES30 : compat.glslVersionNumber >= 130)));
+ 	bool forceDepthWritesOff = id.Bit(FS_BIT_DEPTH_TEST_NEVER);
+ 	bool useDiscardStencilBugWorkaround = id.Bit(FS_BIT_NO_DEPTH_CANNOT_DISCARD_STENCIL) && !forceDepthWritesOff;
+ 
+@@ -389,7 +392,7 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, const ShaderLangu
+ 			WRITE(p, "uniform vec3 u_texenv;\n");
+ 		}
+ 
+-		if (texture3D) {
++		if (texture3D || texLodSlope) {
+ 			*uniformMask |= DIRTY_MIPBIAS;
+ 			WRITE(p, "uniform float u_mipBias;\n");
+ 		}
+@@ -632,6 +635,13 @@ bool GenerateFragmentShader(const FShaderID &id, char *buffer, const ShaderLangu
+ 						} else {
+ 							WRITE(p, "  vec4 t = %s(tex, vec3(%s.xy, %s));\n", compat.texture, texcoord, arrayIndex);
+ 						}
++					} else if (texLodSlope) {
++						// gl_FragCoord.w is 1/w, so this is log2(2 * slope * w) + offset.
++						if (doTextureProjection) {
++							WRITE(p, "  vec4 t = textureProjLod(tex, %s, u_mipBias - log2(gl_FragCoord.w));\n", texcoord);
++						} else {
++							WRITE(p, "  vec4 t = textureLod(tex, %s.xy, u_mipBias - log2(gl_FragCoord.w));\n", texcoord);
++						}
+ 					} else {
+ 						if (doTextureProjection) {
+ 							WRITE(p, "  vec4 t = %sProj(tex, %s);\n", compat.texture, texcoord);
+diff --git a/GPU/Common/ShaderId.cpp b/GPU/Common/ShaderId.cpp
+index 72d99321..6fd7fd96 100644
+--- a/GPU/Common/ShaderId.cpp
++++ b/GPU/Common/ShaderId.cpp
+@@ -189,6 +189,7 @@ std::string FShaderID::Description(bool includeID) const {
+ 		default: desc.C("(TFuncUnk) "); break;
+ 		}
+ 	}
++	if (Bit(FS_BIT_TEX_LOD_SLOPE)) desc.C("LodSlope ");
+ 	if (Bit(FS_BIT_LMODE)) desc.C("LM ");
+ 	if (Bit(FS_BIT_ENABLE_FOG)) desc.C("Fog ");
+ 	if (Bit(FS_BIT_FLATSHADE)) desc.C("Flat ");
+@@ -348,6 +349,11 @@ void ComputeFragmentShaderID(FShaderID *id_out, const ComputedPipelineState &pip
+ 				id.SetBit(FS_BIT_SAMPLE_ARRAY_TEXTURE);
+ 			}
+ 			id.SetBit(FS_BIT_DO_TEXTURE_PROJ, doTextureProjection);
++			// Modified by RetroPlay: plain 2D textures in slope mode get their LOD from w, like the PSP.
++			if (gstate_c.Use(GPU_USE_SHADER_TEX_LOD_SLOPE) && gstate.getTexLevelMode() == GE_TEXLEVEL_MODE_SLOPE &&
++				!gstate_c.curTextureIs3D && !id.Bit(FS_BIT_SAMPLE_ARRAY_TEXTURE) && shaderDepalMode == ShaderDepalMode::OFF) {
++				id.SetBit(FS_BIT_TEX_LOD_SLOPE);
++			}
+ 		}
+ 
+ 		id.SetBit(FS_BIT_LMODE, lmode);
+diff --git a/GPU/Common/ShaderId.h b/GPU/Common/ShaderId.h
+index 439c7f31..dd2d6737 100644
+--- a/GPU/Common/ShaderId.h
++++ b/GPU/Common/ShaderId.h
+@@ -107,7 +107,8 @@ enum FShaderBit : uint8_t {
+ 	FS_BIT_USE_FRAMEBUFFER_FETCH = 59,
+ 	FS_BIT_DEPTH_TEST_NEVER = 60,  // Only used on Mali. Set when depth == NEVER. We forcibly avoid writing to depth in this case, since it crashes the driver.
+ 	FS_BIT_SAMPLE_ARRAY_TEXTURE = 61,  // For multiview, framebuffers are array textures and we need to sample the two layers correctly.
+-	// Free bits: 62-63
++	FS_BIT_TEX_LOD_SLOPE = 62,  // Modified by RetroPlay: sample at the PSP's slope LOD (textureLod).
++	// Free bit: 63
+ };
+ 
+ static inline FShaderBit operator +(FShaderBit bit, int i) {
+diff --git a/GPU/Common/ShaderUniforms.cpp b/GPU/Common/ShaderUniforms.cpp
+index 4b55d21b..5804524f 100644
+--- a/GPU/Common/ShaderUniforms.cpp
++++ b/GPU/Common/ShaderUniforms.cpp
+@@ -68,7 +68,13 @@ void BaseUpdateUniforms(UB_VS_FS_Base *ub, uint64_t dirtyUniforms, bool useBuffe
+ 
+ 	if (dirtyUniforms & DIRTY_MIPBIAS) {
+ 		float mipBias = (float)gstate.getTexLevelOffset16() * (1.0 / 16.0f);
+-		ub->mipBias = (mipBias + 0.5f) / (float)(gstate.getTextureMaxLevel() + 1);
++		if (!gstate_c.curTextureIs3D && gstate.getTexLevelMode() == GE_TEXLEVEL_MODE_SLOPE) {
++			// Modified by RetroPlay: LOD = log2(2 * w * slope) + offset (the software rasterizer's
++			// CalculateSamplingParams); the fragment shader adds log2(w). The PSP ignores the sign.
++			ub->mipBias = log2f(std::max(fabsf(gstate.getTextureLodSlope()), 1e-20f) * 2.0f) + mipBias;
++		} else {
++			ub->mipBias = (mipBias + 0.5f) / (float)(gstate.getTextureMaxLevel() + 1);
++		}
+ 	}
+ 
+ 	if (dirtyUniforms & DIRTY_PROJMATRIX) {
+diff --git a/GPU/Common/TextureCacheCommon.cpp b/GPU/Common/TextureCacheCommon.cpp
+index 7c39f3a4..a8e27d45 100644
+--- a/GPU/Common/TextureCacheCommon.cpp
++++ b/GPU/Common/TextureCacheCommon.cpp
+@@ -210,7 +210,11 @@ SamplerCacheKey TextureCacheCommon::GetSamplingParams(int maxLevel, const TexCac
+ 	}
+ 
+ 	// If mip level is forced to zero, disable mipmapping.
+-	bool noMip = maxLevel == 0 || (!autoMip && lodBias <= 0.0f);
++	// Modified by RetroPlay: in slope mode the level depends on w per fragment, so the constant part
++	// of the bias says nothing about it when the shader computes it (GPU_USE_SHADER_TEX_LOD_SLOPE).
++	const bool shaderSlopeLod = mipMode == GE_TEXLEVEL_MODE_SLOPE && gstate_c.Use(GPU_USE_SHADER_TEX_LOD_SLOPE) &&
++		!gstate_c.curTextureIs3D && !(entry && (entry->status & TexStatus::CLUT8_INDEXED));
++	bool noMip = maxLevel == 0 || (!autoMip && !shaderSlopeLod && lodBias <= 0.0f);
+ 	if (noMip) {
+ 		// Enforce no mip filtering, for safety.
+ 		key.mipEnable = false;
+diff --git a/GPU/GPUCommonHW.cpp b/GPU/GPUCommonHW.cpp
+index aa8908af..e22579f5 100644
+--- a/GPU/GPUCommonHW.cpp
++++ b/GPU/GPUCommonHW.cpp
+@@ -149,7 +149,7 @@ const CommonCommandTableEntry commonCommandTable[] = {
+ 	{ GE_CMD_TEXSIZE7, FLAG_FLUSHBEFOREONCHANGE, DIRTY_TEXTURE_PARAMS },
+ 	{ GE_CMD_TEXFORMAT, FLAG_FLUSHBEFOREONCHANGE, DIRTY_TEXTURE_IMAGE },
+ 	{ GE_CMD_TEXLEVEL, FLAG_EXECUTEONCHANGE, DIRTY_TEXTURE_PARAMS, &GPUCommonHW::Execute_TexLevel },
+-	{ GE_CMD_TEXLODSLOPE, FLAG_FLUSHBEFOREONCHANGE, DIRTY_TEXTURE_PARAMS },
++	{ GE_CMD_TEXLODSLOPE, FLAG_FLUSHBEFOREONCHANGE, DIRTY_TEXTURE_PARAMS | DIRTY_MIPBIAS },
+ 	{ GE_CMD_TEXADDR0, FLAG_FLUSHBEFOREONCHANGE, DIRTY_TEXTURE_IMAGE },
+ 	{ GE_CMD_TEXADDR1, FLAG_FLUSHBEFOREONCHANGE, DIRTY_TEXTURE_PARAMS },
+ 	{ GE_CMD_TEXADDR2, FLAG_FLUSHBEFOREONCHANGE, DIRTY_TEXTURE_PARAMS },
+@@ -592,6 +592,15 @@ u32 GPUCommonHW::CheckGPUFeatures() const {
+ 
+ 	if (draw_->GetDeviceCaps().samplerLodControl) {
+ 		features |= GPU_USE_SAMPLER_LOD_CONTROL;
++		// Modified by RetroPlay: the PSP picks the mip level of GE_TEXLEVEL_MODE_SLOPE textures from
++		// the fragment's w (see CalculateSamplingParams in the software rasterizer). Emulate that with
++		// an explicit LOD in GLSL. HLSL's SV_Position.w is not 1/w, so D3D keeps the old behavior.
++		const ShaderLanguageDesc &lang = draw_->GetShaderLanguageDesc();
++		const bool explicitLod = lang.shaderLanguage == GLSL_VULKAN ||
++			(lang.shaderLanguage == GLSL_3xx && (lang.gles ? lang.glslES30 : lang.glslVersionNumber >= 130));
++		if (explicitLod) {
++			features |= GPU_USE_SHADER_TEX_LOD_SLOPE;
++		}
+ 	}
+ 
+ 	if (draw_->GetDeviceCaps().framebufferFetchSupported) {
+@@ -1189,6 +1198,11 @@ void GPUCommonHW::Execute_Prim(u32 op, u32 diff) {
+ 			if ((data & 3) != GE_TEXLEVEL_MODE_AUTO && (0x00FF0000 & data) != 0) {
+ 				goto bail;
+ 			}
++			// Modified by RetroPlay: slope mode is part of the fragment shader ID and its LOD uniform.
++			if (gstate_c.Use(GPU_USE_SHADER_TEX_LOD_SLOPE) && (data & 3) != (gstate.texlevel & 3) &&
++				((data & 3) == GE_TEXLEVEL_MODE_SLOPE || gstate.getTexLevelMode() == GE_TEXLEVEL_MODE_SLOPE)) {
++				goto bail;
++			}
+ 			gstate.cmdmem[GE_CMD_TEXLEVEL] = data;
+ 			break;
+ 		case GE_CMD_CALL:
+@@ -1423,8 +1437,8 @@ void GPUCommonHW::Execute_TexLevel(u32 op, u32 diff) {
+ 
+ 	gstate.texlevel ^= diff;
+ 
+-	if (diff & 0xFF0000) {
+-		// Piggyback on this flag for 3D textures.
++	if (diff & 0xFF0003) {
++		// Piggyback on this flag for 3D textures (and, modified by RetroPlay, the slope LOD).
+ 		gstate_c.Dirty(DIRTY_MIPBIAS);
+ 	}
+ 	if (gstate.getTexLevelMode() != GE_TEXLEVEL_MODE_AUTO && (0x00FF0000 & gstate.texlevel) != 0) {
+diff --git a/GPU/GPUState.cpp b/GPU/GPUState.cpp
+index 22a8bd8f..3d132080 100644
+--- a/GPU/GPUState.cpp
++++ b/GPU/GPUState.cpp
+@@ -376,7 +376,7 @@ static constexpr const char * g_gpuUseFlagNames[32] = {
+ 	"GPU_USE_VS_RANGE_CULLING",
+ 	"GPU_USE_BLEND_MINMAX",
+ 	"GPU_USE_LOGIC_OP",
+-	"N/A",
++	"GPU_USE_SHADER_TEX_LOD_SLOPE",
+ 	"N/A",
+ 	"GPU_USE_ANISOTROPY",
+ 	"GPU_USE_CLEAR_RAM_HACK",
+diff --git a/GPU/GPUState.h b/GPU/GPUState.h
+index 0422d67d..c7e4e27d 100644
+--- a/GPU/GPUState.h
++++ b/GPU/GPUState.h
+@@ -471,7 +471,9 @@ enum : u32 {
+ 	GPU_USE_VS_RANGE_CULLING = FLAG_BIT(3),
+ 	GPU_USE_BLEND_MINMAX = FLAG_BIT(4),
+ 	GPU_USE_LOGIC_OP = FLAG_BIT(5),
+-	// Free bits: 6-7
++	// Modified by RetroPlay: sample GE_TEXLEVEL_MODE_SLOPE textures at the PSP's explicit LOD in the fragment shader.
++	GPU_USE_SHADER_TEX_LOD_SLOPE = FLAG_BIT(6),
++	// Free bit: 7
+ 	GPU_USE_ANISOTROPY = FLAG_BIT(8),
+ 	GPU_USE_CLEAR_RAM_HACK = FLAG_BIT(9),
+ 	// Free bit: 10-12
+@@ -561,7 +563,7 @@ struct GPUStateCache {
+ 	void SetTextureIs3D(bool is3D) {
+ 		if (is3D != curTextureIs3D) {
+ 			curTextureIs3D = is3D;
+-			Dirty(DIRTY_FRAGMENTSHADER_STATE | (is3D ? DIRTY_MIPBIAS : 0));
++			Dirty(DIRTY_FRAGMENTSHADER_STATE | DIRTY_MIPBIAS);
+ 		}
+ 	}
+ 	void SetTextureIsArray(bool isArrayTexture) {  // VK only
+diff --git a/unittest/TestShaderGenerators.cpp b/unittest/TestShaderGenerators.cpp
+index 2137fbda..a2eeb032 100644
+--- a/unittest/TestShaderGenerators.cpp
++++ b/unittest/TestShaderGenerators.cpp
+@@ -505,6 +505,42 @@ bool TestFragmentShaders() {
+ 	return true;
+ }
+ 
++// Modified by RetroPlay: GE_TEXLEVEL_MODE_SLOPE textures sample at an explicit LOD from w.
++bool TestTexLodSlopeShaders() {
++	char *buffer = new char[65536];
++	Draw::Bugs bugs;
++	bool ok = true;
++	for (bool proj : { false, true }) {
++		FShaderID id;
++		id.SetBit(FS_BIT_DO_TEXTURE);
++		id.SetBits(FS_BIT_TEXFUNC, 3, GE_TEXFUNC_MODULATE);
++		id.SetBit(FS_BIT_DO_TEXTURE_PROJ, proj);
++		id.SetBit(FS_BIT_TEX_LOD_SLOPE);
++		const char *expected = proj ? "textureProjLod(tex" : "textureLod(tex";
++		for (ShaderLanguage lang : { ShaderLanguage::GLSL_VULKAN, ShaderLanguage::GLSL_3xx, ShaderLanguage::GLSL_1xx }) {
++			std::string genError;
++			if (!GenerateFShader(id, buffer, lang, bugs, &genError)) {
++				printf("TexLodSlope: %s failed to generate: %s\n", ShaderLanguageToString(lang), genError.c_str());
++				ok = false;
++				continue;
++			}
++			const bool hasLod = strstr(buffer, expected) != nullptr && strstr(buffer, "log2(gl_FragCoord.w)") != nullptr;
++			// GLSL 1.10 has no textureLod in fragment shaders, so it keeps the hardware LOD.
++			if (hasLod != (lang != ShaderLanguage::GLSL_1xx)) {
++				printf("TexLodSlope: %s %s %s:\n%s\n", ShaderLanguageToString(lang), hasLod ? "unexpectedly uses" : "lacks", expected, LineNumberString(buffer).c_str());
++				ok = false;
++			}
++			std::string errorMessage;
++			if (!TestCompileShader(buffer, lang, ShaderStage::Fragment, &errorMessage)) {
++				printf("TexLodSlope: %s doesn't compile:\n%s\n%s\n", ShaderLanguageToString(lang), LineNumberString(buffer).c_str(), errorMessage.c_str());
++				ok = false;
++			}
++		}
++	}
++	delete[] buffer;
++	return ok;
++}
++
+ bool TestShaderGenerators() {
+ #if PPSSPP_PLATFORM(WINDOWS)
+ 	LoadD3D11();
+@@ -529,6 +565,10 @@ bool TestShaderGenerators() {
+ 		return false;
+ 	}
+ 
++	if (!TestTexLodSlopeShaders()) {
++		return false;
++	}
++
+ 	if (!TestVertexShaders()) {
+ 		return false;
+ 	}

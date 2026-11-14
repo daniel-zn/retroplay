@@ -48,6 +48,8 @@ apply_patch() {
 }
 apply_patch "$DEST/mupen64plus-next" "$HERE/patches/mupen64plus-next-ios-headers.patch"
 apply_patch "$DEST/pcsx_rearmed" "$HERE/patches/pcsx_rearmed-no-ptrace.patch"
+# PSP slope texture LOD in the hardware renderers (ATV Offroad Fury Pro terrain squares).
+apply_patch "$DEST/ppsspp" "$HERE/patches/ppsspp-tex-lod-slope.patch"
 if [[ "${FOR_SIMULATOR:-0}" == "1" ]]; then
   apply_patch "$DEST/mupen64plus-next" "$HERE/patches/mupen64plus-next-ios-simulator.patch"
 fi

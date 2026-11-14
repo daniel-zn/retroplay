@@ -55,6 +55,17 @@ into again only after two newer frames were shown and `IOSurfaceIsInUse` is fals
   up front instead of stuttering through them.
 - **Config.** Texture upscaling off (CPU work without a JIT), no post-processing shaders, 16:9
   crop off, stretch to the presented image, nearest output filter (the image is 1:1).
+- **Slope texture LOD** (`patches/ppsspp-tex-lod-slope.patch`). In `GE_TEXLEVEL_MODE_SLOPE` the PSP
+  picks the mip level per pixel, `log2(2 * w * slope) + offset` (w = clip-space w, as in PPSSPP's
+  software rasterizer). Upstream's hardware renderers can only bias the GPU's own LOD, and with a
+  small slope the bias is negative, so `GetSamplingParams` turns mipmapping off and every pixel
+  samples level 0 (upstream issue #8481). ATV Offroad Fury Pro (UCUS98648) draws its terrain this
+  way with a bright detail texture whose small mips are dark, so whole terrain chunks flipped
+  between dark and light squares. The patch adds `GPU_USE_SHADER_TEX_LOD_SLOPE` (Vulkan and
+  GLSL 1.30+/ES 3.0): slope-mode 2D textures get a fragment shader that calls
+  `textureLod(…, u_mipBias - log2(gl_FragCoord.w))` with `u_mipBias = log2(2 * slope) + offset`
+  (`gl_FragCoord.w` is 1/w), and keep their mip chain. 3D, array and CLUT8-indexed (depal)
+  textures are unchanged. PPSSPP's `unittest ShaderGenerators` covers the new shaders.
 - **Fallback.** If MoltenVK can't start (or lacks `VK_EXT_metal_objects`), the game runs on the
   software renderer as before. Debug builds can force it with `-RetroPlayPSPSoftwareGPU YES`
   for comparisons.
@@ -64,6 +75,12 @@ into again only after two newer frames were shown and `IOSurfaceIsInUse` is fals
   reach an IOSurface, while Vulkan's pluggable presentation renders into IOSurfaces directly.
   The GLES path was not built for a side-by-side measurement (the Simulator emulates GLES on
   Metal, so its numbers wouldn't carry over to a phone).
+
+To compare renderers on the Mac, PPSSPP's `PPSSPPHeadless --graphics=vulkan` can replay a GE frame
+dump (`.ppdmp`) on MoltenVK: set `SDL_VULKAN_LIBRARY` to `libMoltenVK.dylib`, put the binary in a
+`bin/` next to a `Frameworks/` holding that dylib, and use `--resolution-scale=1` for screenshots
+(headless's `windowDesc.Valid()` check rejects the Metal window description; for a local test build
+check `winsys == WINDOWSYSTEM_UNINITIALIZED` instead).
 
 `App/Vendor/fetch-moltenvk.sh` downloads MoltenVK (pinned release, checksums checked) and
 writes `Output/MoltenVK.xcframework`.
