@@ -1,12 +1,12 @@
 {
   "keep": [
-    "build/dd-land"
+    "build/dd-integrate"
   ],
   "workspaces": 1,
   "checks": [
     {
       "name": "package",
-      "run": "s=$(xcrun simctl list devices | grep -F 'RetroPlay Build (' | grep -oE '[0-9A-F-]{36}' | head -1); [ -n \"$s\" ] || { echo 'No RetroPlay Build Simulator'; exit 1; }; xcrun simctl boot \"$s\" 2>/dev/null; xcrun simctl bootstatus \"$s\" >/dev/null && cd App && xcodebuild test -scheme RetroPlay-Package -destination id=$s -derivedDataPath ../build/dd-land/package -collect-test-diagnostics never -quiet; r=$?; xcrun simctl shutdown $s 2>/dev/null; exit $r",
+      "run": "s=$(xcrun simctl list devices | grep -F 'RetroPlay Build (' | grep -oE '[0-9A-F-]{36}' | head -1); [ -n \"$s\" ] || { echo 'No RetroPlay Build Simulator'; exit 1; }; xcrun simctl boot \"$s\" 2>/dev/null; xcrun simctl bootstatus \"$s\" >/dev/null && cd App && xcodebuild test -scheme RetroPlay-Package -destination id=$s -derivedDataPath ../build/dd-integrate/package -collect-test-diagnostics never -quiet; r=$?; xcrun simctl shutdown $s 2>/dev/null; exit $r",
       "inputs": [
         "App/Package.swift",
         "App/Sources/**",
@@ -29,7 +29,7 @@
         "Scripts/app-tests.sh",
         "!**/*.md"
       ],
-      "key": "cd \"$LAND_SOURCE\" && { for f in App/Vendor/Output/*.xcframework; do echo \"$f $(stat -f %m \"$f/Info.plist\")\"; done; for x in External/*; do echo \"$x $(git -C \"$x\" rev-parse HEAD 2>/dev/null)\"; done; } | shasum",
+      "key": "cd \"$INTEGRATE_SOURCE\" && { for f in App/Vendor/Output/*.xcframework; do echo \"$f $(stat -f %m \"$f/Info.plist\")\"; done; for x in External/*; do echo \"$x $(git -C \"$x\" rev-parse HEAD 2>/dev/null)\"; done; } | shasum",
       "line": "sim-retroplay",
       "timeout": 120,
       "select": {
@@ -99,7 +99,7 @@
         "Scripts/app-tests.sh",
         "!**/*.md"
       ],
-      "key": "cd \"$LAND_SOURCE\" && { for f in App/Vendor/Output/*.xcframework; do echo \"$f $(stat -f %m \"$f/Info.plist\")\"; done; for x in External/*; do echo \"$x $(git -C \"$x\" rev-parse HEAD 2>/dev/null)\"; done; } | shasum",
+      "key": "cd \"$INTEGRATE_SOURCE\" && { for f in App/Vendor/Output/*.xcframework; do echo \"$f $(stat -f %m \"$f/Info.plist\")\"; done; for x in External/*; do echo \"$x $(git -C \"$x\" rev-parse HEAD 2>/dev/null)\"; done; } | shasum",
       "line": "sim-retroplay",
       "timeout": 120,
       "onRequest": true

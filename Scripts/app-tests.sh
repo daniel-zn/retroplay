@@ -10,7 +10,7 @@
 set -u
 cd "$(dirname "$0")/.."
 MODE=${1:-app}
-SRC=${LAND_SOURCE:-${INTEGRATE_SOURCE:-}}
+SRC=${INTEGRATE_SOURCE:-}
 # The prebuilt cores and their sources aren't in git: linked from the main checkout, as the
 # release does.
 if [ -n "$SRC" ] && [ "$(cd "$SRC" && pwd)" != "$PWD" ]; then
@@ -22,8 +22,8 @@ xcodegen generate -q || { echo "app-tests: xcodegen failed"; exit 1; }
 
 s=$(xcrun simctl list devices | grep -F 'RetroPlay Build (' | grep -oE '[0-9A-F-]{36}' | head -1)
 [ -n "$s" ] || { echo 'app-tests: no RetroPlay Build Simulator'; exit 1; }
-DD=build/dd-land/app
-R="${LAND_LOG_DIR:-build}/app-tests-$MODE.xcresult"
+DD=build/dd-integrate/app
+R="${INTEGRATE_LOG_DIR:-build}/app-tests-$MODE.xcresult"
 rm -rf "$R"
 
 # Screenshot sets: many launches across looks, for review rather than behaviour.
