@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import XCTest
 
-/// The library's top-right buttons: the system's own toolbar items, in order in one row at the
-/// top, at the default text size and at a large one; and the bar
+/// The library's top-right buttons: the system's own toolbar items, three (import, filter,
+/// Settings; search is a pull down), in order in one row at the top, at the default text size
+/// and at a large one; and the bar
 /// keeps its width while saves import (the status is in the bottom bar).
 final class LibraryTopBarUITests: XCTestCase {
-    private let ids = ["library.import", "library.filter", "library.search", "library.settings"]
+    private let ids = ["library.import", "library.filter", "library.settings"]
 
     override func setUp() {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
     }
 
-    /// The four buttons, once laid out and touchable (the bar settles after launch).
+    /// The three buttons, once laid out and touchable (the bar settles after launch).
     @MainActor
     private func topBar(_ app: XCUIApplication, _ context: String) -> [XCUIElement] {
         // In the navigation bar itself: bar items, not views drawn over it.
@@ -24,6 +25,8 @@ final class LibraryTopBarUITests: XCTestCase {
             XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: $0)
         }
         XCTAssertEqual(XCTWaiter().wait(for: settled, timeout: 10), .completed, "\(context): buttons not hittable")
+        // Exactly these: no Search button beside them.
+        XCTAssertFalse(app.navigationBars.buttons["library.search"].exists, "\(context): the bar still has a Search button")
         return buttons
     }
 
@@ -50,7 +53,7 @@ final class LibraryTopBarUITests: XCTestCase {
                 XCTAssertEqual(frame.midY, frames[0].midY, accuracy: 2, "\(size): \(id) isn't in the row")
                 XCTAssertLessThan(frame.maxY, 140, "\(size): \(id) isn't at the top")
             }
-            // Trailing: the system grows its items with Dynamic Type, so at XXXL the group of four
+            // Trailing: the system grows its items with Dynamic Type, so at XXXL the group
             // reaches past the centre; it still ends at the bar's trailing edge.
             XCTAssertLessThan(window.maxX - frames[frames.count - 1].maxX, 40, "\(size): the bar isn't on the trailing edge")
             XCTAssertGreaterThan(frames[0].minX, window.width * 0.35, "\(size): the bar reaches into the title")
@@ -59,7 +62,7 @@ final class LibraryTopBarUITests: XCTestCase {
         }
     }
 
-    /// While saves are found the top bar keeps its four buttons and its width; the status and
+    /// While saves are found the top bar keeps its three buttons and its width; the status and
     /// Stop are in the bottom bar, and Stop ends the scan. Portrait and landscape.
     @MainActor
     func testTopBarKeepsItsWidthWhileSavesImport() {
