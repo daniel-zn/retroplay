@@ -50,10 +50,13 @@ the commit above.
 **PPSSPP.** `build-ppsspp-ios.sh` with submodules at the commits PPSSPP records and
 `patches/ppsspp-tex-lod-slope.patch` applied. The core reports `v1.20.4-1645-g98e70c8ca3` at boot
 (`git describe --always`, so no `-dirty` suffix). The shipped device library was rebuilt with the
-patch on 2026-11-14 (Xcode 27.2, iPhoneOS 27.2 SDK): CMake `-G Xcode` with PPSSPP's iOS toolchain
-(`IOS_PLATFORM=OS`, `USE_FFMPEG=ON`, `USE_SYSTEM_FFMPEG=OFF`, `USE_MINIUPNPC=ON`, `USE_SYSTEM_LIBPNG=ON`,
+patch on 2026-11-14 (Xcode 27.2, iPhoneOS 27.2 SDK): CMake `-G Xcode` with a copy of PPSSPP's iOS
+toolchain whose minimum is iOS 15.0 instead of 13.0, because Xcode 27's configure-time test builds
+reject 13.0 (`sed 's/set(IPHONEOS_DEPLOYMENT_TARGET 13.0)/set(IPHONEOS_DEPLOYMENT_TARGET 15.0)/'
+cmake/Toolchains/ios.cmake > ios15.cmake`, outside the checkout so it stays unmodified, passed as
+`-DCMAKE_TOOLCHAIN_FILE=…/ios15.cmake`) (`IOS_PLATFORM=OS`, `USE_FFMPEG=ON`, `USE_SYSTEM_FFMPEG=OFF`, `USE_MINIUPNPC=ON`, `USE_SYSTEM_LIBPNG=ON`,
 `ARMIPS_LIBRARY_ONLY=ON`), `xcodebuild -target ALL_BUILD -configuration Release
-IPHONEOS_DEPLOYMENT_TARGET=15.0` (Xcode 27 rejects the toolchain's 13.0; pre-create
+IPHONEOS_DEPLOYMENT_TARGET=15.0` (PPSSPP's CMakeLists still sets 11.0 on its app target; pre-create
 `git-version.cpp` as PPSSPP's `b-ios.sh` does), then `libtool -static` over `lib/Release/*.a`
 except `libfreetype`, `libspirv-cross-{cpp,hlsl,msl}` (not linked), plus the arm64 slices of
 `ffmpeg/ios/universal/lib/*.a`. The result has the same 1326 members as the previous build. The
