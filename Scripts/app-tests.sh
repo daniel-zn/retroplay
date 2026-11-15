@@ -4,6 +4,8 @@
 #   app-tests.sh             unit tests and the behavioural UI tests (every UI class but the
 #                            screenshot sets below)
 #   app-tests.sh screenshots the screenshot sets only (type, theme and layout review)
+#   app-tests.sh appstore    the App Store screenshots only, status bar at 9:41
+#                            (Scripts/app-store-screenshots.sh runs it with a homebrew library)
 # APP_TESTS (app mode): UI tests to run, comma-separated, each a class of RetroPlayUITests or
 # Class/testMethod; the unit tests always run with them. Unset: every behavioural test.
 # Fails when a test it was given didn't run.
@@ -27,7 +29,7 @@ R="${INTEGRATE_LOG_DIR:-build}/app-tests-$MODE.xcresult"
 rm -rf "$R"
 
 # Screenshot sets: many launches across looks, for review rather than behaviour.
-SCREENSHOT_CLASSES=(TypographyScreenshotsUITests LandscapeControlsLookUITests)
+SCREENSHOT_CLASSES=(TypographyScreenshotsUITests LandscapeControlsLookUITests AppStoreScreenshotsUITests)
 only=()
 if [ "$MODE" = screenshots ]; then
   for c in "${SCREENSHOT_CLASSES[@]}"; do
@@ -35,6 +37,8 @@ if [ "$MODE" = screenshots ]; then
     grep -rqs "class $c\b" App/Tests/RetroPlayUITests && only+=("-only-testing:RetroPlayUITests/$c")
   done
   [ ${#only[@]} -gt 0 ] || { echo "app-tests: no screenshot sets here"; exit 0; }
+elif [ "$MODE" = appstore ]; then
+  only+=(-only-testing:RetroPlayUITests/AppStoreScreenshotsUITests)
 elif [ -n "${APP_TESTS:-}" ]; then
   only+=(-only-testing:RetroPlayCoreTests)
   IFS=',' read -ra picks <<< "$APP_TESTS"
@@ -53,6 +57,8 @@ if [ $r -eq 0 ]; then
   ( cd "$DD/Build/Products/Debug-iphonesimulator" && for f in *.framework; do codesign -f -s - "$f" >/dev/null 2>&1; done )
   # A fresh Simulator for the run: after a long build its services can be gone.
   xcrun simctl shutdown "$s" 2>/dev/null; xcrun simctl boot "$s"; xcrun simctl bootstatus "$s" >/dev/null
+  [ "$MODE" = appstore ] && xcrun simctl status_bar "$s" override --time 9:41 --dataNetwork wifi --wifiBars 3 \
+    --cellularMode notSupported --batteryState charged --batteryLevel 100
   run_tests() {
     rm -rf "$R"
     xcodebuild test-without-building -project RetroPlay.xcodeproj -scheme RetroPlay -destination id=$s -derivedDataPath "$DD" \
@@ -67,10 +73,13 @@ if [ $r -eq 0 ]; then
   if [ $r -ne 0 ] && grep -q "Failed to install or launch the test runner" "$R.log" && ! grep -q "Test Case '-\[RetroPlayUITests\..*' started" "$R.log"; then
     echo "app-tests: the test runner didn't start (no test ran); restarting the Simulator and running the tests again"
     xcrun simctl shutdown "$s" 2>/dev/null; sleep 5; xcrun simctl boot "$s"; xcrun simctl bootstatus "$s" >/dev/null
+    [ "$MODE" = appstore ] && xcrun simctl status_bar "$s" override --time 9:41 --dataNetwork wifi --wifiBars 3 \
+      --cellularMode notSupported --batteryState charged --batteryLevel 100
     run_tests
     r=$?
   fi
 fi
+[ "$MODE" = appstore ] && xcrun simctl status_bar "$s" clear 2>/dev/null
 xcrun simctl shutdown "$s" 2>/dev/null
 
 if [ "$MODE" = app ] && [ -n "${APP_TESTS:-}" ]; then

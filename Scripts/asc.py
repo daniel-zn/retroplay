@@ -15,6 +15,13 @@ Steps (each is safe to run again):
   listing            uploads docs/app-store/listing.md (text, URLs, category) to the editable version
   agerating          answers the age rating questions for a 4+ app (no objectionable content)
   screenshots DIR    replaces the 6.9" iPhone screenshots of the editable version with DIR/*.png
+  versions           every App Store version and its state, with its build
+  version VERSION    makes App Store version VERSION (if missing) as the editable one: release after
+                     approval, copyright and App Review contact and notes copied from the newest
+                     version that has them
+  whatsnew FILE      sets the editable version's What's New (en-US) to the text in FILE
+  build NUMBER       attaches TestFlight build NUMBER to the editable version
+  submit             submits the editable version for App Review (prints what's missing if it can't)
 
 The key needs App Manager (or Admin). It's never printed.
 """
@@ -166,14 +173,21 @@ def wait(number):
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
 
+EDITABLE = ["PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED", "WAITING_FOR_REVIEW"]
+
+
+def all_versions(a):
+    return must("versions", call("GET", f"/v1/apps/{a['id']}/appStoreVersions?filter[platform]=IOS"
+                                      "&limit=50&include=build"))
+
+
 def editable_version():
+    """The version being prepared: one not yet submitted first, then one waiting for review."""
     a = app()
-    vs = must("versions", call("GET", f"/v1/apps/{a['id']}/appStoreVersions?filter[platform]=IOS"
-                                    "&filter[appStoreState]=PREPARE_FOR_SUBMISSION,DEVELOPER_REJECTED,"
-                                    "REJECTED,METADATA_REJECTED,WAITING_FOR_REVIEW"))["data"]
+    vs = [v for v in all_versions(a)["data"] if v["attributes"]["appStoreState"] in EDITABLE]
     if not vs:
-        sys.exit("No editable App Store version (make one in App Store Connect).")
-    return a, vs[0]
+        sys.exit("No editable App Store version (make one with the `version` step).")
+    return a, min(vs, key=lambda v: EDITABLE.index(v["attributes"]["appStoreState"]))
 
 
 def app_info(a):
@@ -260,6 +274,106 @@ def screenshots(folder):
     print(f"{len(files)} screenshots in the 6.9\" iPhone set")
 
 
+def versions():
+    a = app()
+    r = all_versions(a)
+    builds = {b["id"]: b["attributes"]["version"] for b in r.get("included", []) if b["type"] == "builds"}
+    for v in r["data"]:
+        b = (v["relationships"].get("build") or {}).get("data")
+        print(f"{v['attributes']['versionString']}: {v['attributes']['appStoreState']}, "
+              f"build {builds.get(b['id'], '?') if b else 'none'}, created {v['attributes'].get('createdDate')}")
+
+
+REVIEW_FIELDS = ("contactFirstName", "contactLastName", "contactEmail", "contactPhone", "demoAccountRequired", "notes")
+
+
+def version(number):
+    a = app()
+    vs = all_versions(a)["data"]
+    new = next((v for v in vs if v["attributes"]["versionString"] == number), None)
+    others = sorted((v for v in vs if v is not new), key=lambda v: v["attributes"].get("createdDate") or "", reverse=True)
+    if new is None:
+        copyright = next((v["attributes"]["copyright"] for v in others if v["attributes"].get("copyright")), None)
+        new = must("create version", call("POST", "/v1/appStoreVersions", {"data": {
+            "type": "appStoreVersions",
+            "attributes": {"platform": "IOS", "versionString": number, "releaseType": "AFTER_APPROVAL",
+                           "copyright": copyright},
+            "relationships": {"app": {"data": {"type": "apps", "id": a["id"]}}}}}))["data"]
+        print(f"made version {number}")
+    elif new["attributes"]["appStoreState"] not in EDITABLE:
+        sys.exit(f"version {number} is {new['attributes']['appStoreState']}, no longer editable")
+    # App Review contact and notes: from the newest earlier version that has them (never printed).
+    detail = None
+    for v in others:
+        detail = call("GET", f"/v1/appStoreVersions/{v['id']}/appStoreReviewDetail").get("data")
+        if detail:
+            break
+    if detail:
+        attrs = {k: detail["attributes"].get(k) for k in REVIEW_FIELDS}
+        ex = call("GET", f"/v1/appStoreVersions/{new['id']}/appStoreReviewDetail").get("data")
+        if ex:
+            must("review detail", call("PATCH", f"/v1/appStoreReviewDetails/{ex['id']}", {"data": {
+                "type": "appStoreReviewDetails", "id": ex["id"], "attributes": attrs}}))
+        else:
+            must("review detail", call("POST", "/v1/appStoreReviewDetails", {"data": {
+                "type": "appStoreReviewDetails", "attributes": attrs,
+                "relationships": {"appStoreVersion": {"data": {"type": "appStoreVersions", "id": new["id"]}}}}}))
+        print(f"version {number}: App Review contact and notes copied from {v['attributes']['versionString']}")
+    else:
+        print(f"version {number}: no earlier App Review details to copy; fill them in on the website")
+    print(f"version {number}: {new['attributes']['appStoreState']}")
+
+
+def whatsnew(path):
+    text = pathlib.Path(path).read_text().strip()
+    _, v = editable_version()
+    loc = must("version loc", call("GET", f"/v1/appStoreVersions/{v['id']}/appStoreVersionLocalizations"))["data"]
+    loc = next(l for l in loc if l["attributes"]["locale"] == "en-US")
+    must("what's new", call("PATCH", f"/v1/appStoreVersionLocalizations/{loc['id']}", {"data": {
+        "type": "appStoreVersionLocalizations", "id": loc["id"], "attributes": {"whatsNew": text}}}))
+    print(f"What's New set on {v['attributes']['versionString']} ({len(text)} chars)")
+
+
+def attach_build(number):
+    a, v = editable_version()
+    b = must("build", call("GET", f"/v1/builds?filter[app]={a['id']}&filter[version]={number}"
+                                  f"&filter[preReleaseVersion.version]={v['attributes']['versionString']}"))["data"]
+    if not b:
+        sys.exit(f"no build {number} of version {v['attributes']['versionString']}")
+    if b[0]["attributes"]["processingState"] != "VALID":
+        sys.exit(f"build {number} is {b[0]['attributes']['processingState']}")
+    must("attach build", call("PATCH", f"/v1/appStoreVersions/{v['id']}", {"data": {
+        "type": "appStoreVersions", "id": v["id"],
+        "relationships": {"build": {"data": {"type": "builds", "id": b[0]["id"]}}}}}))
+    print(f"build {number} attached to {v['attributes']['versionString']}")
+
+
+def submit():
+    a, v = editable_version()
+    if v["attributes"]["appStoreState"] != "PREPARE_FOR_SUBMISSION":
+        sys.exit(f"{v['attributes']['versionString']} is {v['attributes']['appStoreState']}, nothing to submit")
+    open_subs = [s for s in must("submissions", call("GET", f"/v1/reviewSubmissions?filter[app]={a['id']}"
+                                                         "&filter[platform]=IOS"))["data"]
+                 if s["attributes"]["state"] in ("READY_FOR_REVIEW", "UNRESOLVED_ISSUES")]
+    sub = open_subs[0] if open_subs else must("submission", call("POST", "/v1/reviewSubmissions", {"data": {
+        "type": "reviewSubmissions", "attributes": {"platform": "IOS"},
+        "relationships": {"app": {"data": {"type": "apps", "id": a["id"]}}}}}))["data"]
+    if not call("GET", f"/v1/reviewSubmissions/{sub['id']}/items").get("data"):
+        r = call("POST", "/v1/reviewSubmissionItems", {"data": {"type": "reviewSubmissionItems", "relationships": {
+            "reviewSubmission": {"data": {"type": "reviewSubmissions", "id": sub["id"]}},
+            "appStoreVersion": {"data": {"type": "appStoreVersions", "id": v["id"]}}}}})
+        if "error" in r:
+            for e in json.loads(r["body"]).get("errors", []):
+                print(" ", e.get("detail") or e.get("title"))
+                for items in (e.get("meta") or {}).get("associatedErrors", {}).values():
+                    for x in items:
+                        print("  missing:", x.get("code"), "-", x.get("detail") or x.get("title"))
+            sys.exit("Not submitted.")
+    r = must("submit", call("PATCH", f"/v1/reviewSubmissions/{sub['id']}", {"data": {
+        "type": "reviewSubmissions", "id": sub["id"], "attributes": {"submitted": True}}}))
+    print(f"{v['attributes']['versionString']} submitted: {r['data']['attributes']['state']}")
+
+
 if __name__ == "__main__":
     step = sys.argv[1] if len(sys.argv) > 1 else "status"
     if step == "register":
@@ -278,5 +392,15 @@ if __name__ == "__main__":
         agerating()
     elif step == "screenshots" and len(sys.argv) > 2:
         screenshots(sys.argv[2])
+    elif step == "versions":
+        versions()
+    elif step == "version" and len(sys.argv) > 2:
+        version(sys.argv[2])
+    elif step == "whatsnew" and len(sys.argv) > 2:
+        whatsnew(sys.argv[2])
+    elif step == "build" and len(sys.argv) > 2:
+        attach_build(sys.argv[2])
+    elif step == "submit":
+        submit()
     else:
         sys.exit(__doc__)
