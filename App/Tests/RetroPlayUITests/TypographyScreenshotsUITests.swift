@@ -90,7 +90,20 @@ final class TypographyScreenshotsUITests: XCTestCase {
         }
     }
 
-    /// Settings, then (swiped closed) search, in one launch per look.
+    /// The library pulled down until its search field shows, in the grid and in Cover Flow.
+    @MainActor
+    private func pullDownToSearch(_ app: XCUIApplication, _ context: String) -> XCUIElement {
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+            .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)),
+                   withVelocity: .slow, thenHoldForDuration: 0.2)
+        let field = app.searchFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "\(context): pulling down showed no search field")
+        return field
+    }
+
+    /// Settings, then (swiped closed) the grid pulled down to show search, and a search typed;
+    /// then Cover Flow pulled down to show search. One launch per layout and look.
     @MainActor
     func testSearchAndSettings() {
         for look in looks {
@@ -106,14 +119,25 @@ final class TypographyScreenshotsUITests: XCTestCase {
                 .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
             XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier ==[c] %@", "Settings")).firstMatch.waitForNonExistence(timeout: 10), "settings \(look.name): didn't close")
 
-            let search = app.buttons["library.search"].firstMatch
-            XCTAssertTrue(search.waitForExistence(timeout: 10))
-            search.tap()
-            Thread.sleep(forTimeInterval: 1.5)
+            XCTAssertTrue(app.buttons["library.settings"].firstMatch.waitForExistence(timeout: 10))
+            Thread.sleep(forTimeInterval: 1)
+            let field = pullDownToSearch(app, "grid \(look.name)")
+            Thread.sleep(forTimeInterval: 1)
+            shoot(app, "search-revealed-grid-\(look.name)")
+            field.tap()
+            Thread.sleep(forTimeInterval: 1)
             app.typeText("Su")
             Thread.sleep(forTimeInterval: 1)
             shoot(app, "search-\(look.name)")
             app.terminate()
+
+            let flow = launch(look, ["-retroplay.libraryLayout", "coverFlow"])
+            XCTAssertTrue(flow.buttons["library.settings"].firstMatch.waitForExistence(timeout: 30), "cover flow \(look.name): no library")
+            Thread.sleep(forTimeInterval: 2)
+            _ = pullDownToSearch(flow, "cover flow \(look.name)")
+            Thread.sleep(forTimeInterval: 1)
+            shoot(flow, "search-revealed-coverflow-\(look.name)")
+            flow.terminate()
         }
     }
 
@@ -158,8 +182,8 @@ final class TypographyScreenshotsUITests: XCTestCase {
         }
     }
 
-    /// The titles' glitch, each frame of a burst held still (dark and light): the large title
-    /// and the section headings hacked in lime and violet, still read as themselves (VoiceOver
+    /// The titles' glitch, each frame of a burst held still (dark and light): the section
+    /// headings and covers' titles hacked in lime and violet (the large title is the bar's own), still read as themselves (VoiceOver
     /// and the tests see the plain title throughout).
     @MainActor
     func testTitleGlitchFrames() {

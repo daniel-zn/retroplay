@@ -42,8 +42,7 @@ struct SettingsView: View {
             }
             .scrollContentBackground(.hidden)
             .background(RetroPlayTheme.canvas(for: colorScheme))
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
+            .retroPlayLargeTitle("Settings")
             // Opaque SwiftUI toolbarBackground covers the large title; UIKit scroll-edge is clear.
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .retroPlayNavigationTitleChrome(for: colorScheme)

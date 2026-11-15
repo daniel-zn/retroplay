@@ -5,7 +5,8 @@ import PackageDescription
 let package = Package(
     name: "RetroPlay",
     platforms: [
-        .iOS(.v18),
+        // The app ships for iOS 26 (project.yml): its navigation-bar title and subtitle places.
+        .iOS("26.0"),
         .macOS(.v15),
     ],
     products: [

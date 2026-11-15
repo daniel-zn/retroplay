@@ -16,8 +16,6 @@ struct LibraryCoverFlowView<Header: View>: View {
     var onRequestDelete: ((LibraryGame) -> Void)?
     var lastPlayed: [UUID: Date] = [:]
     var missingGameIDs: Set<UUID> = []
-    /// Drives the inline navigation title once the page scrolls (large text in landscape).
-    var titleCollapsed: Binding<Bool>?
     /// Takes controller moves (left / right, A).
     var controllerNavigation = false
     @ViewBuilder let header: () -> Header
@@ -111,15 +109,10 @@ struct LibraryCoverFlowView<Header: View>: View {
                 .frame(minHeight: outer.size.height + bottomRoom)
             }
             .ignoresSafeArea(edges: landscape ? .bottom : [])
-            // Scrolls only when large text leaves no room (landscape); otherwise it stays put.
-            .scrollBounceBehavior(.basedOnSize)
-            .onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.contentOffset.y + geometry.contentInsets.top > 28
-            } action: { _, collapsed in
-                if let titleCollapsed, titleCollapsed.wrappedValue != collapsed {
-                    titleCollapsed.wrappedValue = collapsed
-                }
-            }
+            // The page scrolls only when large text leaves no room (landscape), but it always
+            // pulls down, as the grid does, to show the search field under the title. The covers
+            // swipe only sideways, so a pull down that starts on them moves the page.
+            .scrollBounceBehavior(.always, axes: .vertical)
         }
         .background(RetroPlayTheme.canvas(for: colorScheme).ignoresSafeArea())
         #if DEBUG

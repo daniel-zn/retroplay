@@ -40,7 +40,13 @@ public struct RetroPlayTextStyle: Sendable, Equatable {
         self.relativeTo = relativeTo
     }
 
-    public static let largeTitle = Self(name: "largeTitle", size: 30, relativeTo: .largeTitle)
+    /// Screen titles (the navigation bar's large title): well over Apple's 34, as the thin face
+    /// reads small next to the system's bold one. It grows with Dynamic Type up to
+    /// `largestTitleSize`.
+    public static let largeTitle = Self(name: "largeTitle", size: 42, relativeTo: .largeTitle)
+    /// The large title's size at the largest text sizes: one line of the longest screen title
+    /// still fits a 375-point-wide iPhone, inside the bar's margins.
+    public static let largestTitleSize: CGFloat = 56
     public static let title = Self(name: "title", size: 25, relativeTo: .title)
     public static let title2 = Self(name: "title2", size: 20, relativeTo: .title2)
     public static let title3 = Self(name: "title3", size: 18, relativeTo: .title3)

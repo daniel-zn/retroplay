@@ -79,19 +79,28 @@ enum RetroPlayFont {
         uiFont(size: style.size, textStyle: style.relativeTo.uiKit, face: RetroPlayTypeface.titlePostScriptName)
     }
 
+    /// The large title's font (the italic, `RetroPlayTextStyle.largeTitle`, no larger than
+    /// `largestTitleSize`), for `traits`' text size.
+    static func uiLargeTitleFont(compatibleWith traits: UITraitCollection? = nil) -> UIFont {
+        uiFont(size: RetroPlayTextStyle.largeTitle.size, textStyle: .largeTitle,
+               maximumPointSize: RetroPlayTextStyle.largestTitleSize,
+               face: RetroPlayTypeface.titlePostScriptName, compatibleWith: traits)
+    }
+
     static func uiFont(size: CGFloat, textStyle: UIFont.TextStyle, maximumPointSize: CGFloat? = nil,
-                       face: String = RetroPlayTypeface.postScriptName) -> UIFont {
+                       face: String = RetroPlayTypeface.postScriptName,
+                       compatibleWith traits: UITraitCollection? = nil) -> UIFont {
         registerBundledFont()
         guard let base = UIFont(name: face, size: size) ?? UIFont(name: name, size: size) else {
             // preferredFont is already scaled; scaling it again would magnify
             // the fallback twice at non-default Dynamic Type sizes.
-            return UIFont.preferredFont(forTextStyle: textStyle)
+            return UIFont.preferredFont(forTextStyle: textStyle, compatibleWith: traits)
         }
         let metrics = UIFontMetrics(forTextStyle: textStyle)
         if let maximumPointSize {
-            return metrics.scaledFont(for: base, maximumPointSize: maximumPointSize)
+            return metrics.scaledFont(for: base, maximumPointSize: maximumPointSize, compatibleWith: traits)
         }
-        return metrics.scaledFont(for: base)
+        return metrics.scaledFont(for: base, compatibleWith: traits)
     }
 
     /// The letter spacing every text gets (`RetroPlayTypeface.tracking`), grown with Dynamic

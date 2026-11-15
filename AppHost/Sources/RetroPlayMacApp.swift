@@ -18,5 +18,6 @@ struct RetroPlayMacApp: App {
             RetroPlayRootView()
                 .retroPlayExternalDisplayAccessory()
         }
+        .commands { RetroPlayCommands() }
     }
 }

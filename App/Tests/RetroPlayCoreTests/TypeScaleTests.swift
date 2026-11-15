@@ -94,4 +94,21 @@ final class TypeScaleTests: XCTestCase {
             XCTAssertTrue(CTFontGetGlyphsForCharacters(font, &units, &glyphs, units.count), "no “\(character)”")
         }
     }
+
+    /// Screen titles are big: the large title is well over Apple's 34 points (the thin italic
+    /// reads small beside the system's bold), and at its largest size the longest one is still
+    /// one line on a 375-point-wide iPhone, inside the bar's 16-point margins.
+    func testLargeTitlesAreBigAndFitASmallIPhoneAtTheirLargest() {
+        XCTAssertGreaterThanOrEqual(RetroPlayTextStyle.largeTitle.size, 40)
+        XCTAssertGreaterThan(RetroPlayTextStyle.largestTitleSize, RetroPlayTextStyle.largeTitle.size)
+        let font = CTFontCreateWithName(RetroPlayTypeface.titlePostScriptName as CFString, RetroPlayTextStyle.largestTitleSize, nil)
+        XCTAssertEqual(CTFontCopyPostScriptName(font) as String, RetroPlayTypeface.titlePostScriptName)
+        for title in ["RetroPlay", "Settings"] {
+            let line = CTLineCreateWithAttributedString(NSAttributedString(
+                string: title, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font]))
+            // The italic leans past its advance, and the glitch draws a little beyond it.
+            let width = CTLineGetTypographicBounds(line, nil, nil, nil) + 16
+            XCTAssertLessThanOrEqual(width, 375 - 32, "“\(title)” at \(RetroPlayTextStyle.largestTitleSize) pt is \(width) wide")
+        }
+    }
 }

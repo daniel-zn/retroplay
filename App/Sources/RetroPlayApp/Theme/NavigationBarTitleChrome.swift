@@ -27,7 +27,19 @@ enum RetroPlayNavigationBarChrome {
         ]
         standard.largeTitleTextAttributes = [
             .foregroundColor: foreground,
-            .font: RetroPlayFont.uiTitleFont(.largeTitle),
+            .font: RetroPlayFont.uiLargeTitleFont(),
+            .kern: RetroPlayFont.uiKern
+        ]
+        // The library's game count under its title.
+        let secondary = UIColor(RetroPlayTheme.secondaryText(for: colorScheme))
+        standard.subtitleTextAttributes = [
+            .foregroundColor: secondary,
+            .font: RetroPlayFont.uiFont(.caption),
+            .kern: RetroPlayFont.uiKern
+        ]
+        standard.largeSubtitleTextAttributes = [
+            .foregroundColor: secondary,
+            .font: RetroPlayFont.uiFont(.footnote),
             .kern: RetroPlayFont.uiKern
         ]
 
@@ -37,6 +49,8 @@ enum RetroPlayNavigationBarChrome {
         scrollEdge.shadowColor = .clear
         scrollEdge.titleTextAttributes = standard.titleTextAttributes
         scrollEdge.largeTitleTextAttributes = standard.largeTitleTextAttributes
+        scrollEdge.subtitleTextAttributes = standard.subtitleTextAttributes
+        scrollEdge.largeSubtitleTextAttributes = standard.largeSubtitleTextAttributes
 
         let applyToBar: (UINavigationBar) -> Void = { bar in
             bar.standardAppearance = standard
@@ -46,8 +60,7 @@ enum RetroPlayNavigationBarChrome {
             // Bar buttons (top-bar icons, back chevrons) in the accent, scrolled or not: a white
             // tint here turned the library's buttons white once the bar collapsed.
             bar.tintColor = UIColor(RetroPlayTheme.accent)
-            // Do not force prefersLargeTitles here — Library is .inline with a
-            // custom scroll title; forcing true reserves a blank large-title inset.
+            // Each screen asks for its own title display mode (`retroPlayLargeTitle`).
             bar.isTranslucent = true
         }
 
@@ -65,13 +78,15 @@ enum RetroPlayNavigationBarChrome {
 
     static func applyTitleFonts(to item: UINavigationItem, bar: UINavigationBar) {
         let titleFont = RetroPlayFont.uiTitleFont(.headline)
-        let largeTitleFont = RetroPlayFont.uiTitleFont(.largeTitle)
+        let largeTitleFont = RetroPlayFont.uiLargeTitleFont()
         func patched(_ appearance: UINavigationBarAppearance?) -> UINavigationBarAppearance? {
             guard let copy = appearance?.copy() else { return nil }
             copy.titleTextAttributes[.font] = titleFont
             copy.largeTitleTextAttributes[.font] = largeTitleFont
             copy.titleTextAttributes[.kern] = RetroPlayFont.uiKern
             copy.largeTitleTextAttributes[.kern] = RetroPlayFont.uiKern
+            copy.subtitleTextAttributes[.font] = RetroPlayFont.uiFont(.caption)
+            copy.largeSubtitleTextAttributes[.font] = RetroPlayFont.uiFont(.footnote)
             return copy
         }
         item.standardAppearance = patched(item.standardAppearance ?? bar.standardAppearance)
@@ -161,30 +176,14 @@ extension View {
 }
 
 
-/// Forces `prefersLargeTitles = false` on the enclosing navigation bar (Library custom title).
-@available(iOS 18.0, *)
-struct LibraryInlineNavChrome: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
-
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        let apply: () -> Void = {
-            var current: UIViewController? = uiViewController
-            while let c = current {
-                if let nav = c.navigationController {
-                    nav.navigationBar.prefersLargeTitles = false
-                    return
-                }
-                current = c.parent
-            }
-        }
-        apply()
-        DispatchQueue.main.async(execute: apply)
-    }
-}
-
 @available(iOS 18.0, *)
 extension View {
-    func retroPlayLibraryInlineNav() -> some View {
-        background(LibraryInlineNavChrome())
+    /// A screen's title as iOS shows it: large under the bar's buttons, collapsing into the bar
+    /// as the page scrolls, and inline in landscape; both in the title italic, the large one at
+    /// `RetroPlayTextStyle.largeTitle` (`RetroPlayNavigationBarChrome`; pair with
+    /// `retroPlayNavigationTitleChrome`). The bar draws it, so it has no glitch.
+    func retroPlayLargeTitle(_ title: String) -> some View {
+        navigationTitle(title)
+            .navigationBarTitleDisplayMode(.large)
     }
 }

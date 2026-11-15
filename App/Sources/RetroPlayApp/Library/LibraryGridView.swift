@@ -10,8 +10,6 @@ struct LibraryGridView<Header: View>: View {
     let artworkProvider: (LibraryGame) -> CoverArt?
     /// When non-nil, long-press offers Delete (confirmation lives on the caller).
     var onRequestDelete: ((LibraryGame) -> Void)? = nil
-    /// When non-nil, drives inline nav collapse once scroll offset exceeds threshold.
-    let titleCollapsed: Binding<Bool>?
     /// Last played (newest save state) per game, for the tile subtitle.
     var lastPlayed: [UUID: Date] = [:]
     /// Rows whose ROM was removed in Files; drawn dimmed with a warning mark.
@@ -45,7 +43,6 @@ struct LibraryGridView<Header: View>: View {
         onSelect: @escaping (LibraryGame) -> Void,
         artworkProvider: @escaping (LibraryGame) -> CoverArt?,
         onRequestDelete: ((LibraryGame) -> Void)? = nil,
-        titleCollapsed: Binding<Bool>? = nil,
         lastPlayed: [UUID: Date] = [:],
         missingGameIDs: Set<UUID> = [],
         controllerNavigation: Bool = false,
@@ -58,7 +55,6 @@ struct LibraryGridView<Header: View>: View {
         self.onSelect = onSelect
         self.artworkProvider = artworkProvider
         self.onRequestDelete = onRequestDelete
-        self.titleCollapsed = titleCollapsed
         self.header = header
     }
 
@@ -120,15 +116,6 @@ struct LibraryGridView<Header: View>: View {
             }
         }
         .background(RetroPlayTheme.canvas(for: colorScheme))
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top
-        } action: { _, offset in
-            guard let titleCollapsed else { return }
-            let collapsed = offset > 28
-            if titleCollapsed.wrappedValue != collapsed {
-                titleCollapsed.wrappedValue = collapsed
-            }
-        }
         .onChange(of: navigator.event) { _, event in
             guard controllerNavigation, let event, event.context == .library else { return }
             handle(event.command)
@@ -186,7 +173,6 @@ extension LibraryGridView where Header == EmptyView {
         onSelect: @escaping (LibraryGame) -> Void,
         artworkProvider: @escaping (LibraryGame) -> CoverArt?,
         onRequestDelete: ((LibraryGame) -> Void)? = nil,
-        titleCollapsed: Binding<Bool>? = nil,
         lastPlayed: [UUID: Date] = [:],
         missingGameIDs: Set<UUID> = []
     ) {
@@ -195,7 +181,6 @@ extension LibraryGridView where Header == EmptyView {
             onSelect: onSelect,
             artworkProvider: artworkProvider,
             onRequestDelete: onRequestDelete,
-            titleCollapsed: titleCollapsed,
             lastPlayed: lastPlayed,
             missingGameIDs: missingGameIDs,
             header: { EmptyView() }
