@@ -47,9 +47,9 @@
           "image-name": "controls.png",
           "name": "Sticks and buttons",
           "position": {
-            "scale": 0.8,
+            "scale": 0.92,
             "translation-in-points": [
-              36,
+              24,
               -36
             ]
           }
@@ -70,9 +70,9 @@
           "image-name": "screen.png",
           "name": "Screen",
           "position": {
-            "scale": 0.8,
+            "scale": 0.92,
             "translation-in-points": [
-              36,
+              24,
               -36
             ]
           },
@@ -93,9 +93,9 @@
           "image-name": "panels.png",
           "name": "Side panels",
           "position": {
-            "scale": 0.8,
+            "scale": 0.92,
             "translation-in-points": [
-              36,
+              24,
               -36
             ]
           },
@@ -127,9 +127,9 @@
           "image-name": "body.png",
           "name": "Grip body",
           "position": {
-            "scale": 0.8,
+            "scale": 0.92,
             "translation-in-points": [
-              36,
+              24,
               -36
             ]
           },
