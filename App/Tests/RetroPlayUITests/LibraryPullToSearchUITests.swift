@@ -106,18 +106,23 @@ final class LibraryPullToSearchUITests: XCTestCase {
 
     /// Command-F on a hardware keyboard puts the cursor in the search field, in both layouts.
     @MainActor
-    func testCommandFSearchesTheLibrary() {
-        for layout in ["grid", "coverFlow"] {
-            let app = launch(["-retroplay.libraryLayout", layout])
-            let query = waitForLibrary(app, layout)
-            app.typeKey("f", modifierFlags: .command)
-            let field = app.searchFields.firstMatch
-            XCTAssertTrue(field.waitForExistence(timeout: 5) && waitFor("hasKeyboardFocus == true", field, timeout: 5),
-                          "\(layout): Command-F didn't put the cursor in the search field")
-            app.typeText(query)
-            let results = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH[c] %@ OR label ENDSWITH[c] %@", "Result", "Results")).firstMatch
-            XCTAssertTrue(results.waitForExistence(timeout: 10), "\(layout): typing after Command-F didn't search")
-            app.terminate()
-        }
+    func testCommandFSearchesTheGrid() { expectCommandFSearches("grid") }
+
+    @MainActor
+    func testCommandFSearchesCoverFlow() { expectCommandFSearches("coverFlow") }
+
+    @MainActor
+    private func expectCommandFSearches(_ layout: String) {
+        let app = launch(["-retroplay.libraryLayout", layout])
+        let query = waitForLibrary(app, layout)
+        app.typeKey("f", modifierFlags: .command)
+        let field = app.searchFields.firstMatch
+        let focused = field.waitForExistence(timeout: 5) && waitFor("hasKeyboardFocus == true", field, timeout: 5)
+        attach("command-f-\(layout)")
+        XCTAssertTrue(focused, "\(layout): Command-F didn't put the cursor in the search field")
+        app.typeText(query)
+        let results = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH[c] %@ OR label ENDSWITH[c] %@", "Result", "Results")).firstMatch
+        XCTAssertTrue(results.waitForExistence(timeout: 10), "\(layout): typing after Command-F didn't search")
+        app.terminate()
     }
 }
