@@ -115,9 +115,15 @@ final class LibraryPullToSearchUITests: XCTestCase {
     private func expectCommandFSearches(_ layout: String) {
         let app = launch(["-retroplay.libraryLayout", layout])
         let query = waitForLibrary(app, layout)
-        app.typeKey("f", modifierFlags: .command)
         let field = app.searchFields.firstMatch
-        let focused = field.waitForExistence(timeout: 5) && waitFor("hasKeyboardFocus == true", field, timeout: 5)
+        // The Simulator can drop the first key event after a launch (it connects its hardware
+        // keyboard then), so up to three presses; the count is logged.
+        var focused = false
+        for press in 1...3 where !focused {
+            app.typeKey("f", modifierFlags: .command)
+            focused = waitFor("hasKeyboardFocus == true", field, timeout: 4)
+            print("[command-f] \(layout) press \(press): field \(field.exists) focused \(focused)")
+        }
         attach("command-f-\(layout)")
         XCTAssertTrue(focused, "\(layout): Command-F didn't put the cursor in the search field")
         app.typeText(query)
