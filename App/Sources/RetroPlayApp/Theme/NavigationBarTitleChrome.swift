@@ -179,11 +179,39 @@ extension View {
 @available(iOS 18.0, *)
 extension View {
     /// A screen's title as iOS shows it: large under the bar's buttons, collapsing into the bar
-    /// as the page scrolls, and inline in landscape; both in the title italic, the large one at
-    /// `RetroPlayTextStyle.largeTitle` (`RetroPlayNavigationBarChrome`; pair with
-    /// `retroPlayNavigationTitleChrome`). The bar draws it, so it has no glitch.
+    /// as the page scrolls, and inline in landscape; both in the title italic
+    /// (`RetroPlayNavigationBarChrome`; pair with `retroPlayNavigationTitleChrome`). The large
+    /// one is the app's own Text in the bar's large-title place (iOS 26's `.largeTitle` item),
+    /// so it keeps the title glitch; the bar still collapses it to the inline title.
     func retroPlayLargeTitle(_ title: String) -> some View {
         navigationTitle(title)
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .largeTitle) {
+                    RetroPlayLargeTitleText(title: title)
+                }
+            }
+    }
+}
+
+/// The large title's text: the italic at `RetroPlayTextStyle.largeTitle` (no larger than its
+/// largest size), leading like the bar's own, on one line, with the glitch.
+@available(iOS 18.0, *)
+private struct RetroPlayLargeTitleText: View {
+    let title: String
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
+        Text(title)
+            .font(Font(RetroPlayFont.uiLargeTitleFont(compatibleWith: traits)))
+            .kerning(RetroPlayFont.uiKern)
+            .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
+            .lineLimit(1)
+            .fixedSize()
+            .retroPlayTitleGlitch(title)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
     }
 }

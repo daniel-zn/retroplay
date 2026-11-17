@@ -182,9 +182,9 @@ final class TypographyScreenshotsUITests: XCTestCase {
         }
     }
 
-    /// The titles' glitch, each frame of a burst held still (dark and light): the section
-    /// headings and covers' titles hacked in lime and violet (the large title is the bar's own), still read as themselves (VoiceOver
-    /// and the tests see the plain title throughout).
+    /// The titles' glitch, each frame of a burst held still (dark and light): the big title,
+    /// section headings and covers' titles hacked in lime and violet, still read as themselves
+    /// (VoiceOver and the tests see the plain title throughout).
     @MainActor
     func testTitleGlitchFrames() {
         for look in looks.prefix(2) {
