@@ -31,6 +31,9 @@ struct CoverFlowStageView: View {
                 MainActor.assumeIsolated { scene.frame() }
             }
         } update: { _ in
+            #if DEBUG
+            LibraryWorkProbe.stage += 1
+            #endif
             scene.frame()
         }
     }

@@ -398,7 +398,10 @@ public struct RetroPlayRootView: View {
     }
 
     private var libraryNavigation: some View {
-        NavigationStack {
+        #if DEBUG
+        LibraryWorkProbe.library += 1
+        #endif
+        return NavigationStack {
             Group {
                 if isSearching {
                     searchContent
@@ -522,6 +525,9 @@ public struct RetroPlayRootView: View {
                 PlayView(game: game, romURL: store.absoluteURL(for: game))
             }
         }
+        #if DEBUG
+        .libraryWorkProbe()
+        #endif
     }
 
     /// Command-F: the search field up (pulled into view if it was hidden) with the cursor in it.

@@ -212,6 +212,10 @@ private struct RetroPlayLargeTitleText: View {
             .fixedSize()
             .retroPlayTitleGlitch(title)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // The bar doesn't expose its large-title item's views by themselves: one element,
+            // the title as a heading, for VoiceOver.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
             .accessibilityAddTraits(.isHeader)
     }
 }
