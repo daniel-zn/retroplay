@@ -33,9 +33,6 @@ struct LibraryCoverFlowView<Header: View>: View {
     @State private var listKey: ListKey?
     @State private var headerHeight: CGFloat = 0
     @State private var captionHeight: CGFloat = 0
-    /// The free room under the caption's place (portrait), so the caption shown is centred in
-    /// all the room below the covers.
-    @State private var roomBelowCaption: CGFloat = 0
     /// Where the row is right now, for the snapping to know where a swipe was let go.
     @State private var tracker = CoverFlowScrollTracker()
     @State private var scene = CoverFlowScene()
@@ -61,6 +58,7 @@ struct LibraryCoverFlowView<Header: View>: View {
         #if DEBUG
         let _ = LibraryWorkProbe.coverFlow += 1
         #endif
+        let artRevision = games.reduce(0) { $0 &+ (artworkProvider($1)?.isBoxArt == true ? 1 : 0) }
         GeometryReader { outer in
             // Landscape is short: the row runs down through the home-indicator strip, the caption
             // sits at the bottom instead of being centred, and the covers take the height saved.
@@ -86,27 +84,49 @@ struct LibraryCoverFlowView<Header: View>: View {
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
                     if !games.isEmpty {
                         Spacer(minLength: 0)
-                        carousel(metrics: metrics, width: outer.size.width)
+                        CoverFlowRow(
+                            games: games,
+                            filter: filter,
+                            metrics: metrics,
+                            width: outer.size.width,
+                            missingGameIDs: missingGameIDs,
+                            lastPlayed: lastPlayed,
+                            artRevision: artRevision,
+                            liveIndex: $liveIndex,
+                            position: $position,
+                            tracker: tracker,
+                            scene: scene,
+                            onSelect: onSelect,
+                            artworkProvider: artworkProvider,
+                            onRequestDelete: onRequestDelete,
+                            move: { move(to: $0, animated: $1) },
+                            settle: { settle(at: $0) }
+                        )
+                        .equatable()
                             .padding(.top, landscape ? 4 : 8 + overhang)
                             .padding(.bottom, (landscape ? 6 : 12) + overhang)
                         // The covers are laid out around the caption as it was before it grew
                         // (kept in place, unseen), so they neither move nor shrink; the caption
                         // shown is drawn over that room, centred in all the room below them.
-                        caption(shown: false)
-                            .hidden()
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, landscape ? 14 : 16)
-                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
-                            .overlay {
-                                caption(shown: true)
-                                    .padding(.horizontal, 24)
-                                    .offset(y: landscape ? -4 : roomBelowCaption / 2)
+                        // Portrait: centred in all the room below the covers (the unseen caption and
+                        // the free room under it), by layout alone, so a pull down that changes
+                        // that room doesn't run this view again.
+                        VStack(spacing: 0) {
+                            caption(shown: false)
+                                .hidden()
+                                .padding(.horizontal, 24)
+                                .padding(.bottom, landscape ? 14 : 16)
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
+                            if !landscape {
+                                Spacer(minLength: 0)
                             }
-                            .zIndex(1)
-                        if !landscape {
-                            Spacer(minLength: 0)
-                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { roomBelowCaption = $0 }
                         }
+                        .overlay {
+                            caption(shown: true)
+                                .padding(.horizontal, 24)
+                                .offset(y: landscape ? -4 : 0)
+                        }
+                        .zIndex(1)
                     }
                 }
                 .frame(minHeight: outer.size.height + bottomRoom)
@@ -138,133 +158,6 @@ struct LibraryCoverFlowView<Header: View>: View {
         #if DEBUG
         .task { await smokeScroll() }
         #endif
-    }
-
-    // MARK: Carousel
-
-    private func carousel(metrics: CoverFlow.Metrics, width: CGFloat) -> some View {
-        #if DEBUG
-        LibraryWorkProbe.carousel += 1
-        #endif
-        // A swipe moves the row a full step per game while the side covers are drawn packed
-        // tighter, so covers far out in the stacks are still on screen when their layout slot
-        // is well past the edge. The row is laid out wide enough for every cover that shows
-        // (the lazy stack only builds what's inside its frame), and drawn centred on screen.
-        let reach = min(
-            metrics.layoutDistance(forVisual: width / 2 + metrics.coverWidth / 2),
-            metrics.step * 40
-        ).rounded(.up)
-        let rowWidth = reach * 2 + metrics.step
-        // The boxes are drawn by the 3D scene behind the (invisible) row of buttons. Its view
-        // is centred on the eye, level with the slot's top, and tall enough to reach past the
-        // slot's floor by the boxes' overhang.
-        let stageHeight = (metrics.coverHeight + metrics.overhang + 24) * 2
-        let input = CoverFlowScene.Input(
-            games: games,
-            stage: CoverFlow.Stage(metrics: metrics),
-            size: CGSize(width: width, height: stageHeight),
-            missing: missingGameIDs,
-            liveIndex: liveIndex,
-            dark: colorScheme == .dark,
-            artRevision: games.reduce(0) { $0 &+ (artworkProvider($1)?.isBoxArt == true ? 1 : 0) }
-        )
-        return ScrollView(.horizontal) {
-            LazyHStack(spacing: 0) {
-                ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
-                    coverButton(game, index: index, metrics: metrics)
-                        .frame(width: metrics.step, height: metrics.coverHeight)
-                        // One fixed order (earlier games on top), so covers never swap
-                        // places mid-swipe.
-                        .zIndex(CoverFlow.layer(index: index))
-                }
-            }
-            .scrollTargetLayout()
-        }
-        .scrollIndicators(.hidden)
-        .scrollClipDisabled()
-        .contentMargins(.horizontal, reach, for: .scrollContent)
-        .scrollTargetBehavior(CoverFlowSnapping(metrics: metrics, count: games.count, tracker: tracker))
-        .scrollPosition($position, anchor: .center)
-        .onScrollGeometryChange(for: Double.self) { geometry in
-            geometry.contentOffset.x + geometry.contentInsets.leading
-        } action: { _, offset in
-            tracker.offset = offset
-            let index = metrics.index(forOffset: offset, count: games.count)
-            if liveIndex != index { liveIndex = index }
-        }
-        .onScrollPhaseChange { old, phase in
-            if phase == .interacting, old != .interacting {
-                tracker.start = tracker.offset
-            }
-            // Only a swipe coming to rest; the row also goes idle when the list changes,
-            // before it's been moved to the right game.
-            if phase == .idle, old == .interacting || old == .decelerating {
-                settle(at: liveIndex)
-            }
-        }
-        .frame(width: rowWidth, height: metrics.coverHeight)
-        .frame(width: width)
-        .background(alignment: .top) {
-            CoverFlowStageView(scene: scene, height: stageHeight)
-                .frame(width: width)
-                .offset(y: -stageHeight / 2)
-        }
-        .onChange(of: input, initial: true) { _, input in
-            scene.offset = { [tracker] in tracker.offset }
-            scene.artwork = artworkProvider
-            scene.input = input
-        }
-        .sensoryFeedback(.selection, trigger: liveIndex)
-    }
-
-    private func coverButton(
-        _ game: LibraryGame,
-        index: Int,
-        metrics: CoverFlow.Metrics
-    ) -> some View {
-        let missing = missingGameIDs.contains(game.id)
-        return Button {
-            if index == liveIndex || voiceOverEnabled {
-                onSelect(game)
-            } else {
-                move(to: index, animated: true)
-            }
-        } label: {
-            CoverFlowCover(
-                game: game,
-                cover: artworkProvider(game),
-                missing: missing,
-                tapArea: metrics.restSpan(offset: index - liveIndex)
-            )
-                .frame(width: metrics.coverWidth, height: metrics.coverHeight)
-        }
-        .buttonStyle(RetroPlayPressStyle())
-        .accessibilityLabel(
-            missing
-                ? "\(game.displayName), \(game.systemID.displayName), file missing"
-                : "\(game.displayName), \(game.systemID.displayName)"
-        )
-        .accessibilityValue(lastPlayedText(game) ?? "")
-        .accessibilityHint(missing ? "The game file was removed in Files" : "Starts the game")
-        .modifier(LibraryTileDeleteAccessibilityAction(game: game, onRequestDelete: onRequestDelete))
-        .contextMenu {
-            Button {
-                onSelect(game)
-            } label: {
-                Label(lastPlayed[game.id] == nil ? "Play" : "Continue", systemImage: "play.fill")
-            }
-            if onRequestDelete != nil {
-                Button(role: .destructive) {
-                    onRequestDelete?(game)
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
-        } preview: {
-            // The cover facing front, whichever way it's turned in the row.
-            CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing, shadow: false)
-                .frame(width: 260, height: 260)
-        }
     }
 
     // MARK: Caption
@@ -334,15 +227,10 @@ struct LibraryCoverFlowView<Header: View>: View {
 
     private var compactCaption: Bool { verticalSizeClass == .compact }
 
-    private func lastPlayedText(_ game: LibraryGame) -> String? {
-        lastPlayed[game.id].map {
-            "Played " + $0.formatted(.relative(presentation: .named, unitsStyle: .abbreviated))
-        }
-    }
 
     private func subtitle(_ game: LibraryGame) -> String {
         if missingGameIDs.contains(game.id) { return "File missing" }
-        return lastPlayedText(game) ?? "Not played yet"
+        return coverFlowLastPlayedText(lastPlayed[game.id]) ?? "Not played yet"
     }
 
     // MARK: Focus
@@ -424,6 +312,174 @@ struct LibraryCoverFlowView<Header: View>: View {
         }
     }
     #endif
+}
+
+/// "Played 2 days ago", for the caption and VoiceOver.
+private func coverFlowLastPlayedText(_ date: Date?) -> String? {
+    date.map { "Played " + $0.formatted(.relative(presentation: .named, unitsStyle: .abbreviated)) }
+}
+
+/// The row of covers: invisible buttons in a sideways scroll, with the 3D scene drawing the boxes
+/// behind them. A view of its own, compared by what it shows (`.equatable()`), so the page around
+/// it changing size (the bar growing as a pull down brings in the search field) doesn't build the
+/// row again.
+@available(iOS 18.0, *)
+private struct CoverFlowRow: View, Equatable {
+    let games: [LibraryGame]
+    /// What `move` and `settle` remember the middle game for.
+    let filter: SystemTab
+    let metrics: CoverFlow.Metrics
+    let width: CGFloat
+    let missingGameIDs: Set<UUID>
+    let lastPlayed: [UUID: Date]
+    /// How many covers have box art, so the scene draws them again when art comes in.
+    let artRevision: Int
+    @Binding var liveIndex: Int
+    @Binding var position: ScrollPosition
+    let tracker: CoverFlowScrollTracker
+    let scene: CoverFlowScene
+    let onSelect: (LibraryGame) -> Void
+    let artworkProvider: (LibraryGame) -> CoverArt?
+    let onRequestDelete: ((LibraryGame) -> Void)?
+    /// Brings a game to the middle (animated or not) and remembers it.
+    let move: (Int, Bool) -> Void
+    /// Remembers the game a swipe came to rest on.
+    let settle: (Int) -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+
+    /// The actions are left out: they read only what's compared here (and state).
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.games == rhs.games && lhs.filter == rhs.filter && lhs.metrics == rhs.metrics
+            && lhs.width == rhs.width && lhs.missingGameIDs == rhs.missingGameIDs
+            && lhs.lastPlayed == rhs.lastPlayed && lhs.artRevision == rhs.artRevision
+    }
+
+    var body: some View {
+        #if DEBUG
+        LibraryWorkProbe.carousel += 1
+        #endif
+        // A swipe moves the row a full step per game while the side covers are drawn packed
+        // tighter, so covers far out in the stacks are still on screen when their layout slot
+        // is well past the edge. The row is laid out wide enough for every cover that shows
+        // (the lazy stack only builds what's inside its frame), and drawn centred on screen.
+        let reach = min(
+            metrics.layoutDistance(forVisual: width / 2 + metrics.coverWidth / 2),
+            metrics.step * 40
+        ).rounded(.up)
+        let rowWidth = reach * 2 + metrics.step
+        // The boxes are drawn by the 3D scene behind the (invisible) row of buttons. Its view
+        // is centred on the eye, level with the slot's top, and tall enough to reach past the
+        // slot's floor by the boxes' overhang.
+        let stageHeight = (metrics.coverHeight + metrics.overhang + 24) * 2
+        let input = CoverFlowScene.Input(
+            games: games,
+            stage: CoverFlow.Stage(metrics: metrics),
+            size: CGSize(width: width, height: stageHeight),
+            missing: missingGameIDs,
+            liveIndex: liveIndex,
+            dark: colorScheme == .dark,
+            artRevision: artRevision
+        )
+        return ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
+                    coverButton(game, index: index, metrics: metrics)
+                        .frame(width: metrics.step, height: metrics.coverHeight)
+                        // One fixed order (earlier games on top), so covers never swap
+                        // places mid-swipe.
+                        .zIndex(CoverFlow.layer(index: index))
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollIndicators(.hidden)
+        .scrollClipDisabled()
+        .contentMargins(.horizontal, reach, for: .scrollContent)
+        .scrollTargetBehavior(CoverFlowSnapping(metrics: metrics, count: games.count, tracker: tracker))
+        .scrollPosition($position, anchor: .center)
+        .onScrollGeometryChange(for: Double.self) { geometry in
+            geometry.contentOffset.x + geometry.contentInsets.leading
+        } action: { _, offset in
+            tracker.offset = offset
+            let index = metrics.index(forOffset: offset, count: games.count)
+            if liveIndex != index { liveIndex = index }
+        }
+        .onScrollPhaseChange { old, phase in
+            if phase == .interacting, old != .interacting {
+                tracker.start = tracker.offset
+            }
+            // Only a swipe coming to rest; the row also goes idle when the list changes,
+            // before it's been moved to the right game.
+            if phase == .idle, old == .interacting || old == .decelerating {
+                settle(liveIndex)
+            }
+        }
+        .frame(width: rowWidth, height: metrics.coverHeight)
+        .frame(width: width)
+        .background(alignment: .top) {
+            CoverFlowStageView(scene: scene, height: stageHeight)
+                .frame(width: width)
+                .offset(y: -stageHeight / 2)
+        }
+        .onChange(of: input, initial: true) { _, input in
+            scene.offset = { [tracker] in tracker.offset }
+            scene.artwork = artworkProvider
+            scene.input = input
+        }
+        .sensoryFeedback(.selection, trigger: liveIndex)
+    }
+
+    private func coverButton(
+        _ game: LibraryGame,
+        index: Int,
+        metrics: CoverFlow.Metrics
+    ) -> some View {
+        let missing = missingGameIDs.contains(game.id)
+        return Button {
+            if index == liveIndex || voiceOverEnabled {
+                onSelect(game)
+            } else {
+                move(index, true)
+            }
+        } label: {
+            CoverFlowCover(
+                game: game,
+                cover: artworkProvider(game),
+                missing: missing,
+                tapArea: metrics.restSpan(offset: index - liveIndex)
+            )
+                .frame(width: metrics.coverWidth, height: metrics.coverHeight)
+        }
+        .buttonStyle(RetroPlayPressStyle())
+        .accessibilityLabel(
+            missing
+                ? "\(game.displayName), \(game.systemID.displayName), file missing"
+                : "\(game.displayName), \(game.systemID.displayName)"
+        )
+        .accessibilityValue(coverFlowLastPlayedText(lastPlayed[game.id]) ?? "")
+        .accessibilityHint(missing ? "The game file was removed in Files" : "Starts the game")
+        .modifier(LibraryTileDeleteAccessibilityAction(game: game, onRequestDelete: onRequestDelete))
+        .contextMenu {
+            Button {
+                onSelect(game)
+            } label: {
+                Label(lastPlayed[game.id] == nil ? "Play" : "Continue", systemImage: "play.fill")
+            }
+            if onRequestDelete != nil {
+                Button(role: .destructive) {
+                    onRequestDelete?(game)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        } preview: {
+            // The cover facing front, whichever way it's turned in the row.
+            CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing, shadow: false)
+                .frame(width: 260, height: 260)
+        }
+    }
 }
 
 /// One cover in its square slot, standing on the bottom edge in its own shape.

@@ -17,13 +17,14 @@ extension View {
 
 /// `-RetroPlayTitleGlitchFrame N` (a launch argument, read as a default): every title shows
 /// frame N of a burst all the time, for the screenshot tests; `-1` turns the glitch off, so
-/// other screenshots are steady.
+/// other screenshots are steady. Read from the arguments themselves: the argument defaults
+/// can take a value that starts with "-" for the next option's name.
 enum TitleGlitchLaunch {
-    static var frame: Int? {
-        let defaults = UserDefaults.standard
-        guard defaults.object(forKey: "RetroPlayTitleGlitchFrame") != nil else { return nil }
-        return defaults.integer(forKey: "RetroPlayTitleGlitchFrame")
-    }
+    static let frame: Int? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let at = arguments.firstIndex(of: "-RetroPlayTitleGlitchFrame"), at + 1 < arguments.count else { return nil }
+        return Int(arguments[at + 1])
+    }()
 }
 
 @available(iOS 18.0, *)

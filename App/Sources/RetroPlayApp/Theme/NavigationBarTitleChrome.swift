@@ -180,17 +180,42 @@ extension View {
 extension View {
     /// A screen's title as iOS shows it: large under the bar's buttons, collapsing into the bar
     /// as the page scrolls, and inline in landscape; both in the title italic
-    /// (`RetroPlayNavigationBarChrome`; pair with `retroPlayNavigationTitleChrome`). The large
-    /// one is the app's own Text in the bar's large-title place (iOS 26's `.largeTitle` item),
-    /// so it keeps the title glitch; the bar still collapses it to the inline title.
+    /// (`RetroPlayNavigationBarChrome`; pair with `retroPlayNavigationTitleChrome`). Where the
+    /// title glitch plays, the large one is the app's own Text in the bar's large-title place
+    /// (iOS 26's `.largeTitle` item), still collapsing to the inline title. The bar doesn't
+    /// expose that item to VoiceOver, so with VoiceOver (or Reduce Motion, or the glitch off)
+    /// it's the bar's own large title, which reads as the screen's heading.
     func retroPlayLargeTitle(_ title: String) -> some View {
-        navigationTitle(title)
+        modifier(RetroPlayLargeTitle(title: title))
+    }
+}
+
+@available(iOS 18.0, *)
+private struct RetroPlayLargeTitle: ViewModifier {
+    let title: String
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var glitches: Bool {
+        !voiceOver && !reduceMotion && (TitleGlitchLaunch.frame ?? 0) >= 0
+    }
+
+    func body(content: Content) -> some View {
+        let titled = content
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
+        // Not a toolbar with the item left out: an empty one still takes the bar's own title's
+        // place (unread by VoiceOver). Turning VoiceOver or Reduce Motion on builds the screen
+        // again.
+        if glitches {
+            titled.toolbar {
                 ToolbarItem(placement: .largeTitle) {
                     RetroPlayLargeTitleText(title: title)
                 }
             }
+        } else {
+            titled
+        }
     }
 }
 
@@ -212,10 +237,5 @@ private struct RetroPlayLargeTitleText: View {
             .fixedSize()
             .retroPlayTitleGlitch(title)
             .frame(maxWidth: .infinity, alignment: .leading)
-            // The bar doesn't expose its large-title item's views by themselves: one element,
-            // the title as a heading, for VoiceOver.
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(title)
-            .accessibilityAddTraits(.isHeader)
     }
 }

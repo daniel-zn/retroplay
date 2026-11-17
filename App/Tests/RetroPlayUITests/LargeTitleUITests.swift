@@ -4,7 +4,8 @@ import XCTest
 /// The library's and Settings' titles are large navigation titles (in the bar's large-title
 /// place, collapsing into the bar), set big in the title face: well over the old 30-point size
 /// at the default text size, whole and inside the screen at the largest text sizes, and they
-/// glitch like the app's other titles.
+/// glitch like the app's other titles. With the glitch off (as here, but in the glitch test) the
+/// big title is the bar's own, which VoiceOver and these tests can read.
 final class LargeTitleUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
@@ -71,11 +72,15 @@ final class LargeTitleUITests: XCTestCase {
                                    ("RetroPlay", ["-retroplay.libraryLayout", "coverFlow"]),
                                    ("Settings", ["-RetroPlaySmokeSettings", "YES"])] {
             let app = launch(arguments + ["-retroplay.appearance", "dark"], glitchFrame: 0)
-            let text = barTitle(app, title, "\(title) glitch")
+            // The bar doesn't expose its large-title item: look in the bar under its buttons.
+            let bar = app.navigationBars[title]
+            XCTAssertTrue(bar.waitForExistence(timeout: 30), "\(title) glitch: no “\(title)” bar")
             Thread.sleep(forTimeInterval: 1)
+            let frame = bar.frame
+            let titleRoom = CGRect(x: frame.minX + 12, y: frame.minY + 48, width: frame.width - 24, height: frame.height - 60)
             let shot = XCUIScreen.main.screenshot()
-            let coloured = Self.colouredPixels(in: shot.image, rect: text.frame)
-            print("[large-title] \(title) \(arguments) glitch frame 0: \(coloured) coloured pixels in \(text.frame)")
+            let coloured = Self.colouredPixels(in: shot.image, rect: titleRoom)
+            print("[large-title] \(title) \(arguments) glitch frame 0: \(coloured) coloured pixels in \(titleRoom)")
             let attachment = XCTAttachment(screenshot: shot)
             attachment.name = "large-title-glitch-\(title)-\(arguments.last ?? "")"
             attachment.lifetime = .keepAlways

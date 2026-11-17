@@ -129,6 +129,12 @@ final class LibraryPullToSearchUITests: XCTestCase {
             let delta = after.keys.sorted().map { "\($0)=\((after[$0] ?? 0) - (before[$0] ?? 0))" }.joined(separator: " ")
             print("[pull-work] \(layout): \(delta)")
             XCTAssertFalse(after.isEmpty, "\(layout): the probe read nothing")
+            // Before: Cover Flow ran its page 41 times and built its row of covers 82 times over
+            // these pulls (the bar growing shrinks the page, which re-measured the caption's room).
+            let pages = (after["coverFlow"] ?? 0) - (before["coverFlow"] ?? 0)
+            let rows = (after["carousel"] ?? 0) - (before["carousel"] ?? 0)
+            XCTAssertLessThanOrEqual(pages, 3, "\(layout): the pulls ran the Cover Flow page \(pages) times")
+            XCTAssertLessThanOrEqual(rows, 3, "\(layout): the pulls built the row of covers \(rows) times")
             app.terminate()
         }
     }

@@ -43,7 +43,9 @@ final class TypographyScreenshotsUITests: XCTestCase {
     /// A text that must be on screen, whole and inside the window.
     @MainActor
     private func expectVisible(_ app: XCUIApplication, _ label: String, _ context: String, timeout: TimeInterval = 20) {
-        let text = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@ OR label BEGINSWITH[c] %@", label, label)).firstMatch
+        var text = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@ OR label BEGINSWITH[c] %@", label, label)).firstMatch
+        // A glitching big title is the bar's large-title item, which isn't exposed: its bar is.
+        if !text.waitForExistence(timeout: 2) { text = app.navigationBars[label] }
         guard text.waitForExistence(timeout: timeout) else {
             XCTFail("\(context): no “\(label)”")
             return
