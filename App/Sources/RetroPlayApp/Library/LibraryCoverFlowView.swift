@@ -39,6 +39,10 @@ struct LibraryCoverFlowView<Header: View>: View {
     /// Where the row is right now, for the snapping to know where a swipe was let go.
     @State private var tracker = CoverFlowScrollTracker()
     @State private var scene = CoverFlowScene()
+    #if DEBUG
+    /// How many times the scene's boxes were built anew (a new fit); UI tests read it.
+    @State private var rebuilds = 0
+    #endif
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private struct ListKey: Equatable {
@@ -124,6 +128,13 @@ struct LibraryCoverFlowView<Header: View>: View {
                 .accessibilityIdentifier("coverFlow.position")
                 .accessibilityValue("\(liveIndex)")
         }
+        .overlay(alignment: .bottomTrailing) {
+            Text("\(rebuilds)")
+                .font(.system(size: 2))
+                .opacity(0.02)
+                .accessibilityIdentifier("coverFlow.rebuilds")
+                .accessibilityValue("\(rebuilds)")
+        }
         #endif
         .onChange(of: ListKey(filter: filter, ids: games.map(\.id)), initial: true) { old, new in
             listChanged(from: listKey, to: new)
@@ -203,7 +214,10 @@ struct LibraryCoverFlowView<Header: View>: View {
                 .frame(width: width)
                 .offset(y: -stageHeight / 2)
         }
-        .onChange(of: input, initial: true) { _, input in
+        .onChange(of: input, initial: true) { old, input in
+            #if DEBUG
+            if old.stage != input.stage || old.size != input.size { rebuilds += 1 }
+            #endif
             scene.offset = { [tracker] in tracker.offset }
             scene.artwork = artworkProvider
             scene.input = input

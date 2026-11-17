@@ -104,6 +104,44 @@ final class LibraryPullToSearchUITests: XCTestCase {
         app.terminate()
     }
 
+    /// Pulling Cover Flow down doesn't build its covers again: the bar growing as the search
+    /// field comes in used to re-fit the row on every frame, building every box anew (meshes
+    /// and textures), which is what made the pull lag. One re-fit once the page rests is fine.
+    @MainActor
+    func testPullingCoverFlowDownKeepsTheCovers() {
+        let app = launch(["-retroplay.libraryLayout", "coverFlow"])
+        waitForLibrary(app, "coverflow")
+        let rebuilds = app.descendants(matching: .any)["coverFlow.rebuilds"]
+        XCTAssertTrue(rebuilds.waitForExistence(timeout: 10), "no Cover Flow")
+        Thread.sleep(forTimeInterval: 1)
+        let before = Int(rebuilds.value as? String ?? "") ?? -1
+        pullDown(app, from: 0.4)
+        Thread.sleep(forTimeInterval: 1.5)
+        let after = Int(rebuilds.value as? String ?? "") ?? -1
+        print("[cover-flow-pull] covers built \(after - before) times by one pull (\(before) -> \(after))")
+        XCTAssertLessThanOrEqual(after - before, 1, "one pull down built the covers \(after - before) times")
+        app.terminate()
+    }
+
+    /// How smooth the pull is: the dragging hitch ratio (ms of hitches per second) over a few
+    /// pulls down and back up. Reported for comparison; it fails only if nothing was measured.
+    @MainActor
+    func testCoverFlowPullHitches() {
+        let app = launch(["-retroplay.libraryLayout", "coverFlow"])
+        waitForLibrary(app, "coverflow")
+        let options = XCTMeasureOptions()
+        options.iterationCount = 5
+        measure(metrics: [XCTOSSignpostMetric.scrollDraggingMetric], options: options) {
+            pullDown(app, from: 0.4)
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+                .press(forDuration: 0.05,
+                       thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)),
+                       withVelocity: .slow, thenHoldForDuration: 0.2)
+        }
+        app.terminate()
+    }
+
     /// Command-F on a hardware keyboard puts the cursor in the search field, in both layouts.
     @MainActor
     func testCommandFSearchesTheGrid() { expectCommandFSearches("grid") }
