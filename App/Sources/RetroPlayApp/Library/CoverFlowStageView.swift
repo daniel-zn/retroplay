@@ -71,6 +71,7 @@ final class CoverFlowScene {
             }
             placeCamera()
             needsTint = true
+            placedAt = nil
         }
     }
 
@@ -88,6 +89,9 @@ final class CoverFlowScene {
 
     private var boxes: [UUID: CoverBoxEntity] = [:]
     private var needsTint = true
+    /// The offset the boxes were last placed for: a frame where the row hasn't moved (at rest,
+    /// or while the page is pulled down) leaves them as they are.
+    private var placedAt: Double?
 
     init() {
         root.addChild(camera)
@@ -112,6 +116,7 @@ final class CoverFlowScene {
     private func clear() {
         for box in boxes.values { box.entity.removeFromParent() }
         boxes.removeAll()
+        placedAt = nil
     }
 
     /// Moves every box to where the scroll puts it this frame; builds the ones coming into
@@ -124,6 +129,8 @@ final class CoverFlowScene {
         let stage = input.stage
         let metrics = stage.metrics
         let offset = offset()
+        guard offset != placedAt || needsTint else { return }
+        placedAt = offset
         let window = stage.window(offset: offset, count: input.games.count, width: Double(input.size.width))
         let wanted = Set(window.map { input.games[$0].id })
         for (id, box) in boxes where !wanted.contains(id) {

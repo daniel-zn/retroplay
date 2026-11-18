@@ -10,9 +10,9 @@ final class LibraryPullToSearchUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
     }
 
-    private func launch(_ arguments: [String]) -> XCUIApplication {
+    private func launch(_ arguments: [String], glitchTitle: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = arguments + ["-RetroPlayTitleGlitchFrame", "-1"]
+        app.launchArguments = arguments + (glitchTitle ? [] : ["-RetroPlayTitleGlitchFrame", "-1"])
         app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
         app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
         app.launch()
@@ -104,42 +104,58 @@ final class LibraryPullToSearchUITests: XCTestCase {
         app.terminate()
     }
 
-    /// What a pull down costs, in the grid and in Cover Flow: late frames (the main thread busy
-    /// past a refresh) and how often the library's views were evaluated again, over three pulls
-    /// down and back up. Debug builds count these (`LibraryWorkProbe`).
+    /// What showing and hiding the search field costs, in the grid and in Cover Flow (with the
+    /// plain title and the glitching one): late frames (the main thread busy past a refresh) and
+    /// how often the library's views were evaluated again, over slow and fast pulls down (the
+    /// field shows) and back up (it hides). Debug builds count these (`LibraryWorkProbe`).
     @MainActor
     func testPullDownWork() {
-        for layout in ["grid", "coverFlow"] {
+        for (name, layout, glitch) in [("grid", "grid", false), ("coverFlow", "coverFlow", false),
+                                       ("coverFlow-glitch", "coverFlow", true)] {
             // Box art the size real covers are stored at, on every game.
-            let app = launch(["-retroplay.libraryLayout", layout, "-RetroPlayTestBoxArt", "YES"])
+            let app = launch(["-retroplay.libraryLayout", layout, "-RetroPlayTestBoxArt", "YES"], glitchTitle: glitch)
             waitForLibrary(app, layout)
             let work = app.descendants(matching: .any)["library.work"]
-            XCTAssertTrue(work.waitForExistence(timeout: 10), "\(layout): no work probe")
-            Thread.sleep(forTimeInterval: 2)
+            XCTAssertTrue(work.waitForExistence(timeout: 10), "\(name): no work probe")
+            Thread.sleep(forTimeInterval: 3)
             let before = Self.numbers(work.value as? String)
             let window = app.windows.firstMatch
-            for _ in 0..<3 {
-                pullDown(app, from: 0.4)
-                window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+            let field = app.searchFields.firstMatch
+            func drag(_ from: CGFloat, _ to: CGFloat, _ velocity: XCUIGestureVelocity) {
+                window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
                     .press(forDuration: 0.05,
-                           thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)),
-                           withVelocity: .slow, thenHoldForDuration: 0.2)
+                           thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)),
+                           withVelocity: velocity, thenHoldForDuration: 0.1)
+            }
+            var shown = 0, hidden = 0
+            for velocity in [XCUIGestureVelocity.slow, .slow, .fast, .fast] {
+                drag(0.4, 0.75, velocity)
+                Thread.sleep(forTimeInterval: 0.6)
+                if field.exists && field.isHittable && field.frame.height > 20 { shown += 1 }
+                drag(0.75, 0.3, velocity)
+                Thread.sleep(forTimeInterval: 0.6)
+                if !(field.exists && field.isHittable && field.frame.height > 20) { hidden += 1 }
             }
             Thread.sleep(forTimeInterval: 1)
             let after = Self.numbers(work.value as? String)
             let delta = after.keys.sorted().map { "\($0)=\((after[$0] ?? 0) - (before[$0] ?? 0))" }.joined(separator: " ")
-            print("[pull-work] \(layout): \(delta)")
-            XCTAssertFalse(after.isEmpty, "\(layout): the probe read nothing")
-            // Before: Cover Flow ran its page 41 times and built its row of covers 82 times over
-            // these pulls (the bar growing shrinks the page, which re-measured the caption's room).
-            let pages = (after["coverFlow"] ?? 0) - (before["coverFlow"] ?? 0)
-            let rows = (after["carousel"] ?? 0) - (before["carousel"] ?? 0)
-            XCTAssertLessThanOrEqual(pages, 3, "\(layout): the pulls ran the Cover Flow page \(pages) times")
-            XCTAssertLessThanOrEqual(rows, 3, "\(layout): the pulls built the row of covers \(rows) times")
-            // Before: every frame of a pull searched for where the covers stand, twice (about
-            // 30 ms each), for the same sizes; the answer is now kept.
-            let searches = (after["gapSearches"] ?? 0) - (before["gapSearches"] ?? 0)
-            XCTAssertEqual(searches, 0, "\(layout): the pulls searched the Cover Flow gaps \(searches) times")
+            print("[pull-work] \(name): shown \(shown)/4 hidden \(hidden)/4 \(delta)")
+            XCTAssertFalse(after.isEmpty, "\(name): the probe read nothing")
+            XCTAssertGreaterThanOrEqual(shown, 3, "\(name): the pulls down didn't show the search field")
+            // The grid scrolls on under a pull up (the field may stay); Cover Flow's page fits.
+            if layout == "coverFlow" {
+                XCTAssertGreaterThanOrEqual(hidden, 3, "\(name): the pulls up didn't hide the search field")
+            }
+            func count(_ key: String) -> Int { (after[key] ?? 0) - (before[key] ?? 0) }
+            // Before: the page followed the bar, so every frame of the field showing or hiding
+            // laid Cover Flow's page out again (216 to 267 times over these pulls), and with
+            // the glitching title the room left made the covers smaller, building the row and
+            // its covers again mid-pull. The page now keeps its size while it's pulled.
+            XCTAssertEqual(count("pagePasses"), 0, "\(name): showing and hiding search laid the Cover Flow page out \(count("pagePasses")) times")
+            XCTAssertEqual(count("carousel"), 0, "\(name): showing and hiding search built the row of covers \(count("carousel")) times")
+            XCTAssertEqual(count("covers"), 0, "\(name): showing and hiding search drew covers again \(count("covers")) times")
+            XCTAssertLessThanOrEqual(count("coverFlow"), 3, "\(name): the pulls ran the Cover Flow view \(count("coverFlow")) times")
+            XCTAssertEqual(count("gapSearches"), 0, "\(name): the pulls searched the Cover Flow gaps \(count("gapSearches")) times")
             app.terminate()
         }
     }

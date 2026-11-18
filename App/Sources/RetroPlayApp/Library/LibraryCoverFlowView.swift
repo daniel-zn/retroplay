@@ -36,6 +36,8 @@ struct LibraryCoverFlowView<Header: View>: View {
     /// Where the row is right now, for the snapping to know where a swipe was let go.
     @State private var tracker = CoverFlowScrollTracker()
     @State private var scene = CoverFlowScene()
+    @State private var page: Page?
+    @State private var pageHold = CoverFlowPageHold()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private struct ListKey: Equatable {
@@ -59,85 +61,20 @@ struct LibraryCoverFlowView<Header: View>: View {
         let _ = LibraryWorkProbe.coverFlow += 1
         #endif
         let artRevision = games.reduce(0) { $0 &+ (artworkProvider($1)?.isBoxArt == true ? 1 : 0) }
-        GeometryReader { outer in
-            // Landscape is short: the row runs down through the home-indicator strip, the caption
-            // sits at the bottom instead of being centred, and the covers take the height saved.
-            let landscape = outer.size.width > outer.size.height
-            let bottomRoom = landscape ? outer.safeAreaInsets.bottom : 0
-            let room = outer.size.height + bottomRoom - headerHeight - captionHeight - (landscape ? 24 : 32)
-            let deepest = games.map { CoverFlow.boxDepth($0.systemID) }.max() ?? 0
-            // Turned covers' near edges reach past the slot: size the row with that room taken
-            // off, and leave it below the covers so they clear the caption.
-            let overhang = CGFloat(CoverFlow.Metrics.fitting(
-                width: outer.size.width, height: room, tallestAspect: tallestAspect, deepestBox: deepest
-            ).overhang)
-            // Landscape grows the covers upwards: the room above takes no overhang allowance.
-            let metrics = CoverFlow.Metrics.fitting(
-                width: outer.size.width,
-                height: room - overhang * (landscape ? 1 : 2),
-                tallestAspect: tallestAspect,
-                deepestBox: deepest
-            )
-            ScrollView(.vertical) {
-                VStack(spacing: 0) {
-                    header()
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
-                    if !games.isEmpty {
-                        Spacer(minLength: 0)
-                        CoverFlowRow(
-                            games: games,
-                            filter: filter,
-                            metrics: metrics,
-                            width: outer.size.width,
-                            missingGameIDs: missingGameIDs,
-                            lastPlayed: lastPlayed,
-                            artRevision: artRevision,
-                            liveIndex: $liveIndex,
-                            position: $position,
-                            tracker: tracker,
-                            scene: scene,
-                            onSelect: onSelect,
-                            artworkProvider: artworkProvider,
-                            onRequestDelete: onRequestDelete,
-                            move: { move(to: $0, animated: $1) },
-                            settle: { settle(at: $0) }
-                        )
-                        .equatable()
-                            .padding(.top, landscape ? 4 : 8 + overhang)
-                            .padding(.bottom, (landscape ? 6 : 12) + overhang)
-                        // The covers are laid out around the caption as it was before it grew
-                        // (kept in place, unseen), so they neither move nor shrink; the caption
-                        // shown is drawn over that room, centred in all the room below them.
-                        // Portrait: centred in all the room below the covers (the unseen caption and
-                        // the free room under it), by layout alone, so a pull down that changes
-                        // that room doesn't run this view again.
-                        VStack(spacing: 0) {
-                            caption(shown: false)
-                                .hidden()
-                                .padding(.horizontal, 24)
-                                .padding(.bottom, landscape ? 14 : 16)
-                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
-                            if !landscape {
-                                Spacer(minLength: 0)
-                            }
-                        }
-                        .overlay {
-                            caption(shown: true)
-                                .padding(.horizontal, 24)
-                                .offset(y: landscape ? -4 : 0)
-                        }
-                        .zIndex(1)
-                    }
+        // The page is laid out for the size it's held at (`page`), not followed frame by frame:
+        // as the bar above grows and shrinks (the search field showing or hiding, the title
+        // collapsing) the page just slides, and nothing in it is laid out again.
+        Color.clear
+            .onGeometryChange(for: Page.self) { proxy in
+                Page(width: proxy.size.width, height: proxy.size.height,
+                     top: proxy.safeAreaInsets.top, bottom: proxy.safeAreaInsets.bottom)
+            } action: { pageChanged(to: $0) }
+            .overlay {
+                if let page {
+                    content(page, artRevision: artRevision)
                 }
-                .frame(minHeight: outer.size.height + bottomRoom)
             }
-            .ignoresSafeArea(edges: landscape ? .bottom : [])
-            // The page scrolls only when large text leaves no room (landscape), but it always
-            // pulls down, as the grid does, to show the search field under the title. The covers
-            // swipe only sideways, so a pull down that starts on them moves the page.
-            .scrollBounceBehavior(.always, axes: .vertical)
-        }
-        .background(RetroPlayTheme.canvas(for: colorScheme).ignoresSafeArea())
+            .background(RetroPlayTheme.canvas(for: colorScheme).ignoresSafeArea())
         #if DEBUG
         // UI tests read which cover is in the middle.
         .overlay(alignment: .bottomLeading) {
@@ -158,6 +95,114 @@ struct LibraryCoverFlowView<Header: View>: View {
         #if DEBUG
         .task { await smokeScroll() }
         #endif
+    }
+
+    /// The size and safe area the page is laid out for.
+    private struct Page: Equatable {
+        var width: CGFloat
+        var height: CGFloat
+        var top: CGFloat
+        var bottom: CGFloat
+    }
+
+    /// Takes a new page size, except one where only the bar above moved after the page was
+    /// pulled: that's the search field or the large title coming and going, which slides the
+    /// page without changing what fits on it. Before any pull it's the title settling as its
+    /// subtitle comes in, taken once it holds.
+    private func pageChanged(to new: Page) {
+        guard let old = page,
+              // The bar's move nudges the other edges by a point or so as it rounds.
+              abs(new.width - old.width) < 0.5, abs(new.bottom - old.bottom) < 3,
+              abs((new.height + new.top + new.bottom) - (old.height + old.top + old.bottom)) < 3
+        else {
+            page = new
+            pageHold.reset()
+            return
+        }
+        if new != old { pageHold.settle { page = new } }
+    }
+
+    @ViewBuilder
+    private func content(_ page: Page, artRevision: Int) -> some View {
+        #if DEBUG
+        let _ = LibraryWorkProbe.notePage(size: CGSize(width: page.width, height: page.height),
+                                          insets: EdgeInsets(top: page.top, leading: 0, bottom: page.bottom, trailing: 0))
+        #endif
+        // Landscape is short: the row runs down through the home-indicator strip, the caption
+        // sits at the bottom instead of being centred, and the covers take the height saved.
+        let landscape = page.width > page.height
+        let bottomRoom = landscape ? page.bottom : 0
+        let room = page.height + bottomRoom - headerHeight - captionHeight - (landscape ? 24 : 32)
+        let deepest = games.map { CoverFlow.boxDepth($0.systemID) }.max() ?? 0
+        // Turned covers' near edges reach past the slot: size the row with that room taken
+        // off, and leave it below the covers so they clear the caption.
+        let overhang = CGFloat(CoverFlow.Metrics.fitting(
+            width: page.width, height: room, tallestAspect: tallestAspect, deepestBox: deepest
+        ).overhang)
+        // Landscape grows the covers upwards: the room above takes no overhang allowance.
+        let metrics = CoverFlow.Metrics.fitting(
+            width: page.width,
+            height: room - overhang * (landscape ? 1 : 2),
+            tallestAspect: tallestAspect,
+            deepestBox: deepest
+        )
+        ScrollView(.vertical) {
+            VStack(spacing: 0) {
+                header()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                if !games.isEmpty {
+                    Spacer(minLength: 0)
+                    CoverFlowRow(
+                        games: games,
+                        filter: filter,
+                        metrics: metrics,
+                        width: page.width,
+                        missingGameIDs: missingGameIDs,
+                        lastPlayed: lastPlayed,
+                        artRevision: artRevision,
+                        liveIndex: $liveIndex,
+                        position: $position,
+                        tracker: tracker,
+                        scene: scene,
+                        onSelect: onSelect,
+                        artworkProvider: artworkProvider,
+                        onRequestDelete: onRequestDelete,
+                        move: { move(to: $0, animated: $1) },
+                        settle: { settle(at: $0) }
+                    )
+                    .equatable()
+                        .padding(.top, landscape ? 4 : 8 + overhang)
+                        .padding(.bottom, (landscape ? 6 : 12) + overhang)
+                    // The covers are laid out around the caption as it was before it grew
+                    // (kept in place, unseen), so they neither move nor shrink; the caption
+                    // shown is drawn over that room. Portrait: centred in all the room below
+                    // the covers (the unseen caption and the free room under it).
+                    VStack(spacing: 0) {
+                        caption(shown: false)
+                            .hidden()
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, landscape ? 14 : 16)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
+                        if !landscape {
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .overlay {
+                        caption(shown: true)
+                            .padding(.horizontal, 24)
+                            .offset(y: landscape ? -4 : 0)
+                    }
+                    .zIndex(1)
+                }
+            }
+            .frame(minHeight: page.height + bottomRoom)
+        }
+        .ignoresSafeArea(edges: landscape ? .bottom : [])
+        // The page scrolls only when large text leaves no room (landscape), but it always
+        // pulls down, as the grid does, to show the search field under the title. The covers
+        // swipe only sideways, so a pull down that starts on them moves the page.
+        .scrollBounceBehavior(.always, axes: .vertical)
+        .onScrollPhaseChange { _, phase in pageHold.phase(phase) }
     }
 
     // MARK: Caption
@@ -566,6 +611,42 @@ final class CoverFlowScrollTracker: @unchecked Sendable {
     var offset: Double = 0
     /// The offset when the current swipe began.
     var start: Double = 0
+}
+
+/// Whether the page has been pulled since it took its size (a reference, so the scrolling
+/// doesn't run the view again). Once it has, the bar's height is the pull's doing (the search
+/// field showing, the title collapsed), not a new size for the page.
+@MainActor
+final class CoverFlowPageHold {
+    private(set) var pulled = false
+    /// A bar height waiting to be taken, if no pull starts first.
+    private var waiting: Task<Void, Never>?
+
+    func phase(_ phase: ScrollPhase) {
+        guard phase.isScrolling else { return }
+        pulled = true
+        waiting?.cancel()
+    }
+
+    /// The page took a new size (the window changed): the bar's height counts again until
+    /// the next pull.
+    func reset() {
+        pulled = false
+        waiting?.cancel()
+    }
+
+    /// Takes a bar height that holds for a moment with no pull: the title settling as its
+    /// subtitle comes in. A pull's first frame comes before its scroll phase does; the pull
+    /// cancels it.
+    func settle(_ take: @escaping @MainActor () -> Void) {
+        guard !pulled else { return }
+        waiting?.cancel()
+        waiting = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let self, !self.pulled else { return }
+            take()
+        }
+    }
 }
 
 /// Snaps the row to a cover and keeps a flick from running away: one swipe moves about one
