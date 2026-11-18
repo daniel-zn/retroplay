@@ -147,55 +147,61 @@ struct LibraryCoverFlowView<Header: View>: View {
             deepestBox: deepest
         )
         ScrollView(.vertical) {
-            VStack(spacing: 0) {
-                header()
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
-                if !games.isEmpty {
-                    Spacer(minLength: 0)
-                    CoverFlowRow(
-                        games: games,
-                        filter: filter,
-                        metrics: metrics,
-                        width: page.width,
-                        missingGameIDs: missingGameIDs,
-                        lastPlayed: lastPlayed,
-                        artRevision: artRevision,
-                        liveIndex: $liveIndex,
-                        position: $position,
-                        tracker: tracker,
-                        scene: scene,
-                        onSelect: onSelect,
-                        artworkProvider: artworkProvider,
-                        onRequestDelete: onRequestDelete,
-                        move: { move(to: $0, animated: $1) },
-                        settle: { settle(at: $0) }
-                    )
-                    .equatable()
-                        .padding(.top, landscape ? 4 : 8 + overhang)
-                        .padding(.bottom, (landscape ? 6 : 12) + overhang)
-                    // The covers are laid out around the caption as it was before it grew
-                    // (kept in place, unseen), so they neither move nor shrink; the caption
-                    // shown is drawn over that room. Portrait: centred in all the room below
-                    // the covers (the unseen caption and the free room under it).
-                    VStack(spacing: 0) {
-                        caption(shown: false)
-                            .hidden()
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, landscape ? 14 : 16)
-                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
-                        if !landscape {
-                            Spacer(minLength: 0)
+            // At least the height it's laid out for (the search field showing pushes it down),
+            // all of the screen when there's more (the title collapsed to the bar), more when
+            // the text needs it: by layout alone, so none of these runs this view again.
+            CoverFlowPageFill {
+                Color.clear.containerRelativeFrame(.vertical)
+                VStack(spacing: 0) {
+                    header()
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                    if !games.isEmpty {
+                        Spacer(minLength: 0)
+                        CoverFlowRow(
+                            games: games,
+                            filter: filter,
+                            metrics: metrics,
+                            width: page.width,
+                            missingGameIDs: missingGameIDs,
+                            lastPlayed: lastPlayed,
+                            artRevision: artRevision,
+                            liveIndex: $liveIndex,
+                            position: $position,
+                            tracker: tracker,
+                            scene: scene,
+                            onSelect: onSelect,
+                            artworkProvider: artworkProvider,
+                            onRequestDelete: onRequestDelete,
+                            move: { move(to: $0, animated: $1) },
+                            settle: { settle(at: $0) }
+                        )
+                        .equatable()
+                            .padding(.top, landscape ? 4 : 8 + overhang)
+                            .padding(.bottom, (landscape ? 6 : 12) + overhang)
+                        // The covers are laid out around the caption as it was before it grew
+                        // (kept in place, unseen), so they neither move nor shrink; the caption
+                        // shown is drawn over that room. Portrait: centred in all the room below
+                        // the covers (the unseen caption and the free room under it).
+                        VStack(spacing: 0) {
+                            caption(shown: false)
+                                .hidden()
+                                .padding(.horizontal, 24)
+                                .padding(.bottom, landscape ? 14 : 16)
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
+                            if !landscape {
+                                Spacer(minLength: 0)
+                            }
                         }
+                        .overlay {
+                            caption(shown: true)
+                                .padding(.horizontal, 24)
+                                .offset(y: landscape ? -4 : 0)
+                        }
+                        .zIndex(1)
                     }
-                    .overlay {
-                        caption(shown: true)
-                            .padding(.horizontal, 24)
-                            .offset(y: landscape ? -4 : 0)
-                    }
-                    .zIndex(1)
                 }
+                .frame(minHeight: page.height + bottomRoom)
             }
-            .frame(minHeight: page.height + bottomRoom)
         }
         .ignoresSafeArea(edges: landscape ? .bottom : [])
         // The page scrolls only when large text leaves no room (landscape), but it always
@@ -611,6 +617,25 @@ final class CoverFlowScrollTracker: @unchecked Sendable {
     var offset: Double = 0
     /// The offset when the current swipe began.
     var start: Double = 0
+}
+
+/// Lays the page out (the second view) at least as tall as the first (the screen's height),
+/// or taller if the page needs it.
+struct CoverFlowPageFill: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let width = proposal.width
+        let screen = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil)).height
+        let page = subviews[1].sizeThatFits(ProposedViewSize(width: width, height: nil))
+        return CGSize(width: width ?? page.width, height: max(screen, page.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let size = ProposedViewSize(width: bounds.width, height: bounds.height)
+        subviews[0].place(at: bounds.origin, proposal: size)
+        subviews[1].place(at: bounds.origin, proposal: size)
+    }
 }
 
 /// Whether the page has been pulled since it took its size (a reference, so the scrolling
