@@ -37,6 +37,14 @@ final class CoverArtImageCache: ObservableObject {
             return cached
         }
         if missing.contains(game.id) { return nil }
+        #if DEBUG
+        LibraryWorkProbe.coverReads += 1
+        if let test = TestBoxArt.image(for: game) {
+            boxArt.insert(game.id)
+            cache.setObject(test, forKey: key)
+            return test
+        }
+        #endif
         guard let url = covers.displayableCoverURL(forGameID: game.id),
               let data = try? Data(contentsOf: url),
               let image = UIImage(data: data)
@@ -80,3 +88,38 @@ final class CoverArtImageCache: ObservableObject {
         missing.removeAll()
     }
 }
+
+#if DEBUG
+/// UI tests (`-RetroPlayTestBoxArt YES`): every game gets box art the size downloaded art is
+/// stored at (600 pixels tall, JPEG), busy with detail like a real cover, so the library is
+/// measured with real-sized pictures without any real game's art. Read as a stored cover is
+/// (`UIImage(data:)`, decoded when first drawn).
+enum TestBoxArt {
+    static let enabled = UserDefaults.standard.bool(forKey: "RetroPlayTestBoxArt")
+
+    static func image(for game: LibraryGame) -> UIImage? {
+        guard enabled else { return nil }
+        let size = CGSize(width: 346, height: 600)
+        var seed = UInt64(truncatingIfNeeded: game.id.hashValue) | 1
+        func next() -> CGFloat {
+            seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17
+            return CGFloat(seed % 10_000) / 10_000
+        }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let drawn = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            let cg = context.cgContext
+            UIColor(hue: next(), saturation: 0.7, brightness: 0.5, alpha: 1).setFill()
+            cg.fill(CGRect(origin: .zero, size: size))
+            // Thousands of small shapes: JPEG keeps the detail, so the file and its decoding
+            // cost what a photographed cover does.
+            for _ in 0..<6000 {
+                UIColor(hue: next(), saturation: next(), brightness: next(), alpha: 1).setFill()
+                cg.fillEllipse(in: CGRect(x: next() * size.width, y: next() * size.height,
+                                          width: 2 + next() * 9, height: 2 + next() * 9))
+            }
+        }
+        return drawn.jpegData(compressionQuality: 0.82).flatMap { UIImage(data: $0) }
+    }
+}
+#endif

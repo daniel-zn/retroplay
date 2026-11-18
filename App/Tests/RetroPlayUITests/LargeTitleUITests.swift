@@ -12,9 +12,10 @@ final class LargeTitleUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
     }
 
-    private func launch(_ arguments: [String], glitchFrame: Int = -1) -> XCUIApplication {
+    /// `glitchFrame` nil: the glitch as it plays (the app's own big title).
+    private func launch(_ arguments: [String], glitchFrame: Int? = -1) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = arguments + ["-RetroPlayTitleGlitchFrame", String(glitchFrame)]
+        app.launchArguments = arguments + (glitchFrame.map { ["-RetroPlayTitleGlitchFrame", String($0)] } ?? [])
         app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
         app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
         app.launch()
@@ -110,6 +111,80 @@ final class LargeTitleUITests: XCTestCase {
             if max(r, g, b) - min(r, g, b) > 70 { count += 1 }
         }
         return count
+    }
+
+    /// The glitching big title (the app's own, in the bar's large-title place) stands where the
+    /// bar's own large title does: as far under the bar's buttons, and as far in from the left,
+    /// at the default and the largest text size. Found by its ink (white on black).
+    @MainActor
+    func testGlitchingTitleSitsWhereTheSystemTitleDoes() {
+        // Every place and size measured, so a miss shows how it scales.
+        continueAfterFailure = true
+        for (title, arguments) in [("RetroPlay", ["-retroplay.libraryLayout", "grid"]),
+                                   ("Settings", ["-RetroPlaySmokeSettings", "YES"])] {
+            for size in ["UICTContentSizeCategoryL", "UICTContentSizeCategoryAccessibilityXXXL"] {
+                var ink: [String: CGRect] = [:]
+                for (kind, frame) in [("system", Optional(-1)), ("glitching", nil)] as [(String, Int?)] {
+                    let app = launch(arguments + ["-retroplay.appearance", "dark", "-UIPreferredContentSizeCategoryName", size],
+                                     glitchFrame: frame)
+                    let bar = app.navigationBars[title]
+                    XCTAssertTrue(bar.waitForExistence(timeout: 30), "\(title) \(size) \(kind): no bar")
+                    Thread.sleep(forTimeInterval: 1.5)
+                    // A burst can smear the line: the lowest top over a few looks is the title's own.
+                    var best: CGRect?
+                    for _ in 0..<6 {
+                        let shot = XCUIScreen.main.screenshot()
+                        if let found = Self.inkBox(in: shot.image, rect: CGRect(x: 8, y: bar.frame.minY,
+                                                                                  width: bar.frame.width * 0.55,
+                                                                                  height: bar.frame.height)),
+                           found.minY > (best?.minY ?? -1) {
+                            best = found
+                        }
+                        Thread.sleep(forTimeInterval: 0.2)
+                    }
+                    print("[large-title] \(title) \(size) \(kind): bar \(bar.frame) ink \(String(describing: best))")
+                    attach("title-place-\(title)-\(size)-\(kind)")
+                    ink[kind] = best
+                    app.terminate()
+                }
+                print("[large-title] place \(title) \(size): system \(String(describing: ink["system"])) glitching \(String(describing: ink["glitching"]))")
+                guard let system = ink["system"], let glitching = ink["glitching"] else {
+                    XCTFail("\(title) \(size): no title ink found")
+                    continue
+                }
+                XCTAssertEqual(glitching.minY, system.minY, accuracy: 2,
+                               "\(title) \(size): the glitching title's top is at \(glitching.minY), the system's at \(system.minY)")
+                XCTAssertEqual(glitching.minX, system.minX, accuracy: 2,
+                               "\(title) \(size): the glitching title starts at \(glitching.minX), the system's at \(system.minX)")
+            }
+        }
+    }
+
+    /// The box (points) of the bright pixels in `rect`: rows and columns with a few of them.
+    private static func inkBox(in image: UIImage, rect: CGRect) -> CGRect? {
+        guard let cg = image.cgImage else { return nil }
+        let scale = CGFloat(cg.width) / image.size.width
+        let crop = CGRect(x: rect.minX * scale, y: rect.minY * scale, width: rect.width * scale, height: rect.height * scale)
+            .integral.intersection(CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        guard let part = cg.cropping(to: crop) else { return nil }
+        let w = part.width, h = part.height
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        guard let context = CGContext(data: &pixels, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.draw(part, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var rows = [Int](repeating: 0, count: h), columns = [Int](repeating: 0, count: w)
+        for y in 0..<h {
+            for x in 0..<w {
+                let i = (y * w + x) * 4
+                if Int(pixels[i]) + Int(pixels[i + 1]) + Int(pixels[i + 2]) > 600 { rows[y] += 1; columns[x] += 1 }
+            }
+        }
+        guard let top = rows.firstIndex(where: { $0 >= 3 }), let bottom = rows.lastIndex(where: { $0 >= 3 }),
+              let left = columns.firstIndex(where: { $0 >= 3 }), let right = columns.lastIndex(where: { $0 >= 3 })
+        else { return nil }
+        return CGRect(x: rect.minX + CGFloat(left) / scale, y: rect.minY + CGFloat(top) / scale,
+                      width: CGFloat(right - left + 1) / scale, height: CGFloat(bottom - top + 1) / scale)
     }
 
     @MainActor

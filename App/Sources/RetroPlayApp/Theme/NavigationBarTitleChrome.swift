@@ -184,15 +184,17 @@ extension View {
     /// title glitch plays, the large one is the app's own Text in the bar's large-title place
     /// (iOS 26's `.largeTitle` item), still collapsing to the inline title. The bar doesn't
     /// expose that item to VoiceOver, so with VoiceOver (or Reduce Motion, or the glitch off)
-    /// it's the bar's own large title, which reads as the screen's heading.
-    func retroPlayLargeTitle(_ title: String) -> some View {
-        modifier(RetroPlayLargeTitle(title: title))
+    /// it's the bar's own large title, which reads as the screen's heading. `subtitle` goes
+    /// under it (`navigationSubtitle`).
+    func retroPlayLargeTitle(_ title: String, subtitle: String? = nil) -> some View {
+        modifier(RetroPlayLargeTitle(title: title, subtitle: subtitle))
     }
 }
 
 @available(iOS 18.0, *)
 private struct RetroPlayLargeTitle: ViewModifier {
     let title: String
+    let subtitle: String?
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -201,8 +203,7 @@ private struct RetroPlayLargeTitle: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        let titled = content
-            .navigationTitle(title)
+        let titled = subtitled(content.navigationTitle(title))
             .navigationBarTitleDisplayMode(.large)
         // Not a toolbar with the item left out: an empty one still takes the bar's own title's
         // place (unread by VoiceOver). Turning VoiceOver or Reduce Motion on builds the screen
@@ -210,32 +211,50 @@ private struct RetroPlayLargeTitle: ViewModifier {
         if glitches {
             titled.toolbar {
                 ToolbarItem(placement: .largeTitle) {
-                    RetroPlayLargeTitleText(title: title)
+                    RetroPlayLargeTitleText(title: title, hasSubtitle: subtitle?.isEmpty == false)
                 }
             }
         } else {
             titled
         }
     }
+
+    @ViewBuilder
+    private func subtitled(_ content: some View) -> some View {
+        if let subtitle {
+            content.navigationSubtitle(subtitle)
+        } else {
+            content
+        }
+    }
 }
 
 /// The large title's text: the italic at `RetroPlayTextStyle.largeTitle` (no larger than its
-/// largest size), leading like the bar's own, on one line, with the glitch.
+/// largest size), on one line, with the glitch, where the bar draws its own: the bar hosts the
+/// item straight under its buttons, where it leaves room above its own title (more with a
+/// subtitle under it), so the text keeps that room, grown with the font. Measured against the
+/// bar's own title, at the default and the largest text size
+/// (`LargeTitleUITests.testGlitchingTitleSitsWhereTheSystemTitleDoes`).
 @available(iOS 18.0, *)
 private struct RetroPlayLargeTitleText: View {
     let title: String
+    let hasSubtitle: Bool
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
+        let font = RetroPlayFont.uiLargeTitleFont(compatibleWith: traits)
+        let grown = font.pointSize / RetroPlayFont.uiLargeTitleFont(
+            compatibleWith: UITraitCollection(preferredContentSizeCategory: .large)).pointSize
         Text(title)
-            .font(Font(RetroPlayFont.uiLargeTitleFont(compatibleWith: traits)))
+            .font(Font(font))
             .kerning(RetroPlayFont.uiKern)
             .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
             .lineLimit(1)
             .fixedSize()
             .retroPlayTitleGlitch(title)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, ((hasSubtitle ? 21.7 : 8) * grown).rounded())
     }
 }

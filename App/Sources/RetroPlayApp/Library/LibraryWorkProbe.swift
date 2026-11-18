@@ -2,6 +2,7 @@
 #if DEBUG
 import SwiftUI
 import UIKit
+import RetroPlayCore
 
 /// Debug builds only: how much the library does while it moves, for UI tests to compare (a
 /// pull down in the grid and in Cover Flow). Frames that came late (the main thread busy past a
@@ -14,10 +15,13 @@ enum LibraryWorkProbe {
     static var carousel = 0
     static var covers = 0
     static var stage = 0
+    /// Covers read from disk (and decoded) by the cover cache.
+    static var coverReads = 0
 
     static var summary: String {
         "frames=\(FramePacer.shared.frames) late=\(FramePacer.shared.late) library=\(library) "
-            + "coverFlow=\(coverFlow) carousel=\(carousel) covers=\(covers) stage=\(stage)"
+            + "coverFlow=\(coverFlow) carousel=\(carousel) covers=\(covers) stage=\(stage) coverReads=\(coverReads) "
+            + "gapSearches=\(CoverFlow.Metrics.gapSearches)"
     }
 
     /// Counts the display's frames, and those that came more than half a refresh late.

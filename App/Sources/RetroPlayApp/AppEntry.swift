@@ -464,8 +464,7 @@ public struct RetroPlayRootView: View {
             .background(RetroPlayTheme.canvas(for: colorScheme))
             // iOS's large title (collapsing into the bar as the library scrolls; inline in
             // landscape), with the game count under it.
-            .retroPlayLargeTitle("RetroPlay")
-            .navigationSubtitle(librarySubtitle)
+            .retroPlayLargeTitle("RetroPlay", subtitle: librarySubtitle)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
             .retroPlayNavigationTitleChrome(for: colorScheme)
             // The search field sits hidden under the title until the library is pulled down

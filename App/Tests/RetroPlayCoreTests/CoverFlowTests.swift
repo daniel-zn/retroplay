@@ -3,6 +3,18 @@ import XCTest
 @testable import RetroPlayCore
 
 final class CoverFlowTests: XCTestCase {
+    /// The library asks for the same sizes on every frame of a pull down; the gap search runs
+    /// once for them (it was most of the main thread's time while pulling Cover Flow).
+    func testSameSizesSearchTheGapOnce() {
+        let before = CoverFlow.Metrics.gapSearches
+        let first = CoverFlow.Metrics.fitting(width: 417, height: 533, tallestAspect: 0.57, deepestBox: 0.16)
+        for _ in 0..<20 {
+            XCTAssertEqual(CoverFlow.Metrics.fitting(width: 417, height: 533, tallestAspect: 0.57, deepestBox: 0.16), first)
+        }
+        XCTAssertEqual(CoverFlow.Metrics.gapSearches - before, 1)
+        XCTAssertEqual(first.rightGap, CoverFlow.Metrics.fitting(width: 417, height: 533, tallestAspect: 0.57, deepestBox: 0.16).rightGap)
+    }
+
     private let a = UUID(), b = UUID(), c = UUID(), d = UUID()
 
     // MARK: Focus after the list changes

@@ -110,7 +110,8 @@ final class LibraryPullToSearchUITests: XCTestCase {
     @MainActor
     func testPullDownWork() {
         for layout in ["grid", "coverFlow"] {
-            let app = launch(["-retroplay.libraryLayout", layout])
+            // Box art the size real covers are stored at, on every game.
+            let app = launch(["-retroplay.libraryLayout", layout, "-RetroPlayTestBoxArt", "YES"])
             waitForLibrary(app, layout)
             let work = app.descendants(matching: .any)["library.work"]
             XCTAssertTrue(work.waitForExistence(timeout: 10), "\(layout): no work probe")
@@ -135,6 +136,10 @@ final class LibraryPullToSearchUITests: XCTestCase {
             let rows = (after["carousel"] ?? 0) - (before["carousel"] ?? 0)
             XCTAssertLessThanOrEqual(pages, 3, "\(layout): the pulls ran the Cover Flow page \(pages) times")
             XCTAssertLessThanOrEqual(rows, 3, "\(layout): the pulls built the row of covers \(rows) times")
+            // Before: every frame of a pull searched for where the covers stand, twice (about
+            // 30 ms each), for the same sizes; the answer is now kept.
+            let searches = (after["gapSearches"] ?? 0) - (before["gapSearches"] ?? 0)
+            XCTAssertEqual(searches, 0, "\(layout): the pulls searched the Cover Flow gaps \(searches) times")
             app.terminate()
         }
     }

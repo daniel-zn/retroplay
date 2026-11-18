@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
+import Synchronization
 
 /// The library's Cover Flow view: where the covers stand, and which game is in the middle.
 /// Kept free of SwiftUI so the geometry and the focus rules can be tested.
@@ -52,7 +53,32 @@ public enum CoverFlow {
         /// the slot's top, `eye` in front, both boxes tipped back by `pitch`). Measured row by
         /// row across the screen: the middle cover's edge leans out at the bottom and the spine's
         /// at the top, so their nearest corners stand at different heights.
+        ///
+        /// The search takes thousands of steps, and the library asks again with the same sizes
+        /// on every frame of a pull down (the page's safe area moves), so each answer is kept.
         static func snugRightGap(width: Double, height: Double, depth: Double, eye: Double) -> Double {
+            let key = GapKey(width: width, height: height, depth: depth, eye: eye)
+            if let known = gaps.withLock({ $0.answers[key] }) { return known }
+            let gap = searchSnugRightGap(width: width, height: height, depth: depth, eye: eye)
+            gaps.withLock {
+                // A handful of sizes come up (orientations, text sizes); start again past many.
+                if $0.answers.count > 64 { $0.answers.removeAll() }
+                $0.answers[key] = gap
+                $0.searches += 1
+            }
+            return gap
+        }
+
+        /// How many times `snugRightGap` has searched (not answered from what it kept).
+        public static var gapSearches: Int { gaps.withLock { $0.searches } }
+
+        private struct GapKey: Hashable {
+            let width, height, depth, eye: Double
+        }
+
+        private static let gaps = Mutex<(answers: [GapKey: Double], searches: Int)>(([:], 0))
+
+        private static func searchSnugRightGap(width: Double, height: Double, depth: Double, eye: Double) -> Double {
             let middle = drawnCorners(width: width, height: height, depth: depth, eye: eye, yaw: 0, at: 0)
             let air = width * CoverFlow.stackAir
             var low = 0.0, high = width * 2
