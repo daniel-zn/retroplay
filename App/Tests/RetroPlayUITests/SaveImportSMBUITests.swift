@@ -13,12 +13,6 @@ final class SaveImportSMBUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func attach(_ app: XCUIApplication, _ name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
 
     /// The first button, cell or text labelled `label` (or starting with it).
     private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
@@ -45,7 +39,7 @@ final class SaveImportSMBUITests: XCTestCase {
             }
             Thread.sleep(forTimeInterval: 0.5)
         } while Date() < deadline
-        attach(app, "smb-stuck-\(step)")
+        attachScreen("smb-stuck-\(step)")
         throw XCTSkip("Couldn't find \(labels) at step “\(step)”; see the attached screenshot.")
     }
 
@@ -59,7 +53,7 @@ final class SaveImportSMBUITests: XCTestCase {
         if browse.waitForExistence(timeout: 10) { browse.tap() }
         let entry = element(files, server)
         guard entry.waitForExistence(timeout: 10) else {
-            attach(files, "smb-forget-no-server")
+            attachScreen("smb-forget-no-server")
             files.terminate()
             return
         }
@@ -71,7 +65,7 @@ final class SaveImportSMBUITests: XCTestCase {
                 break
             }
         }
-        attach(files, "smb-after-forget")
+        attachScreen("smb-after-forget")
         files.terminate()
     }
 
@@ -95,7 +89,7 @@ final class SaveImportSMBUITests: XCTestCase {
             try tap(files, ["Connect to Server"], step: "files-connect-menu")
             let address = files.textFields.firstMatch
             guard address.waitForExistence(timeout: 10) else {
-                attach(files, "smb-stuck-address")
+                attachScreen("smb-stuck-address")
                 throw XCTSkip("No server address field.")
             }
             address.tap()
@@ -104,17 +98,17 @@ final class SaveImportSMBUITests: XCTestCase {
             // The sign-in screen is up once it shows a password field.
             let secret = files.secureTextFields.firstMatch
             guard secret.waitForExistence(timeout: 20) else {
-                attach(files, "smb-stuck-sign-in")
+                attachScreen("smb-stuck-sign-in")
                 throw XCTSkip("No sign-in screen after Connect.")
             }
             let registered = element(files, "Registered User")
             if registered.exists, registered.isHittable { registered.tap() }
-            attach(files, "smb-sign-in")
+            attachScreen("smb-sign-in")
             let name = files.textFields
                 .matching(NSPredicate(format: "identifier != %@", "ServerAddressTextField"))
                 .firstMatch
             guard name.waitForExistence(timeout: 5) else {
-                attach(files, "smb-stuck-name")
+                attachScreen("smb-stuck-name")
                 throw XCTSkip("No name field on the sign-in screen.")
             }
             name.tap()
@@ -134,14 +128,12 @@ final class SaveImportSMBUITests: XCTestCase {
             try tap(files, ["Next", "Connect", "Done"], step: "files-sign-in")
             _ = element(files, path.first ?? server).waitForExistence(timeout: 20)
         }
-        attach(files, "smb-files-connected")
+        attachScreen("smb-files-connected")
         files.terminate()
 
         // 2. RetroPlay: + → Saves, then the share's folder, then Open.
         let app = XCUIApplication()
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         try tap(app, ["library.import"], step: "plus", timeout: 30)
         try tap(app, ["library.import.saves", "Saves"], step: "saves")
         try tap(app, ["Browse"], step: "picker-browse", timeout: 20)
@@ -149,13 +141,13 @@ final class SaveImportSMBUITests: XCTestCase {
         for name in path {
             try tap(app, [name], step: "picker-\(name)", timeout: 20)
         }
-        attach(app, "smb-picker-folder")
+        attachScreen("smb-picker-folder")
         try tap(app, ["Open"], step: "picker-open")
 
         // 3. What the scan made of it: a summary sheet or the "No saves" alert, with its notes.
         let summary = app.staticTexts["saveImport.summary"].firstMatch
         let found = summary.waitForExistence(timeout: 60)
-        attach(app, "smb-result")
+        attachScreen("smb-result")
         let texts = app.staticTexts.allElementsBoundByIndex.map(\.label).filter { !$0.isEmpty }
         let note = XCTAttachment(string: texts.joined(separator: "\n"))
         note.name = "smb-result-texts"

@@ -11,11 +11,7 @@ final class CoverFlowTapUITests: XCTestCase {
     func testTappingTheMiddleCoverDoesNotMoveTheRow() {
         let app = XCUIApplication()
         app.launchArguments = ["-retroplay.libraryLayout", "coverFlow", "-RetroPlaySmokePortrait", "YES"]
-        // Xcode points test launches at the build folder for frameworks, where the emulator
-        // cores sit unsigned; the app's own signed copies are the ones to load.
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         let position = app.descendants(matching: .any)["coverFlow.position"]
         XCTAssertTrue(position.waitForExistence(timeout: 30), "no Cover Flow")
         sleep(2)

@@ -13,13 +13,6 @@ final class PauseMenuFitUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
     }
 
-    @MainActor
-    private func shoot(_ name: String) {
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = "pause-\(name)"
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
 
     @MainActor
     private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
@@ -54,10 +47,10 @@ final class PauseMenuFitUITests: XCTestCase {
                     if !frame.isEmpty, visible.contains(frame) { return row }
                 }
                 drag(app, down: down)
-                Thread.sleep(forTimeInterval: 0.4)
+                waitUntilStill(element(app, label))
             }
         }
-        shoot("\(context)-unreachable-\(label)")
+        attachScreen("pause-\(context)-unreachable-\(label)")
         XCTFail("\(context): “\(label)” can't be scrolled into view (frame \(element(app, label).frame), menu \(menu.frame), window \(window))")
         return nil
     }
@@ -76,9 +69,7 @@ final class PauseMenuFitUITests: XCTestCase {
             "-UIPreferredContentSizeCategoryName", size,
             "-RetroPlaySmokeSystem", "nes", "-RetroPlaySmokeMenu", "YES",
         ]
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         defer { app.terminate() }
         let resume = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Resume")).firstMatch
         guard resume.waitForExistence(timeout: 45) else {
@@ -86,20 +77,20 @@ final class PauseMenuFitUITests: XCTestCase {
             return
         }
         Thread.sleep(forTimeInterval: 1)
-        shoot("\(name)-closed")
+        attachScreen("pause-\(name)-closed")
 
         tapRow(app, "Saves", name)
         Thread.sleep(forTimeInterval: 0.6)
         tapRow(app, "Options", name)
         Thread.sleep(forTimeInterval: 0.8)
-        shoot("\(name)-open")
+        attachScreen("pause-\(name)-open")
 
         // Every row, bottom ones first (most likely past the screen), then back to the top.
         for label in ["Quit Game", "Fill Screen in Landscape", "Smooth Screen", "Haptics", "Options",
                       "Import Battery Save…", "Reset", "No saves yet", "Saves", "Save state", "Resume"] {
             reach(app, label, name)
         }
-        shoot("\(name)-top")
+        attachScreen("pause-\(name)-top")
         // The menu itself: inside the screen, whatever its content.
         // The menu is a scroll view (any element type is matched).
         let menu = app.descendants(matching: .any)["playMenu"].firstMatch

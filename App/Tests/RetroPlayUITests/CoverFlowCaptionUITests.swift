@@ -20,9 +20,7 @@ final class CoverFlowCaptionUITests: XCTestCase {
         app.launchArguments = ["-UIPreferredContentSizeCategoryName", size, "-retroplay.libraryLayout", "coverFlow",
                                // The caption is hidden from VoiceOver; debug builds expose it for this check.
                                "-RetroPlayTestCaptionAccessible", "YES"]
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         defer { app.terminate() }
         let caption = app.descendants(matching: .any)["coverFlow.caption"].firstMatch
         guard caption.waitForExistence(timeout: 30) else {

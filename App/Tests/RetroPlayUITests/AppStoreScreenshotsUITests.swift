@@ -18,19 +18,10 @@ final class AppStoreScreenshotsUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL",
                                "-retroplay.appearance", "dark", "-RetroPlayTitleGlitchFrame", "-1"] + extra
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         return app
     }
 
-    @MainActor
-    private func shoot(_ name: String) {
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = "appstore-\(name)"
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
 
     @MainActor
     private func text(_ app: XCUIApplication, _ label: String) -> XCUIElement {
@@ -44,7 +35,7 @@ final class AppStoreScreenshotsUITests: XCTestCase {
             XCTAssertTrue(text(app, "RetroPlay").waitForExistence(timeout: 30), "\(name): no title")
             XCTAssertTrue(app.buttons["library.settings"].firstMatch.waitForExistence(timeout: 10), "\(name): no top bar")
             Thread.sleep(forTimeInterval: 2)
-            shoot(name)
+            attachScreen("appstore-\(name)")
             app.terminate()
         }
     }
@@ -57,10 +48,10 @@ final class AppStoreScreenshotsUITests: XCTestCase {
         // debug readout and a "You died." screen).
         do {
             let app = launch(["-RetroPlaySmokeSystem", "snes", "-RetroPlaySmokeGame", "breakout", "-retroplay.touchWithController", "YES"])
-            let start = app.descendants(matching: .any).matching(NSPredicate(format: "label ==[c] %@", "Start")).firstMatch
+            let start = app.descendants(matching: .any).labelled("Start")
             XCTAssertTrue(start.waitForExistence(timeout: 45), "playing: no controls")
             Thread.sleep(forTimeInterval: 8)
-            shoot("3-playing")
+            attachScreen("appstore-3-playing")
             app.terminate()
         }
 
@@ -69,7 +60,7 @@ final class AppStoreScreenshotsUITests: XCTestCase {
         let resume = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Resume")).firstMatch
         XCTAssertTrue(resume.waitForExistence(timeout: 45), "pause menu: no Resume")
         Thread.sleep(forTimeInterval: 1.5)
-        shoot("4-pause-menu")
+        attachScreen("appstore-4-pause-menu")
         app.terminate()
     }
 
@@ -78,7 +69,7 @@ final class AppStoreScreenshotsUITests: XCTestCase {
         let app = launch(["-retroplay.libraryLayout", "coverFlow", "-RetroPlaySmokeSettings", "YES"])
         XCTAssertTrue(text(app, "Settings").waitForExistence(timeout: 30), "settings: no title")
         Thread.sleep(forTimeInterval: 1.5)
-        shoot("5-settings")
+        attachScreen("appstore-5-settings")
         app.terminate()
     }
 }

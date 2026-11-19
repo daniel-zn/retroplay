@@ -22,7 +22,7 @@ final class LandscapeCentreRowUITests: XCTestCase {
 
     @MainActor
     private func labelled(_ app: XCUIApplication, _ label: String) -> XCUIElement {
-        app.descendants(matching: .any).matching(NSPredicate(format: "label ==[c] %@", label)).firstMatch
+        app.descendants(matching: .any).labelled(label)
     }
 
     @MainActor
@@ -37,11 +37,9 @@ final class LandscapeCentreRowUITests: XCTestCase {
                                // The fitted layout (a Simulator may remember Fill Screen in
                                // Landscape, where the picture runs under the controls on purpose).
                                "-retroplay.landscapeFill.\(system)", "NO"]
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         defer { app.terminate() }
-        let pause = app.buttons.matching(NSPredicate(format: "label ==[c] %@", "Pause menu")).firstMatch
+        let pause = app.buttons.labelled("Pause menu")
         guard pause.waitForExistence(timeout: 45) else {
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             shot.name = "row-\(system)-\(look)-no-game"

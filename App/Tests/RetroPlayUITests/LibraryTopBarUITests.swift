@@ -57,7 +57,7 @@ final class LibraryTopBarUITests: XCTestCase {
             // reaches past the centre; it still ends at the bar's trailing edge.
             XCTAssertLessThan(window.maxX - frames[frames.count - 1].maxX, 40, "\(size): the bar isn't on the trailing edge")
             XCTAssertGreaterThan(frames[0].minX, window.width * 0.35, "\(size): the bar reaches into the title")
-            attach(app, "top-bar-\(size)")
+            attachScreen("top-bar-\(size)")
             app.terminate()
         }
     }
@@ -77,7 +77,7 @@ final class LibraryTopBarUITests: XCTestCase {
             XCTAssertGreaterThan(status.frame.midY, window.midY, "\(orientation): the status isn't at the bottom: \(status.frame)")
             XCTAssertFalse(during[0].isEnabled, "\(orientation): + takes a second import while saves are found")
             XCTAssertFalse(app.navigationBars.descendants(matching: .any)["library.findingSaves"].exists, "\(orientation): the status is in the top bar")
-            attach(app, "mid-import-\(orientation)")
+            attachScreen("mid-import-\(orientation)")
 
             let stop = app.buttons["library.stopFindingSaves"].firstMatch
             XCTAssertTrue(stop.waitForExistence(timeout: 5) && stop.isHittable, "\(orientation): Stop can't be reached")
@@ -89,7 +89,7 @@ final class LibraryTopBarUITests: XCTestCase {
             print("[top-bar] \(orientation): importing \(importing), idle \(idle)")
             XCTAssertEqual(importing.width, idle.width, accuracy: 0.5, "\(orientation): the bar's width changed while importing")
             XCTAssertEqual(importing.minX, idle.minX, accuracy: 0.5, "\(orientation): the bar moved while importing")
-            attach(app, "library-\(orientation)")
+            attachScreen("library-\(orientation)")
             app.terminate()
         }
         XCUIDevice.shared.orientation = .portrait
@@ -98,19 +98,10 @@ final class LibraryTopBarUITests: XCTestCase {
     private func launch(_ arguments: [String]) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = arguments
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         return app
     }
 
-    private func attach(_ app: XCUIApplication, _ name: String) {
-        // The screen, not the app: in landscape app.screenshot() comes out rotated twice.
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
 
     /// Menus iOS draws itself keep its look: normal case and the system font (the "+" menu,
     /// and a game's long-press menu).
@@ -126,7 +117,7 @@ final class LibraryTopBarUITests: XCTestCase {
         // Case-sensitive on purpose.
         XCTAssertTrue(games.label.hasPrefix("Games"), "the + menu says “\(games.label)”")
         XCTAssertTrue(saves.label.hasPrefix("Saves"), "the + menu says “\(saves.label)”")
-        attach(app, "plus-menu-case")
+        attachScreen("plus-menu-case")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
 
         let tile = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", ", ")).element(boundBy: 0)
@@ -135,7 +126,7 @@ final class LibraryTopBarUITests: XCTestCase {
         let play = app.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "Play", "Continue")).firstMatch
         XCTAssertTrue(play.waitForExistence(timeout: 5), "the game's menu has no “Play” / “Continue” in normal case")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == %@", "Delete")).firstMatch.exists, "no “Delete” in normal case")
-        attach(app, "context-menu-case")
+        attachScreen("context-menu-case")
         app.terminate()
     }
 
@@ -144,7 +135,7 @@ final class LibraryTopBarUITests: XCTestCase {
     func testSettingsHasNoDoneButtonAndSwipesClosed() {
         let app = launch(["-RetroPlaySmokeSettings", "YES"])
         XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier ==[c] %@", "Settings")).firstMatch.waitForExistence(timeout: 30), "no Settings")
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label ==[c] %@", "Done")).firstMatch.exists, "Settings has a Done button")
+        XCTAssertFalse(app.buttons.labelled("Done").exists, "Settings has a Done button")
         let window = app.windows.firstMatch
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
             .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
@@ -170,7 +161,7 @@ final class LibraryTopBarUITests: XCTestCase {
             XCTAssertTrue(games.waitForExistence(timeout: 5), "\(size): no Games in the menu")
             XCTAssertTrue(saves.exists, "\(size): no Saves in the menu")
             XCTAssertLessThan(games.frame.midY, saves.frame.midY, "\(size): Games should come first")
-            attach(app, "import-menu-\(appearance)-\(size)")
+            attachScreen("import-menu-\(appearance)-\(size)")
             app.terminate()
         }
     }
@@ -191,7 +182,7 @@ final class LibraryTopBarUITests: XCTestCase {
         // The picker draws out of process; on a cold Simulator its sheet can stay blank for
         // well over 20 s.
         let found = open.waitForExistence(timeout: 60)
-        attach(app, "save-folder-picker")
+        attachScreen("save-folder-picker")
         XCTAssertTrue(found, "no Open button: the picker isn't in folder mode")
         app.terminate()
     }
@@ -225,7 +216,7 @@ final class LibraryTopBarUITests: XCTestCase {
             app.swipeDown()
             XCTAssertTrue(app.buttons["saveImport.import"].exists)
             XCTAssertTrue(app.buttons["saveImport.keepExisting"].exists)
-            attach(app, "save-import-\(appearance)-\(size)")
+            attachScreen("save-import-\(appearance)-\(size)")
             app.terminate()
         }
     }
@@ -241,7 +232,7 @@ final class LibraryTopBarUITests: XCTestCase {
             .matching(NSPredicate(format: "label CONTAINS[c] %@", "SmokeSaves/A/B/C/Zelda.sav"))
             .firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5), "the nested save isn't listed")
-        attach(app, "save-import-nested-folder")
+        attachScreen("save-import-nested-folder")
         app.terminate()
     }
 }

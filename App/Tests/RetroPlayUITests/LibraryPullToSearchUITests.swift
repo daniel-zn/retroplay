@@ -13,23 +13,10 @@ final class LibraryPullToSearchUITests: XCTestCase {
     private func launch(_ arguments: [String], glitchTitle: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = arguments + (glitchTitle ? [] : ["-RetroPlayTitleGlitchFrame", "-1"])
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         return app
     }
 
-    private func attach(_ name: String) {
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
-
-    private func waitFor(_ format: String, _ element: XCUIElement, timeout: TimeInterval) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: format), object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
-    }
 
     /// The library, laid out: its top bar is there and a game shows. Returns a query that
     /// finds that game (the start of its name), so the test doesn't lean on which games exist.
@@ -71,12 +58,12 @@ final class LibraryPullToSearchUITests: XCTestCase {
                       "\(context): pulling down didn't show the search field")
         let window = app.windows.firstMatch.frame
         XCTAssertLessThan(field.frame.maxY, window.height * 0.4, "\(context): the search field isn't at the top: \(field.frame)")
-        attach("pull-search-\(context)-revealed")
+        attachScreen("pull-search-\(context)-revealed")
         field.tap()
         app.typeText(query)
         let results = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH[c] %@ OR label ENDSWITH[c] %@", "Result", "Results")).firstMatch
         XCTAssertTrue(results.waitForExistence(timeout: 10), "\(context): typing didn't show results")
-        attach("pull-search-\(context)-results")
+        attachScreen("pull-search-\(context)-results")
     }
 
     @MainActor
@@ -130,10 +117,10 @@ final class LibraryPullToSearchUITests: XCTestCase {
             var shown = 0, hidden = 0
             for velocity in [XCUIGestureVelocity.slow, .slow, .fast, .fast] {
                 drag(0.4, 0.75, velocity)
-                Thread.sleep(forTimeInterval: 0.6)
+                waitUntilStill(field)
                 if field.exists && field.isHittable && field.frame.height > 20 { shown += 1 }
                 drag(0.75, 0.3, velocity)
-                Thread.sleep(forTimeInterval: 0.6)
+                waitUntilStill(field)
                 if !(field.exists && field.isHittable && field.frame.height > 20) { hidden += 1 }
             }
             Thread.sleep(forTimeInterval: 1)
@@ -188,7 +175,7 @@ final class LibraryPullToSearchUITests: XCTestCase {
             focused = waitFor("hasKeyboardFocus == true", field, timeout: 4)
             print("[command-f] \(layout) press \(press): field \(field.exists) focused \(focused)")
         }
-        attach("command-f-\(layout)")
+        attachScreen("command-f-\(layout)")
         XCTAssertTrue(focused, "\(layout): Command-F didn't put the cursor in the search field")
         app.typeText(query)
         let results = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH[c] %@ OR label ENDSWITH[c] %@", "Result", "Results")).firstMatch

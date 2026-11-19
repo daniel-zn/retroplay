@@ -25,20 +25,10 @@ final class TypographyScreenshotsUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-UIPreferredContentSizeCategoryName", look.size, "-retroplay.appearance", look.appearance,
                                "-RetroPlayTitleGlitchFrame", String(glitchFrame)] + extra
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         return app
     }
 
-    @MainActor
-    private func shoot(_ app: XCUIApplication, _ name: String) {
-        // The screen, not the app: in landscape app.screenshot() comes out rotated twice.
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = "type-\(name)"
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
 
     /// A text that must be on screen, whole and inside the window.
     @MainActor
@@ -60,13 +50,13 @@ final class TypographyScreenshotsUITests: XCTestCase {
             let grid = launch(look, ["-retroplay.libraryLayout", "grid"])
             expectVisible(grid, "RetroPlay", "grid \(look.name)", timeout: 30)
             Thread.sleep(forTimeInterval: 1)
-            shoot(grid, "library-grid-\(look.name)")
+            attachScreen("type-library-grid-\(look.name)")
             grid.terminate()
 
             let flow = launch(look, ["-retroplay.libraryLayout", "coverFlow"])
             expectVisible(flow, "RetroPlay", "cover flow \(look.name)", timeout: 30)
             Thread.sleep(forTimeInterval: 2)
-            shoot(flow, "library-coverflow-\(look.name)")
+            attachScreen("type-library-coverflow-\(look.name)")
             flow.terminate()
         }
     }
@@ -80,14 +70,14 @@ final class TypographyScreenshotsUITests: XCTestCase {
             let landscape = launch(look, ["-retroplay.libraryLayout", "coverFlow"])
             XCTAssertTrue(landscape.buttons["library.settings"].firstMatch.waitForExistence(timeout: 30), "landscape \(look.name): no top bar")
             Thread.sleep(forTimeInterval: 2)
-            shoot(landscape, "library-landscape-\(look.name)")
+            attachScreen("type-library-landscape-\(look.name)")
             landscape.terminate()
             XCUIDevice.shared.orientation = .portrait
 
             let importing = launch(look, ["-retroplay.libraryLayout", "coverFlow", "-RetroPlaySmokeSaveScan", "YES"])
             XCTAssertTrue(importing.descendants(matching: .any)["library.findingSaves"].firstMatch.waitForExistence(timeout: 30), "importing \(look.name): no status")
             Thread.sleep(forTimeInterval: 1)
-            shoot(importing, "library-importing-\(look.name)")
+            attachScreen("type-library-importing-\(look.name)")
             importing.terminate()
         }
     }
@@ -112,10 +102,10 @@ final class TypographyScreenshotsUITests: XCTestCase {
             let app = launch(look, ["-retroplay.libraryLayout", "grid", "-RetroPlaySmokeSettings", "YES"])
             expectVisible(app, "Settings", "settings \(look.name)", timeout: 30)
             Thread.sleep(forTimeInterval: 1)
-            shoot(app, "settings-\(look.name)")
+            attachScreen("type-settings-\(look.name)")
             app.swipeUp()
             Thread.sleep(forTimeInterval: 1)
-            shoot(app, "settings-scrolled-\(look.name)")
+            attachScreen("type-settings-scrolled-\(look.name)")
             let window = app.windows.firstMatch
             window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
                 .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
@@ -125,12 +115,12 @@ final class TypographyScreenshotsUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 1)
             let field = pullDownToSearch(app, "grid \(look.name)")
             Thread.sleep(forTimeInterval: 1)
-            shoot(app, "search-revealed-grid-\(look.name)")
+            attachScreen("type-search-revealed-grid-\(look.name)")
             field.tap()
             Thread.sleep(forTimeInterval: 1)
             app.typeText("Su")
             Thread.sleep(forTimeInterval: 1)
-            shoot(app, "search-\(look.name)")
+            attachScreen("type-search-\(look.name)")
             app.terminate()
 
             let flow = launch(look, ["-retroplay.libraryLayout", "coverFlow"])
@@ -138,7 +128,7 @@ final class TypographyScreenshotsUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 2)
             _ = pullDownToSearch(flow, "cover flow \(look.name)")
             Thread.sleep(forTimeInterval: 1)
-            shoot(flow, "search-revealed-coverflow-\(look.name)")
+            attachScreen("type-search-revealed-coverflow-\(look.name)")
             flow.terminate()
         }
     }
@@ -149,7 +139,7 @@ final class TypographyScreenshotsUITests: XCTestCase {
             let sheet = launch(look, ["-RetroPlaySmokeSaveImport", "YES"])
             expectVisible(sheet, "Found 4 saves", "save import \(look.name)", timeout: 30)
             Thread.sleep(forTimeInterval: 1)
-            shoot(sheet, "save-import-\(look.name)")
+            attachScreen("type-save-import-\(look.name)")
             sheet.terminate()
 
             // A game's pause menu (opened by the smoke argument once the game runs).
@@ -157,7 +147,7 @@ final class TypographyScreenshotsUITests: XCTestCase {
             let resume = play.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Resume")).firstMatch
             XCTAssertTrue(resume.waitForExistence(timeout: 45), "play menu \(look.name): no Resume")
             Thread.sleep(forTimeInterval: 1)
-            shoot(play, "play-menu-\(look.name)")
+            attachScreen("type-play-menu-\(look.name)")
             play.terminate()
         }
     }
@@ -178,7 +168,7 @@ final class TypographyScreenshotsUITests: XCTestCase {
                 row.tap()
                 expectVisible(app, "No Waiting Saves", "waiting saves \(look.name)", timeout: 10)
                 Thread.sleep(forTimeInterval: 1)
-                shoot(app, "glitch-waiting-saves-empty-\(look.name)-frame\(frame)")
+                attachScreen("type-glitch-waiting-saves-empty-\(look.name)-frame\(frame)")
                 app.terminate()
             }
         }
@@ -194,7 +184,7 @@ final class TypographyScreenshotsUITests: XCTestCase {
                 let app = launch(look, ["-retroplay.libraryLayout", "grid"], glitchFrame: frame)
                 expectVisible(app, "RetroPlay", "glitch frame \(frame) \(look.name)", timeout: 30)
                 Thread.sleep(forTimeInterval: 1)
-                shoot(app, "glitch-\(look.name)-frame\(frame)")
+                attachScreen("type-glitch-\(look.name)-frame\(frame)")
                 app.terminate()
             }
         }

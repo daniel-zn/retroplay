@@ -20,13 +20,6 @@ final class FilesPickerSaveImportUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    @MainActor
-    private func attach(_ app: XCUIApplication, _ name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
 
     @MainActor
     private func element(_ app: XCUIApplication, _ label: String) -> XCUIElement {
@@ -51,7 +44,7 @@ final class FilesPickerSaveImportUITests: XCTestCase {
             }
             Thread.sleep(forTimeInterval: 0.5)
         } while Date() < deadline
-        attach(app, "files-stuck-\(step)")
+        attachScreen("files-stuck-\(step)")
         XCTFail("Couldn't find “\(label)” at step \(step)")
     }
 
@@ -75,7 +68,7 @@ final class FilesPickerSaveImportUITests: XCTestCase {
             while Date() < deadline, !titled() { Thread.sleep(forTimeInterval: 0.3) }
         }
         if !titled() {
-            attach(app, "files-stuck-folder-\(folder)")
+            attachScreen("files-stuck-folder-\(folder)")
             XCTFail("Couldn't open “\(folder)” in the picker")
         }
     }
@@ -98,11 +91,11 @@ final class FilesPickerSaveImportUITests: XCTestCase {
         for folder in path.split(separator: "/").map(String.init) {
             open(app, folder)
         }
-        attach(app, "files-picker-\(name)")
+        attachScreen("files-picker-\(name)")
         tap(app, "Open", step: "open")
         let summary = app.staticTexts["saveImport.summary"].firstMatch
         let found = summary.waitForExistence(timeout: 120)
-        attach(app, "files-summary-\(name)")
+        attachScreen("files-summary-\(name)")
         let texts = app.staticTexts.allElementsBoundByIndex.map(\.label).filter { !$0.isEmpty }
         let note = XCTAttachment(string: texts.joined(separator: "\n"))
         note.name = "files-summary-\(name)-texts"
@@ -118,9 +111,7 @@ final class FilesPickerSaveImportUITests: XCTestCase {
             throw XCTSkip("No On My iPhone folders given to the test runner.")
         }
         let app = XCUIApplication()
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
 
         // The folder holding one save, exactly like the player: it's listed, nothing written.
         pick(app, one, name: "one")
@@ -145,7 +136,7 @@ final class FilesPickerSaveImportUITests: XCTestCase {
         tap(app, "saveImport.import", step: "import")
         let done = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Imported")).firstMatch
         XCTAssertTrue(done.waitForExistence(timeout: 60), "no “Imported …” notice")
-        attach(app, "files-imported")
+        attachScreen("files-imported")
     }
 
     /// One folder holding a save, opened and picked with Open (the folder picker takes one
@@ -160,9 +151,7 @@ final class FilesPickerSaveImportUITests: XCTestCase {
             throw XCTSkip("No On My iPhone folders given to the test runner.")
         }
         let app = XCUIApplication()
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
 
         pick(app, one, name: "one-folder")
         for text in expect.split(separator: "|").map(String.init) {

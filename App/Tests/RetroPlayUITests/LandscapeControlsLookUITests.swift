@@ -18,12 +18,10 @@ final class LandscapeControlsLookUITests: XCTestCase {
                 app.launchArguments = ["-RetroPlaySmokeSystem", system, "-retroplay.flatControls", flat ? "YES" : "NO",
                                        // Shown although the Simulator's keyboard counts as a controller.
                                        "-retroplay.touchWithController", "YES"]
-                app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-                app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-                app.launch()
+                app.launchRetroPlay()
                 // Waits for the game (the pause button) rather than a fixed time, then a moment
                 // for a picture behind the controls.
-                XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label ==[c] %@", "Pause menu")).firstMatch.waitForExistence(timeout: 45), "\(system): no game")
+                XCTAssertTrue(app.buttons.labelled("Pause menu").waitForExistence(timeout: 45), "\(system): no game")
                 Thread.sleep(forTimeInterval: 3)
                 let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
                 shot.name = "controls-\(system)-\(flat ? "flat" : "glass")"

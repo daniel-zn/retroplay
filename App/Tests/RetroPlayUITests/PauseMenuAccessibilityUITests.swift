@@ -22,9 +22,7 @@ final class PauseMenuAccessibilityUITests: XCTestCase {
                                "-RetroPlaySmokeAccessibilityProbe", "YES",
                                // The touch controls are shown (the Simulator's keyboard counts as a controller).
                                "-retroplay.touchWithController", "YES"]
-        app.launchEnvironment["DYLD_FRAMEWORK_PATH"] = ""
-        app.launchEnvironment["DYLD_LIBRARY_PATH"] = ""
-        app.launch()
+        app.launchRetroPlay()
         let probe = app.descendants(matching: .any)["a11y.probe"].firstMatch
         let ready = NSPredicate(format: "label BEGINSWITH[c] %@", "PROBE|")
         guard XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: ready, object: probe)], timeout: 60) == .completed else {
