@@ -38,15 +38,15 @@ extension XCTestCase {
     }
 
     /// Waits until `element` stops moving (a drag's scroll or an animation has settled): the
-    /// same frame on two looks 0.1 s apart. False if it still moves after `timeout`.
+    /// same frame on two looks 0.1 s apart, or gone. False if it still moves after `timeout`.
     @MainActor
     @discardableResult
     func waitUntilStill(_ element: XCUIElement, timeout: TimeInterval = 3) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
-        var last = element.frame
+        var last = element.exists ? element.frame : .null
         while Date() < deadline {
             Thread.sleep(forTimeInterval: 0.1)
-            let now = element.frame
+            let now = element.exists ? element.frame : .null
             if now == last { return true }
             last = now
         }
