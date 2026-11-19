@@ -1,41 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
-public enum PlaybackControlState: Equatable, Sendable {
-    case running
-    case paused
-
-    public enum Action: Equatable, Sendable {
-        case pause
-        case resume
-    }
-
-    public var action: Action {
-        switch self {
-        case .running: return .pause
-        case .paused: return .resume
-        }
-    }
-
-    public var accessibilityLabel: String {
-        switch self {
-        case .running: return "Pause"
-        case .paused: return "Resume"
-        }
-    }
-
-    public var statusLine: String {
-        switch self {
-        case .running: return "Running"
-        case .paused: return "Paused"
-        }
-    }
-
-    public mutating func toggle() {
-        self = self == .running ? .paused : .running
-    }
-}
-
 /// Whether emulation should resume after save/load/auto-resume while scene-driven background pause is active.
 public enum PlaybackResumePolicy: Sendable {
     public static func shouldResumeAfterOperation(
@@ -46,47 +11,23 @@ public enum PlaybackResumePolicy: Sendable {
     }
 }
 
-/// Testable restart preparation. PlayView always boots with auto-resume disabled after `.ready`.
+/// Testable restart preparation (the load gate has already checked for a running core and no
+/// save in flight). PlayView always boots with auto-resume disabled after `.ready`.
 public enum RestartFromScratch: Sendable {
-    public enum Decision: Equatable, Sendable {
-        case restart
-        case ignoreNoActiveCore
-        case ignoreOperationInProgress
-    }
-
     public enum Outcome: Equatable, Sendable {
+        /// The saves are gone and the core stopped: boot fresh.
         case ready
         case saveCleanupFailed
-        case ignored(Decision)
-
-        public var shouldBootFresh: Bool {
-            switch self {
-            case .ready: return true
-            case .saveCleanupFailed, .ignored: return false
-            }
-        }
-    }
-
-    public static func decide(hasActiveCore: Bool, operationInProgress: Bool) -> Decision {
-        guard !operationInProgress else { return .ignoreOperationInProgress }
-        guard hasActiveCore else { return .ignoreNoActiveCore }
-        return .restart
     }
 
     @MainActor
     public static func prepare(
-        core: (any EmulatorCore)?,
-        operationInProgress: Bool,
+        core: any EmulatorCore,
         system: SystemID,
         gameID: UUID,
         paths: SavePaths = SavePaths(),
         fileManager: FileManager = .default
     ) -> Outcome {
-        let decision = decide(hasActiveCore: core != nil, operationInProgress: operationInProgress)
-        guard decision == .restart, let core else {
-            return .ignored(decision)
-        }
-
         // Pause before touching on-disk states so the emu loop cannot race quick-save I/O.
         core.pause()
         do {
@@ -308,23 +249,6 @@ public enum BatterySaveReload: Sendable {
     /// Matches PlayView `leavePlay` — long enough for a quick-save/load to finish cleanly.
     public static let saveBusyPollNanoseconds: UInt64 = 50_000_000
     public static let saveBusyMaxPollAttempts = 40
-
-    public static func shouldReloadAfterImport(for system: SystemID) -> Bool {
-        switch system {
-        case .gba, .psp, .nds:
-            return true
-        case .n64:
-            return true
-        // The libretro cores read SAVE_RAM once at load, so a new save needs a reload.
-        case .nes, .snes, .genesis, .atari7800, .ps1:
-            return true
-        }
-    }
-
-    public static func reloadNotice(for system: SystemID) -> String? {
-        guard shouldReloadAfterImport(for: system) else { return nil }
-        return "Reloading to apply imported battery save…"
-    }
 
     /// Battery-save reload must not race an in-flight quick-save/load or abandon silently.
     @MainActor

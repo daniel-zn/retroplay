@@ -363,28 +363,3 @@ enum CoverEdgeColor {
     }
 }
 
-#if DEBUG
-/// `-RetroPlaySmokePackages YES`: every system's generic front and spine, flat, for
-/// screenshots.
-struct RetailPackageGallery: View {
-    var body: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 12)], spacing: 16) {
-                ForEach(SystemID.allCases) { system in
-                    let game = LibraryGame(displayName: "Sample Game Title", systemID: system, relativePath: "sample")
-                    HStack(alignment: .bottom, spacing: 2) {
-                        GameArtworkView(game: game, cornerRadius: 6, labelTitleSize: 11)
-                            .aspectRatio(RetroPlayTheme.boxArtAspect(system), contentMode: .fit)
-                            .frame(width: 100)
-                        PackageSpine(system: system, title: game.displayName, cover: nil)
-                            .frame(width: 100 * CoverFlow.boxDepth(system) * 2.5,
-                                   height: 100 / RetroPlayTheme.boxArtAspect(system))
-                    }
-                }
-            }
-            .padding(16)
-        }
-        .background(Color.black)
-    }
-}
-#endif

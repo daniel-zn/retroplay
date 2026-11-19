@@ -5,53 +5,10 @@ import XCTest
 final class PlaySessionLifecycleTests: XCTestCase {
     func testSessionTokenBumpInvalidatesPreviousBoot() {
         let initial = PlaySessionToken(rawValue: 4)
-        let bumped = PlaySessionLifecycle.bump(initial)
+        let bumped = initial.bumped()
         XCTAssertEqual(bumped.rawValue, 5)
         XCTAssertTrue(bumped.isCurrent(live: bumped))
         XCTAssertFalse(initial.isCurrent(live: bumped))
-    }
-
-    func testBackgroundOnlyPausesRunningPlayback() {
-        let transition = PlaySceneLifecycle.transition(
-            to: .background,
-            userPlayback: .running,
-            pausedForBackground: false
-        )
-        XCTAssertTrue(transition.shouldPauseCore)
-        XCTAssertFalse(transition.shouldResumeCore)
-        XCTAssertTrue(transition.markPausedForBackground)
-    }
-
-    func testInactiveDoesNotAutoPause() {
-        XCTAssertEqual(
-            PlaySceneLifecycle.transition(
-                to: .inactive,
-                userPlayback: .running,
-                pausedForBackground: false
-            ),
-            .noop
-        )
-    }
-
-    func testForegroundResumesOnlyAfterBackgroundPause() {
-        let transition = PlaySceneLifecycle.transition(
-            to: .active,
-            userPlayback: .running,
-            pausedForBackground: true
-        )
-        XCTAssertFalse(transition.shouldPauseCore)
-        XCTAssertTrue(transition.shouldResumeCore)
-        XCTAssertTrue(transition.clearPausedForBackground)
-    }
-
-    func testForegroundDoesNotResumeUserPausedPlayback() {
-        let transition = PlaySceneLifecycle.transition(
-            to: .active,
-            userPlayback: .paused,
-            pausedForBackground: true
-        )
-        XCTAssertFalse(transition.shouldResumeCore)
-        XCTAssertTrue(transition.clearPausedForBackground)
     }
 
     func testPlaybackResumePolicyHonorsBackgroundPause() {

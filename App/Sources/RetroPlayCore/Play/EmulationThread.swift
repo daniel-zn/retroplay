@@ -60,11 +60,6 @@ final class EmulationThread: @unchecked Sendable {
         active = session
     }
 
-    /// Emulation thread only.
-    func isActive(_ session: EmulationSession) -> Bool {
-        active === session
-    }
-
     /// Emulation thread only. Tears down whatever session is loaded. Call before loading
     /// a new driver: PPSSPP and mupen64plus cannot hold two games at once.
     func evictResident() {

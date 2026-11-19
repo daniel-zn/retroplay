@@ -21,7 +21,6 @@ struct PadTouchOutput: Equatable, Sendable {
 ///
 /// Pad visuals observe this model directly, so a button press re-renders only the
 /// buttons — not the whole Play screen.
-@available(iOS 18.0, *)
 @MainActor
 @Observable
 final class PadInputModel {

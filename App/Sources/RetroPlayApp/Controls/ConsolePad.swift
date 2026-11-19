@@ -4,7 +4,6 @@ import RetroPlayCore
 
 /// Per-system pad pieces. Portrait stacks them under the screen; landscape puts
 /// them in the thumb zones either side of it. Hardware layouts follow docs/CONTROLS-*.md.
-@available(iOS 18.0, *)
 @MainActor
 struct ConsolePad {
     let system: SystemID
@@ -526,7 +525,6 @@ extension GBAInput {
 }
 
 /// Background plate colour per system (portrait).
-@available(iOS 18.0, *)
 extension SystemID {
     var padChassis: Color {
         switch self {
@@ -561,7 +559,6 @@ extension SystemID {
 
 /// Everything below the screen in portrait. Sized from the space it gets: the thumb row
 /// fills the width, and controls grow until either the width or the height runs out.
-@available(iOS 18.0, *)
 struct ConsolePadPortrait: View {
     let system: SystemID
     let size: CGSize

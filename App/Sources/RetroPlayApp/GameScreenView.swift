@@ -8,7 +8,6 @@ import RetroPlayCore
 /// Shows emulator frames. A display link pulls the newest frame from the core's
 /// `VideoFrameStore` and puts it straight into a layer, so SwiftUI never
 /// re-evaluates the Play screen per frame.
-@available(iOS 18.0, *)
 struct GameScreenView: UIViewRepresentable {
     let store: VideoFrameStore
     var smoothing: Bool
@@ -30,7 +29,6 @@ struct GameScreenView: UIViewRepresentable {
     }
 }
 
-@available(iOS 18.0, *)
 final class GameScreenUIView: UIView {
     var store: VideoFrameStore? {
         didSet {
@@ -142,7 +140,6 @@ final class GameScreenUIView: UIView {
     }
 }
 
-@available(iOS 18.0, *)
 private final class DisplayLinkProxy: NSObject {
     weak var target: GameScreenUIView?
 
@@ -163,7 +160,6 @@ private final class DisplayLinkProxy: NSObject {
 /// what's under it changes, and over static black it trails the game. Each frame is shrunk
 /// to 16 × 9 and drawn at 3% opacity (reads as black). 15 updates a second and a tiny
 /// image, so it costs next to nothing.
-@available(iOS 18.0, *)
 struct AmbientScreenView: UIViewRepresentable {
     let store: VideoFrameStore
 
@@ -178,7 +174,6 @@ struct AmbientScreenView: UIViewRepresentable {
     }
 }
 
-@available(iOS 18.0, *)
 final class AmbientScreenUIView: UIView {
     var store: VideoFrameStore? {
         didSet {
@@ -239,7 +234,6 @@ final class AmbientScreenUIView: UIView {
     }
 }
 
-@available(iOS 18.0, *)
 extension AmbientScreenUIView {
     /// Nearest-neighbour 16 × 9 sample of a BGRA surface (144 reads; the picture is shown at 3%).
     fileprivate static func sample(_ surface: IOSurface, into context: CGContext) {
@@ -263,7 +257,6 @@ extension AmbientScreenUIView {
     }
 }
 
-@available(iOS 18.0, *)
 private final class AmbientLinkProxy: NSObject {
     weak var target: AmbientScreenUIView?
 

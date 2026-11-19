@@ -153,7 +153,6 @@ final class LibraryPullToSearchUITests: XCTestCase {
             // its covers again mid-pull. The page now keeps its size while it's pulled.
             XCTAssertEqual(count("pagePasses"), 0, "\(name): showing and hiding search laid the Cover Flow page out \(count("pagePasses")) times")
             XCTAssertEqual(count("carousel"), 0, "\(name): showing and hiding search built the row of covers \(count("carousel")) times")
-            XCTAssertEqual(count("covers"), 0, "\(name): showing and hiding search drew covers again \(count("covers")) times")
             XCTAssertLessThanOrEqual(count("coverFlow"), 3, "\(name): the pulls ran the Cover Flow view \(count("coverFlow")) times")
             XCTAssertEqual(count("gapSearches"), 0, "\(name): the pulls searched the Cover Flow gaps \(count("gapSearches")) times")
             app.terminate()

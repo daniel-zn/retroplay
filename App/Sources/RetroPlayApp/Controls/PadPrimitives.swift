@@ -3,7 +3,6 @@ import SwiftUI
 import RetroPlayCore
 
 /// Hardware-inspired palettes. Layout accuracy first; tints are recognition cues, not skins.
-@available(iOS 18.0, *)
 enum PadPalette {
     enum GBA {
         static let chassis = Color(red: 0.36, green: 0.32, blue: 0.62)
@@ -122,7 +121,6 @@ enum PadPalette {
 
 // MARK: - Shapes
 
-@available(iOS 18.0, *)
 struct PlusShape: Shape {
     var armThickness: CGFloat
 
@@ -145,7 +143,6 @@ struct PlusShape: Shape {
 }
 
 /// Regular octagon with flats on the cardinals (N64 Control Stick gate).
-@available(iOS 18.0, *)
 struct RegularOctagon: Shape {
     func path(in rect: CGRect) -> Path {
         let r = min(rect.width, rect.height) / 2

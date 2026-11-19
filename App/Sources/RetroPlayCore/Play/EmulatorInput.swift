@@ -110,7 +110,6 @@ public struct N64Input: OptionSet, Sendable, Hashable {
 
 public extension N64Input {
     static let dpad: N64Input = [.dpadUp, .dpadDown, .dpadLeft, .dpadRight]
-    static let cButtons: N64Input = [.cUp, .cDown, .cLeft, .cRight]
 }
 
 /// Analog stick for N64 (−128…127). Digital pad scaffolding may leave this at zero.

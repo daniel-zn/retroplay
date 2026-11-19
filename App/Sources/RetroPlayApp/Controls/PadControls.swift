@@ -51,18 +51,17 @@ extension Color {
     }
 }
 
-/// Liquid Glass controls: iOS 26 and later, unless Settings → Flat Controls is on. Otherwise
-/// every control draws its flat fill (`padSurface`'s fallback). Read when a control draws, so
-/// the setting applies to the next game without anything else to keep in sync.
+/// Liquid Glass controls, unless Settings → Flat Controls is on: then every control draws its
+/// flat fill (`padSurface`'s fallback). Read when a control draws, so the setting applies to the
+/// next game without anything else to keep in sync.
 var padLiquidGlass: Bool {
-    guard #available(iOS 26.0, *) else { return false }
-    return !UserDefaults.standard.bool(forKey: PlaySettingsKey.flatControls)
+    !UserDefaults.standard.bool(forKey: PlaySettingsKey.flatControls)
 }
 
 extension View {
     /// A control's surface on Liquid Glass. Over the game (`clear`, landscape) it's the
     /// clearest glass with no tint, so the picture shows; on the pad's backing it's tinted
-    /// with the button's colour. Flat controls (or before iOS 26): `fallback` drawn behind it.
+    /// with the button's colour. Flat controls: `fallback` drawn behind it.
     @ViewBuilder
     func padSurface<S: Shape, Fallback: View>(
         _ shape: S,
@@ -70,7 +69,7 @@ extension View {
         clear: Bool = false,
         @ViewBuilder fallback: () -> Fallback
     ) -> some View {
-        if #available(iOS 26.0, *), padLiquidGlass {
+        if padLiquidGlass {
             glassEffect(clear ? .clear : .regular.tint(tint), in: shape)
         } else {
             background { ZStack { fallback() } }
@@ -84,7 +83,6 @@ extension View {
 /// the other corners use this fraction of the button's height.
 let padCornerFraction: CGFloat = 0.3
 
-@available(iOS 18.0, *)
 struct PadFaceButton: View {
     @Environment(PadInputModel.self) private var input
     @Environment(\.padGlass) private var glass
@@ -147,7 +145,6 @@ struct PadFaceButton: View {
     }
 }
 
-@available(iOS 18.0, *)
 struct PadShoulderButton: View {
     @Environment(PadInputModel.self) private var input
     @Environment(\.padGlass) private var glass
@@ -203,7 +200,6 @@ struct PadShoulderButton: View {
 }
 
 /// Small Start / Select capsule.
-@available(iOS 18.0, *)
 struct PadPillButton: View {
     @Environment(PadInputModel.self) private var input
     @Environment(\.padGlass) private var glass
@@ -260,7 +256,6 @@ struct PadPillButton: View {
     }
 }
 
-@available(iOS 18.0, *)
 struct PadDPad: View {
     @Environment(PadInputModel.self) private var input
     @Environment(\.padGlass) private var glass
@@ -326,7 +321,6 @@ struct PadDPad: View {
 /// The D-pad as one joined cross whose arms pull in when pressed (0 = up, 1 = pressed): the
 /// pressed arm gets shorter and a little narrower, still attached to the centre, so the glass
 /// shows the press the way the round buttons shrink. Diagonals pull in two arms.
-@available(iOS 18.0, *)
 struct PressablePlusShape: Shape {
     /// A pressed arm shrinks by the same ratio as every other control, in length and width.
     static let pressedRetract: CGFloat = 1 - padPressScale
@@ -366,7 +360,6 @@ struct PressablePlusShape: Shape {
 }
 
 /// Analog stick: octagonal gate + nub that follows touch or a physical stick.
-@available(iOS 18.0, *)
 struct PadStick: View {
     @Environment(PadInputModel.self) private var input
     @Environment(\.padGlass) private var glass
@@ -420,7 +413,6 @@ struct PadStick: View {
 }
 
 /// Four buttons in a diamond (PSP △○✕□, DS XAYB, N64 C buttons).
-@available(iOS 18.0, *)
 struct PadDiamond: View {
     struct Item {
         var title: String

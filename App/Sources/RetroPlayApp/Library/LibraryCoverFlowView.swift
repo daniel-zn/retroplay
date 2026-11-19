@@ -6,7 +6,6 @@ import RetroPlayCore
 /// The library as one row of covers you swipe through (the PS Vita RetroFlow launcher's
 /// look): the middle cover faces you, the others stand turned away in a stack on each
 /// side, on the same plain background as the grid.
-@available(iOS 18.0, *)
 struct LibraryCoverFlowView<Header: View>: View {
     let games: [LibraryGame]
     /// The system filter shown; each remembers its own middle game.
@@ -18,10 +17,12 @@ struct LibraryCoverFlowView<Header: View>: View {
     var missingGameIDs: Set<UUID> = []
     /// Takes controller moves (left / right, A).
     var controllerNavigation = false
+    /// Bumped when a cover changes (box art downloaded, the player's pictures), so the 3D scene
+    /// draws the covers again.
+    var artRevision = 0
     @ViewBuilder let header: () -> Header
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(ControllerNavigator.self) private var navigator
     @AppStorage("retroplay.coverFlowFocus") private var memoryRaw = ""
     @State private var position = ScrollPosition(idType: UUID.self)
@@ -31,7 +32,6 @@ struct LibraryCoverFlowView<Header: View>: View {
     /// stays in the middle when the list changes.
     @State private var settledID: UUID?
     @State private var listKey: ListKey?
-    @State private var headerHeight: CGFloat = 0
     @State private var captionHeight: CGFloat = 0
     /// Where the row is right now, for the snapping to know where a swipe was let go.
     @State private var tracker = CoverFlowScrollTracker()
@@ -60,7 +60,6 @@ struct LibraryCoverFlowView<Header: View>: View {
         #if DEBUG
         let _ = LibraryWorkProbe.coverFlow += 1
         #endif
-        let artRevision = games.reduce(0) { $0 &+ (artworkProvider($1)?.isBoxArt == true ? 1 : 0) }
         // The page is laid out for the size it's held at (`page`), not followed frame by frame:
         // as the bar above grows and shrinks (the search field showing or hiding, the title
         // collapsing) the page just slides, and nothing in it is laid out again.
@@ -71,7 +70,7 @@ struct LibraryCoverFlowView<Header: View>: View {
             } action: { pageChanged(to: $0) }
             .overlay {
                 if let page {
-                    content(page, artRevision: artRevision)
+                    content(page)
                 }
             }
             .background(RetroPlayTheme.canvas(for: colorScheme).ignoresSafeArea())
@@ -92,9 +91,6 @@ struct LibraryCoverFlowView<Header: View>: View {
             guard controllerNavigation, let event, event.context == .library else { return }
             handle(event.command)
         }
-        #if DEBUG
-        .task { await smokeScroll() }
-        #endif
     }
 
     /// The size and safe area the page is laid out for.
@@ -123,16 +119,15 @@ struct LibraryCoverFlowView<Header: View>: View {
     }
 
     @ViewBuilder
-    private func content(_ page: Page, artRevision: Int) -> some View {
+    private func content(_ page: Page) -> some View {
         #if DEBUG
-        let _ = LibraryWorkProbe.notePage(size: CGSize(width: page.width, height: page.height),
-                                          insets: EdgeInsets(top: page.top, leading: 0, bottom: page.bottom, trailing: 0))
+        let _ = LibraryWorkProbe.pagePasses += 1
         #endif
         // Landscape is short: the row runs down through the home-indicator strip, the caption
         // sits at the bottom instead of being centred, and the covers take the height saved.
         let landscape = page.width > page.height
         let bottomRoom = landscape ? page.bottom : 0
-        let room = page.height + bottomRoom - headerHeight - captionHeight - (landscape ? 24 : 32)
+        let room = page.height + bottomRoom - captionHeight - (landscape ? 24 : 32)
         let deepest = games.map { CoverFlow.boxDepth($0.systemID) }.max() ?? 0
         // Turned covers' near edges reach past the slot: size the row with that room taken
         // off, and leave it below the covers so they clear the caption.
@@ -154,7 +149,6 @@ struct LibraryCoverFlowView<Header: View>: View {
                 Color.clear.containerRelativeFrame(.vertical)
                 VStack(spacing: 0) {
                     header()
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
                     if !games.isEmpty {
                         Spacer(minLength: 0)
                         CoverFlowRow(
@@ -178,13 +172,12 @@ struct LibraryCoverFlowView<Header: View>: View {
                         .equatable()
                             .padding(.top, landscape ? 4 : 8 + overhang)
                             .padding(.bottom, (landscape ? 6 : 12) + overhang)
-                        // The covers are laid out around the caption as it was before it grew
-                        // (kept in place, unseen), so they neither move nor shrink; the caption
-                        // shown is drawn over that room. Portrait: centred in all the room below
-                        // the covers (the unseen caption and the free room under it).
+                        // The covers are laid out around the caption's room (the caption as it
+                        // was before it grew, the same for every game), so they neither move nor
+                        // shrink; the caption shown is drawn over that room. Portrait: centred in
+                        // all the room below the covers (the room and the free space under it).
                         VStack(spacing: 0) {
-                            caption(shown: false)
-                                .hidden()
+                            captionRoom
                                 .padding(.horizontal, 24)
                                 .padding(.bottom, landscape ? 14 : 16)
                                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { captionHeight = $0 }
@@ -193,7 +186,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                             }
                         }
                         .overlay {
-                            caption(shown: true)
+                            caption
                                 .padding(.horizontal, 24)
                                 .offset(y: landscape ? -4 : 0)
                         }
@@ -213,31 +206,20 @@ struct LibraryCoverFlowView<Header: View>: View {
 
     // MARK: Caption
 
-    /// Title, system and last played for the middle game. `shown: false` is the caption as it
-    /// was before it grew, which the covers are laid out around; `shown: true` is the one drawn:
-    /// a headline-sized title (two lines in portrait, then "…"; one in landscape) over a
-    /// readable system / last-played line. The unseen one always holds two title lines in
-    /// portrait, so the covers don't jump as names change length.
-    private func caption(shown: Bool) -> some View {
-        let titleFont = shown ? (compactCaption ? RetroPlayFont.titleFace(.headline) : RetroPlayFont.titleFace(.title3)) : RetroPlayFont.titleFace(.subheadline)
-        let detailFont = shown ? RetroPlayFont.subheadline : RetroPlayFont.footnote
-        let spacing: CGFloat = compactCaption ? (shown ? 4 : 3) : (shown ? 10 : 8)
-        return ZStack {
+    /// Title, system and last played for the middle game: a headline-sized title (two lines in
+    /// portrait, then "…"; one in landscape) over a readable system / last-played line.
+    private var caption: some View {
+        ZStack {
             if let game = focusedGame {
-                // Landscape has the width for one line: no second line held empty between
-                // the name and the system.
-                VStack(spacing: spacing) {
+                VStack(spacing: compactCaption ? 4 : 10) {
                     Text(game.displayName)
-                        .font(titleFont)
+                        .font(RetroPlayFont.titleFace(compactCaption ? .headline : .title3))
                         .foregroundStyle(RetroPlayTheme.primaryText(for: colorScheme))
                         .multilineTextAlignment(.center)
                         .lineSpacing(0)
-                        // The covers are laid out around the unseen caption, which keeps two
-                        // lines; the one drawn holds only the lines a title needs, so a short
-                        // title sits with its system line.
-                        .lineLimit(compactCaption ? 1 : 2, reservesSpace: !compactCaption && !shown)
+                        // Only the lines a title needs, so a short title sits with its system line.
+                        .lineLimit(compactCaption ? 1 : 2)
                         .truncationMode(.tail)
-                        .minimumScaleFactor(shown ? 1 : 0.7)
                         // Glitches soon after the covers settle on it, then now and then.
                         .retroPlayTitleGlitch(game.displayName)
                     HStack(spacing: 8) {
@@ -252,7 +234,7 @@ struct LibraryCoverFlowView<Header: View>: View {
                                     : RetroPlayTheme.secondaryText(for: colorScheme)
                             )
                     }
-                    .font(detailFont)
+                    .font(RetroPlayFont.subheadline)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 }
@@ -262,10 +244,25 @@ struct LibraryCoverFlowView<Header: View>: View {
         }
         .frame(maxWidth: 560)
         .animation(.easeOut(duration: 0.18), value: focusedGame?.id)
-        // VoiceOver reads the same on each cover. Debug builds keep the drawn caption for UI tests
+        // VoiceOver reads the same on each cover. Debug builds keep the caption for UI tests
         // that ask (`-RetroPlayTestCaptionAccessible YES`), so they can check where it is.
-        .accessibilityHidden(!(shown && Self.captionAccessibleForTests))
-        .accessibilityIdentifier(shown ? "coverFlow.caption" : "")
+        .accessibilityHidden(!Self.captionAccessibleForTests)
+        .accessibilityIdentifier("coverFlow.caption")
+    }
+
+    /// The room the covers leave for the caption, unseen: the caption as it was before it grew,
+    /// two title lines in portrait (one in landscape) over the detail line, whatever the game.
+    private var captionRoom: some View {
+        VStack(spacing: compactCaption ? 3 : 8) {
+            Text(verbatim: " ")
+                .font(RetroPlayFont.titleFace(.subheadline))
+                .lineSpacing(0)
+                .lineLimit(compactCaption ? 1 : 2, reservesSpace: !compactCaption)
+            Text(verbatim: " ")
+                .font(RetroPlayFont.footnote)
+        }
+        .frame(maxWidth: 560)
+        .hidden()
     }
 
     private static var captionAccessibleForTests: Bool {
@@ -346,23 +343,6 @@ struct LibraryCoverFlowView<Header: View>: View {
         }
     }
 
-    #if DEBUG
-    /// Screenshots (the Simulator can't swipe): `-RetroPlaySmokeCoverFlowIndex 4` brings the
-    /// fifth cover to the middle; `-RetroPlaySmokeCoverFlowSlow YES` then glides on to the
-    /// next one over eight seconds, to catch the row mid-swipe.
-    private func smokeScroll() async {
-        let defaults = UserDefaults.standard
-        guard controllerNavigation, defaults.object(forKey: "RetroPlaySmokeCoverFlowIndex") != nil else { return }
-        let index = defaults.integer(forKey: "RetroPlaySmokeCoverFlowIndex")
-        try? await Task.sleep(for: .seconds(1.5))
-        move(to: index, animated: true)
-        guard defaults.bool(forKey: "RetroPlaySmokeCoverFlowSlow"), games.indices.contains(index + 1) else { return }
-        try? await Task.sleep(for: .seconds(1))
-        withAnimation(.linear(duration: 8)) {
-            position.scrollTo(id: games[index + 1].id, anchor: .center)
-        }
-    }
-    #endif
 }
 
 /// "Played 2 days ago", for the caption and VoiceOver.
@@ -374,7 +354,6 @@ private func coverFlowLastPlayedText(_ date: Date?) -> String? {
 /// behind them. A view of its own, compared by what it shows (`.equatable()`), so the page around
 /// it changing size (the bar growing as a pull down brings in the search field) doesn't build the
 /// row again.
-@available(iOS 18.0, *)
 private struct CoverFlowRow: View, Equatable {
     let games: [LibraryGame]
     /// What `move` and `settle` remember the middle game for.
@@ -495,12 +474,9 @@ private struct CoverFlowRow: View, Equatable {
                 move(index, true)
             }
         } label: {
-            CoverFlowCover(
-                game: game,
-                cover: artworkProvider(game),
-                missing: missing,
-                tapArea: metrics.restSpan(offset: index - liveIndex)
-            )
+            // The box is drawn by the 3D scene behind; this is just where a tap on it lands.
+            Color.clear
+                .contentShape(TapArea(span: metrics.restSpan(offset: index - liveIndex)))
                 .frame(width: metrics.coverWidth, height: metrics.coverHeight)
         }
         .buttonStyle(RetroPlayPressStyle())
@@ -527,25 +503,18 @@ private struct CoverFlowRow: View, Equatable {
             }
         } preview: {
             // The cover facing front, whichever way it's turned in the row.
-            CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing, shadow: false)
+            CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing)
                 .frame(width: 260, height: 260)
         }
     }
 }
 
-/// One cover in its square slot, standing on the bottom edge in its own shape.
-@available(iOS 18.0, *)
+/// One cover facing front in its square slot, standing on the bottom edge in its own shape (the
+/// long-press preview).
 private struct CoverFlowCover: View {
     let game: LibraryGame
     let cover: CoverArt?
     let missing: Bool
-    /// In the row: where the cover is drawn at rest, left and right of its place in the row.
-    /// Taps land there, so a tap on the middle cover can't fall to a neighbour stacked over
-    /// its slot (nil: a flat cover, for the long-press preview).
-    var tapArea: (left: Double, right: Double)?
-    var shadow = true
-
-    @Environment(\.colorScheme) private var colorScheme
 
     private var aspect: CGFloat {
         if let cover, cover.isBoxArt, cover.image.size.height > 0 {
@@ -555,27 +524,9 @@ private struct CoverFlowCover: View {
     }
 
     var body: some View {
-        #if DEBUG
-        let _ = LibraryWorkProbe.covers += 1
-        #endif
-        if tapArea != nil {
-            // In the row the box is drawn by the 3D scene behind; this is just where a tap
-            // on it lands.
-            Color.clear
-                .contentShape(TapArea(span: tapArea))
-                .accessibilityHidden(true)
-        } else {
-            Color.clear
-                .overlay(alignment: .bottom) {
-                    front
-                        .shadow(
-                            color: .black.opacity(shadow ? (colorScheme == .dark ? 0.55 : 0.25) : 0),
-                            radius: 14,
-                            y: 8
-                        )
-                }
-                .accessibilityHidden(true)
-        }
+        Color.clear
+            .overlay(alignment: .bottom) { front }
+            .accessibilityHidden(true)
     }
 
     private var front: some View {
@@ -599,13 +550,14 @@ private struct CoverFlowCover: View {
     }
 }
 
-/// A cover's tap area: the band of the row it's drawn in (from its centre), full height.
+/// A cover's tap area: where it's drawn at rest, left and right of its place in the row (from its
+/// centre), full height. Taps land there, so a tap on the middle cover can't fall to a neighbour
+/// stacked over its slot.
 private struct TapArea: Shape {
-    let span: (left: Double, right: Double)?
+    let span: (left: Double, right: Double)
 
     func path(in rect: CGRect) -> Path {
-        guard let span else { return Path(rect) }
-        return Path(CGRect(x: rect.midX + span.left, y: rect.minY,
+        Path(CGRect(x: rect.midX + span.left, y: rect.minY,
                            width: max(span.right - span.left, 1), height: rect.height))
     }
 }
@@ -676,7 +628,6 @@ final class CoverFlowPageHold {
 
 /// Snaps the row to a cover and keeps a flick from running away: one swipe moves about one
 /// game, a hard flick a few (`CoverFlow.Metrics.restingIndex`).
-@available(iOS 18.0, *)
 struct CoverFlowSnapping: ScrollTargetBehavior {
     let metrics: CoverFlow.Metrics
     let count: Int

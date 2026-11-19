@@ -21,9 +21,9 @@ enum ControllerNavContext: Equatable {
 }
 
 /// Drives the library and the pause menu from a game controller. It polls the current
-/// controller instead of installing handlers, so the in-game input (`GameControllerInput`)
-/// keeps its own. Nothing is sent while a game is running with its menu closed.
-@available(iOS 18.0, *)
+/// controller (60 times a second, only while one is connected) instead of installing handlers,
+/// so the in-game input (`GameControllerInput`) keeps its own. Nothing is sent while a game is
+/// running with its menu closed.
 @MainActor
 @Observable
 final class ControllerNavigator {
@@ -64,7 +64,7 @@ final class ControllerNavigator {
     }
 
     func start() {
-        guard timer == nil else { return }
+        guard observers.isEmpty else { return }
         let center = NotificationCenter.default
         for name in [Notification.Name.GCControllerDidConnect, .GCControllerDidDisconnect] {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
@@ -72,11 +72,6 @@ final class ControllerNavigator {
             })
         }
         refreshConnection()
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.poll() }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
         #if DEBUG
         playSmokeMoves()
         #endif
@@ -110,15 +105,25 @@ final class ControllerNavigator {
     }
     #endif
 
+    /// A pad came or went (or the app started with one connected): poll only while there's one.
     private func refreshConnection() {
         isConnected = GCController.controllers().contains { $0.extendedGamepad != nil }
+        if isConnected, timer == nil {
+            let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.poll() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+        } else if !isConnected {
+            timer?.invalidate()
+            timer = nil
+            pressed = []
+            heldDirection = nil
+        }
     }
 
-    private var hasPad: Bool { GCController.controllers().contains { $0.extendedGamepad != nil } }
-
     private func poll() {
-        guard hasPad,
-              let pad = GCController.current?.extendedGamepad
+        guard let pad = GCController.current?.extendedGamepad
                 ?? GCController.controllers().lazy.compactMap(\.extendedGamepad).first
         else {
             pressed = []

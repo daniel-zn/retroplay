@@ -140,14 +140,3 @@ public final class LibretroNativeDriver: NativeEmulatorDriver {
 }
 
 #endif
-
-/// Call from `@main` app init. Registers every libretro system when the cores are bundled.
-public enum LibretroNativeBootstrap {
-    public static func registerIfAvailable() {
-        #if RETROPLAY_HAS_LIBRETRO
-        for system in SystemID.allCases where system.libretroCore != nil {
-            NativeDriverRegistry.register(system) { LibretroNativeDriver(system: system) }
-        }
-        #endif
-    }
-}

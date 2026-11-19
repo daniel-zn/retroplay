@@ -9,7 +9,6 @@ extension View {
     /// fresh random number each time it appears, so it's never the same twice. It
     /// draws over the text as laid out (nothing moves, VoiceOver reads the text as it is) and
     /// sleeps between bursts; with Reduce Motion it never glitches.
-    @available(iOS 18.0, *)
     func retroPlayTitleGlitch(_ text: String) -> some View {
         modifier(TitleGlitchModifier(text: text))
     }
@@ -27,7 +26,6 @@ enum TitleGlitchLaunch {
     }()
 }
 
-@available(iOS 18.0, *)
 private struct TitleGlitchModifier: ViewModifier {
     let text: String
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -68,7 +66,6 @@ private struct TitleGlitchModifier: ViewModifier {
 /// Draws a title as `frame` says: its hacked glyphs in three bands with lime and violet copies
 /// split off (as the Mercurius decode draws them), a block over one on a burst's first frame,
 /// and the line smeared in lime and violet behind it.
-@available(iOS 18.0, *)
 private struct GlitchTitleRenderer: TextRenderer, Equatable {
     let glitch: TitleGlitch
     /// Seconds since the title appeared.

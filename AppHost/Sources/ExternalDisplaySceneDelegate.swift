@@ -4,7 +4,6 @@ import SwiftUI
 import UIKit
 
 /// UIKit owns external-display scene creation; the phone's SwiftUI scene remains interactive.
-@available(iOS 18.0, *)
 @objc(ExternalDisplaySceneDelegate)
 final class ExternalDisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?

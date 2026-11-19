@@ -7,7 +7,6 @@ import UIKit
 /// Root shell: the library, with import, filter and Settings as glass buttons in its top bar
 /// (no tab bar) and iOS's search field under its large title, revealed by pulling the library
 /// down. Appearance preference (dark default).
-@available(iOS 18.0, *)
 public struct RetroPlayRootView: View {
     @StateObject private var store = LibraryStore()
     @AppStorage("retroplay.appearance") private var appearanceRaw = AppearancePreference.dark.rawValue
@@ -99,7 +98,7 @@ public struct RetroPlayRootView: View {
         guard !store.games.isEmpty else { return "" }
         return systemTab == .all
             ? gameCountText(store.games.count)
-            : "\(systemTab.title) · \(filteredGames.count) of \(gameCountText(store.games.count))"
+            : "\(systemTab.title) · \(store.games(matching: systemTab.systemID).count) of \(gameCountText(store.games.count))"
     }
 
     private var filteredGames: [LibraryGame] {
@@ -108,17 +107,15 @@ public struct RetroPlayRootView: View {
 
     /// The filters the filter menu and L1 / R1 offer: All, the systems that have games, and
     /// the one showing (so an emptied filter stays marked).
-    private var offeredTabs: [SystemTab] {
-        let counts = tabCounts
-        return SystemTab.allCases.filter { $0 == .all || $0 == systemTab || (counts[$0] ?? 0) > 0 }
+    private func offeredTabs(_ counts: [SystemTab: Int]) -> [SystemTab] {
+        SystemTab.allCases.filter { $0 == .all || $0 == systemTab || (counts[$0] ?? 0) > 0 }
     }
 
     private var tabCounts: [SystemTab: Int] {
+        let bySystem = Dictionary(grouping: store.games, by: \.systemID).mapValues(\.count)
         var counts: [SystemTab: Int] = [.all: store.games.count]
         for tab in SystemTab.allCases {
-            if let system = tab.systemID {
-                counts[tab] = store.games.filter { $0.systemID == system }.count
-            }
+            if let system = tab.systemID { counts[tab] = bySystem[system] ?? 0 }
         }
         return counts
     }
@@ -143,7 +140,6 @@ public struct RetroPlayRootView: View {
     public var body: some View {
         libraryNavigation
         #if DEBUG
-        .overlay { if UserDefaults.standard.bool(forKey: "RetroPlaySmokePackages") { RetailPackageGallery() } }
         .overlay(alignment: .topLeading) {
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeAccessibilityProbe") { AccessibilityProbeOverlay() }
         }
@@ -162,7 +158,7 @@ public struct RetroPlayRootView: View {
             // L1 / R1 step through the system filters that have games.
             guard let event, event.context == .library,
                   event.command == .previousPage || event.command == .nextPage else { return }
-            let tabs = offeredTabs
+            let tabs = offeredTabs(tabCounts)
             guard let current = tabs.firstIndex(of: systemTab) ?? tabs.firstIndex(of: .all) else { return }
             let step = event.command == .nextPage ? 1 : -1
             withAnimation(.easeOut(duration: 0.15)) {
@@ -211,12 +207,6 @@ public struct RetroPlayRootView: View {
                 if let id = saveImports.beginScan(), saveImports.scanFinished(id) {
                     saveImportID = id
                     saveImport = SaveImportSession(id: id, batch: .smokeSample)
-                }
-            }
-            // `-RetroPlaySmokeLandscape YES`: the library in landscape too.
-            if UserDefaults.standard.bool(forKey: "RetroPlaySmokeLandscape") {
-                for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
-                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { _ in }
                 }
             }
             if playGame == nil {
@@ -410,52 +400,57 @@ public struct RetroPlayRootView: View {
                         LibraryOnboardingView { openImporter(.games) }
                             .padding(.top, 12)
                     }
-                } else if layout == .coverFlow {
-                    LibraryCoverFlowView(
-                        games: filteredGames,
-                        filter: systemTab,
-                        onSelect: { play($0) },
-                        artworkProvider: { game in
-                            loadCover(for: game)
-                        },
-                        onRequestDelete: { requestDelete($0) },
-                        lastPlayed: lastPlayed,
-                        missingGameIDs: store.missingGameIDs,
-                        controllerNavigation: true
-                    ) {
-                        if filteredGames.isEmpty {
-                            EmptyFilterView(
-                                tab: systemTab,
-                                onImport: { openImporter(.games) },
-                                onShowAll: { systemTab = .all }
-                            )
-                        }
-                    }
                 } else {
-                    LibraryGridView(
-                        games: filteredGames,
-                        onSelect: { play($0) },
-                        artworkProvider: { game in
-                            loadCover(for: game)
-                        },
-                        onRequestDelete: { requestDelete($0) },
-                        lastPlayed: lastPlayed,
-                        missingGameIDs: store.missingGameIDs,
-                        controllerNavigation: true
-                    ) {
-                        if filteredGames.isEmpty {
-                            EmptyFilterView(
-                                tab: systemTab,
-                                onImport: { openImporter(.games) },
-                                onShowAll: { systemTab = .all }
-                            )
-                        } else {
-                            SectionHeading(
-                                title: systemTab == .all ? "All Games" : systemTab.title,
-                                trailing: sort.title
-                            )
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 10)
+                    // Sorted once per pass (the headers below are run again as the covers move).
+                    let games = filteredGames
+                    if layout == .coverFlow {
+                        LibraryCoverFlowView(
+                            games: games,
+                            filter: systemTab,
+                            onSelect: { play($0) },
+                            artworkProvider: { game in
+                                loadCover(for: game)
+                            },
+                            onRequestDelete: { requestDelete($0) },
+                            lastPlayed: lastPlayed,
+                            missingGameIDs: store.missingGameIDs,
+                            controllerNavigation: true,
+                            artRevision: coverCache.revision
+                        ) {
+                            if games.isEmpty {
+                                EmptyFilterView(
+                                    tab: systemTab,
+                                    onImport: { openImporter(.games) },
+                                    onShowAll: { systemTab = .all }
+                                )
+                            }
+                        }
+                    } else {
+                        LibraryGridView(
+                            games: games,
+                            onSelect: { play($0) },
+                            artworkProvider: { game in
+                                loadCover(for: game)
+                            },
+                            onRequestDelete: { requestDelete($0) },
+                            lastPlayed: lastPlayed,
+                            missingGameIDs: store.missingGameIDs,
+                            controllerNavigation: true
+                        ) {
+                            if games.isEmpty {
+                                EmptyFilterView(
+                                    tab: systemTab,
+                                    onImport: { openImporter(.games) },
+                                    onShowAll: { systemTab = .all }
+                                )
+                            } else {
+                                SectionHeading(
+                                    title: systemTab == .all ? "All Games" : systemTab.title,
+                                    trailing: sort.title
+                                )
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 10)
+                            }
                         }
                     }
                 }
@@ -481,6 +476,7 @@ public struct RetroPlayRootView: View {
                 // Import first (adds to the library), then the filter, and Settings at the edge,
                 // as across iOS: the system's own items, one glass group. It never changes while
                 // something imports (that shows in the bottom bar).
+                let counts = tabCounts
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     LibraryImportMenu(
                         onImportGames: { openImporter(.games) },
@@ -490,8 +486,8 @@ public struct RetroPlayRootView: View {
                     LibraryFilterMenu(
                         selection: $systemTab,
                         sort: sortBinding,
-                        tabs: offeredTabs,
-                        counts: tabCounts
+                        tabs: offeredTabs(counts),
+                        counts: counts
                     )
                     .disabled(store.games.isEmpty)
                     LibraryTopBarButton(title: "Settings", symbol: "gearshape") {
@@ -561,30 +557,33 @@ public struct RetroPlayRootView: View {
                 } else {
                     recentSearchesList
                 }
-            } else if searchResults.isEmpty {
-                RetroPlayUnavailableView(
-                    title: "No Results",
-                    systemImage: "magnifyingglass",
-                    description: "No games match “\(searchQuery)”."
-                )
-                .keyboardSwipeDownDismiss { searchFocused = false }
             } else {
-                LibraryGridView(
-                    games: searchResults,
-                    onSelect: { play($0, fromSearch: true) },
-                    artworkProvider: { game in
-                        loadCover(for: game)
-                    },
-                    onRequestDelete: { requestDelete($0) },
-                    lastPlayed: lastPlayed,
-                    missingGameIDs: store.missingGameIDs
-                ) {
-                    SectionHeading(
-                        title: searchResults.count == 1 ? "1 Result" : "\(searchResults.count) Results"
+                let results = searchResults
+                if results.isEmpty {
+                    RetroPlayUnavailableView(
+                        title: "No Results",
+                        systemImage: "magnifyingglass",
+                        description: "No games match “\(searchQuery)”."
                     )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 10)
+                    .keyboardSwipeDownDismiss { searchFocused = false }
+                } else {
+                    LibraryGridView(
+                        games: results,
+                        onSelect: { play($0, fromSearch: true) },
+                        artworkProvider: { game in
+                            loadCover(for: game)
+                        },
+                        onRequestDelete: { requestDelete($0) },
+                        lastPlayed: lastPlayed,
+                        missingGameIDs: store.missingGameIDs
+                    ) {
+                        SectionHeading(
+                            title: results.count == 1 ? "1 Result" : "\(results.count) Results"
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 10)
+                    }
                 }
             }
         }
@@ -928,14 +927,12 @@ public struct RetroPlayRootView: View {
     }
 }
 
-@available(iOS 18.0, *)
 private enum ImportKind {
     case games
     case saves
 }
 
 /// A scanned saves pick waiting for the player's go-ahead.
-@available(iOS 18.0, *)
 private struct SaveImportSession: Identifiable {
     /// The `SaveImportSessions` id.
     let id: UUID
@@ -943,7 +940,6 @@ private struct SaveImportSession: Identifiable {
 }
 
 #if DEBUG
-@available(iOS 18.0, *)
 private extension SaveImportBatch {
     /// Sample rows for `-RetroPlaySmokeSaveImport` screenshots.
     static var smokeSample: SaveImportBatch {
@@ -987,7 +983,6 @@ private extension SaveImportBatch {
 #endif
 
 /// An import outcome for the "Import" notice or the "Import failed" alert.
-@available(iOS 18.0, *)
 private enum ImportResultAlert {
     case notice(String)
     case error(String)

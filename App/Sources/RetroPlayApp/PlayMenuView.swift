@@ -3,7 +3,6 @@ import SwiftUI
 import RetroPlayCore
 
 /// Pause menu shown over the game (emulation is paused while it is open).
-@available(iOS 18.0, *)
 struct PlayMenuView: View {
     let title: String
     let systemName: String
@@ -136,7 +135,7 @@ struct PlayMenuView: View {
                     .minimumScaleFactor(0.5)
                     .frame(maxWidth: .infinity)
             }
-            .prominentGlassButton()
+            .buttonStyle(.glassProminent)
             .controlSize(.large)
             .controllerFocusRing(focus == .resume, cornerRadius: 22)
             .id(MenuItem.resume)
@@ -153,7 +152,7 @@ struct PlayMenuView: View {
                 .id(MenuItem.save)
                 AirPlayRoutePicker()
                     .frame(width: MenuIconButton.size, height: MenuIconButton.size)
-                    .menuGlass(Circle(), fallback: Color.white.opacity(0.12))
+                    .menuGlass(Circle())
                     .accessibilityLabel("AirPlay display")
             }
             .padding(.vertical, 4)
@@ -234,50 +233,16 @@ struct PlayMenuView: View {
 }
 
 extension View {
-    /// The pause menu card: Liquid Glass (iOS 26), else the material card.
-    @ViewBuilder
+    /// The pause menu card: Liquid Glass.
     func menuCardGlass() -> some View {
-        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer {
-                glassEffect(.regular, in: shape)
-            }
-        } else {
-            background(.regularMaterial, in: shape)
-                .overlay { shape.strokeBorder(Color.white.opacity(0.12), lineWidth: 1) }
-                .shadow(color: .black.opacity(0.4), radius: 24, y: 8)
+        GlassEffectContainer {
+            glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
     }
 
-    /// A pause-menu button's surface: interactive Liquid Glass (iOS 26), optionally tinted,
-    /// else `fallback` filling `shape`.
-    @ViewBuilder
-    func menuGlass<S: Shape>(_ shape: S, tint: Color? = nil, fallback: Color) -> some View {
-        if #available(iOS 26.0, *) {
-            glassEffect(.regular.tint(tint).interactive(), in: shape)
-        } else {
-            background(fallback, in: shape)
-        }
-    }
-
-    /// A secondary button: glass (iOS 26), else bordered.
-    @ViewBuilder
-    func glassButton() -> some View {
-        if #available(iOS 26.0, *) {
-            buttonStyle(.glass)
-        } else {
-            buttonStyle(.bordered)
-        }
-    }
-
-    /// Resume: prominent glass (iOS 26), else bordered prominent.
-    @ViewBuilder
-    func prominentGlassButton() -> some View {
-        if #available(iOS 26.0, *) {
-            buttonStyle(.glassProminent)
-        } else {
-            buttonStyle(.borderedProminent)
-        }
+    /// A pause-menu button's surface: interactive Liquid Glass, optionally tinted.
+    func menuGlass<S: Shape>(_ shape: S, tint: Color? = nil) -> some View {
+        glassEffect(.regular.tint(tint).interactive(), in: shape)
     }
 }
 
@@ -412,7 +377,6 @@ extension PlayMenuView {
 
 /// The game's own save: not a button (the game loads it when it boots), just that it's there
 /// and when it was last written.
-@available(iOS 18.0, *)
 private struct InGameSaveRow: View {
     let date: Date
 
@@ -447,7 +411,6 @@ private struct InGameSaveRow: View {
 }
 
 /// One save state: its name and when it was made.
-@available(iOS 18.0, *)
 private struct SaveRowLabel: View {
     let entry: SaveStateStore.Entry
 
@@ -482,7 +445,6 @@ private struct SaveRowLabel: View {
 }
 
 /// Save row: same glass fill as the tiles, left-aligned, a little shorter.
-@available(iOS 18.0, *)
 private struct SaveRowButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
@@ -492,16 +454,12 @@ private struct SaveRowButtonStyle: ButtonStyle {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .menuGlass(
-                RoundedRectangle(cornerRadius: 12, style: .continuous),
-                fallback: Color.white.opacity(configuration.isPressed ? 0.22 : 0.08)
-            )
+            .menuGlass(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
 /// Neutral pause-menu tile: light glass fill, white label (the green tint read as disabled).
-@available(iOS 18.0, *)
 struct MenuTileButtonStyle: ButtonStyle {
     static let height: CGFloat = 46
     var foreground: Color = .white
@@ -514,15 +472,11 @@ struct MenuTileButtonStyle: ButtonStyle {
             .multilineTextAlignment(.center)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, minHeight: Self.height)
-            .menuGlass(
-                RoundedRectangle(cornerRadius: 14, style: .continuous),
-                fallback: Color.white.opacity(configuration.isPressed ? 0.22 : 0.12)
-            )
+            .menuGlass(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
 /// Round icon-only quick action. `active` fills it with `activeColor`.
-@available(iOS 18.0, *)
 struct MenuIconButton: View {
     static let size: CGFloat = 52
     let symbol: String
@@ -539,8 +493,7 @@ struct MenuIconButton: View {
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(active ? .black : tint)
                 .frame(width: Self.size, height: Self.size)
-                .menuGlass(Circle(), tint: active ? activeColor : nil,
-                           fallback: active ? activeColor : Color.white.opacity(0.12))
+                .menuGlass(Circle(), tint: active ? activeColor : nil)
                 .contentShape(Circle())
                 .opacity(isEnabled ? 1 : 0.4)
         }

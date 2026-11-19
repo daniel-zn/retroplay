@@ -41,7 +41,6 @@ enum PadSurface {
     static let space = "RetroPlay.PadSurface"
 }
 
-@available(iOS 18.0, *)
 extension View {
     /// Report this view's frame as a touch region. Apply *after* press animations
     /// (scale) so the hit area does not move while a button is held.
@@ -75,7 +74,6 @@ extension View {
 /// * haptic tick on every new press.
 ///
 /// Touches that start away from every control fall through to SwiftUI (menu button).
-@available(iOS 18.0, *)
 struct PadTouchSurface: UIViewRepresentable {
     var regions: [PadRegion]
     var hapticsEnabled: Bool
@@ -103,7 +101,6 @@ struct PadTouchSurface: UIViewRepresentable {
     }
 }
 
-@available(iOS 18.0, *)
 final class PadTouchView: UIView {
     var regions: [PadRegion] = [] {
         didSet {

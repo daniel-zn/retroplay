@@ -5,7 +5,6 @@ import RetroPlayCore
 /// What a "+" → Saves pick would import, before anything is written: the saves found and the
 /// games they belong to, the ones that would replace a save already here (one choice for all
 /// of them), and what was skipped and why. Swipe down to cancel.
-@available(iOS 18.0, *)
 struct SaveImportSheet: View {
     let batch: SaveImportBatch
     let committing: Bool

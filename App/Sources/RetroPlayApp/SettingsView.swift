@@ -2,7 +2,6 @@
 import SwiftUI
 import RetroPlayCore
 
-@available(iOS 18.0, *)
 struct SettingsView: View {
     @Binding var appearanceRaw: String
     let gameCounts: [SystemTab: Int]
@@ -251,7 +250,6 @@ struct SettingsView: View {
 }
 
 /// iOS Settings–style row label: white glyph on a coloured rounded square.
-@available(iOS 18.0, *)
 struct SettingsIconLabel: View {
     let title: String
     let symbol: String

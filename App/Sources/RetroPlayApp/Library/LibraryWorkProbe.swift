@@ -13,25 +13,16 @@ enum LibraryWorkProbe {
     static var library = 0
     static var coverFlow = 0
     static var carousel = 0
-    static var covers = 0
     static var stage = 0
     /// Covers read from disk (and decoded) by the cover cache.
     static var coverReads = 0
-    /// Times Cover Flow's page measured itself (its size and safe area), and what it saw.
+    /// Times Cover Flow's page was laid out again (for a new size).
     static var pagePasses = 0
-    static var pageSizes: [String] = []
-
-    static func notePage(size: CGSize, insets: EdgeInsets) {
-        pagePasses += 1
-        let seen = "\(Int(size.width))x\(Int(size.height))t\(Int(insets.top))b\(Int(insets.bottom))"
-        if pageSizes.last != seen, pageSizes.count < 40 { pageSizes.append(seen) }
-    }
 
     static var summary: String {
         "frames=\(FramePacer.shared.frames) late=\(FramePacer.shared.late) library=\(library) "
-            + "coverFlow=\(coverFlow) carousel=\(carousel) covers=\(covers) stage=\(stage) coverReads=\(coverReads) "
-            + "gapSearches=\(CoverFlow.Metrics.gapSearches) pagePasses=\(pagePasses) "
-            + "pageSizes=\(pageSizes.joined(separator: ","))"
+            + "coverFlow=\(coverFlow) carousel=\(carousel) stage=\(stage) coverReads=\(coverReads) "
+            + "gapSearches=\(CoverFlow.Metrics.gapSearches) pagePasses=\(pagePasses)"
     }
 
     /// Counts the display's frames, and those that came more than half a refresh late.

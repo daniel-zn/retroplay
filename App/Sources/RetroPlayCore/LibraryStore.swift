@@ -89,9 +89,6 @@ public final class LibraryStore: ObservableObject {
     /// Documents/Games — sandbox copies of user-picked files only.
     public var gamesDirectoryURL: URL { savePaths.gamesDirectory }
 
-    /// Legacy name; same as `gamesDirectoryURL`.
-    public var romsDirectoryURL: URL { gamesDirectoryURL }
-
     /// Folders counted in Settings → Storage: games, battery saves (incl. PSP memstick), states.
     public var storageDirectoryURLs: [URL] {
         [savePaths.gamesDirectory, savePaths.savesDirectory, savePaths.statesDirectory]

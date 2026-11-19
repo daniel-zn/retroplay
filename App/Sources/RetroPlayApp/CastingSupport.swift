@@ -85,7 +85,6 @@ public final class CastingCoordinator: ObservableObject {
 }
 
 /// Full-screen, noninteractive scene shown on an AirPlay/external display.
-@available(iOS 18.0, *)
 public struct ExternalGameDisplayView: View {
     @ObservedObject private var casting = CastingCoordinator.shared
     @AppStorage(PlaySettingsKey.smoothScreen) private var smoothScreen = false
@@ -126,7 +125,6 @@ public struct ExternalGameDisplayView: View {
     }
 }
 
-@available(iOS 18.0, *)
 struct AirPlayRoutePicker: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let picker = AVRoutePickerView()
@@ -143,7 +141,6 @@ struct AirPlayRoutePicker: UIViewRepresentable {
     }
 }
 
-@available(iOS 18.0, *)
 public extension View {
     /// iOS 27 requires an explicitly registered scene accessory before it will
     /// connect a noninteractive external-display scene. Earlier releases use

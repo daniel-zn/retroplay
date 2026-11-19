@@ -10,7 +10,6 @@ import RetroPlayCore
 /// Keyboard: arrows = D-pad · Z/X/A/S = south/east/west/north face ·
 /// Q/W = L/R · E/R = L2/R2 (N64 Z) · Return = Start · Right Shift / Delete = Select ·
 /// I/J/K/L = right stick (N64 C buttons) · Esc = menu.
-@available(iOS 18.0, *)
 @MainActor
 @Observable
 final class GameControllerInput {

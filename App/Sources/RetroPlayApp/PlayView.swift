@@ -21,7 +21,6 @@ enum PlaySettingsKey {
 
 /// Full-screen play: game screen + multi-touch pad (portrait: pad below; landscape:
 /// pad in the thumb zones over the screen edges), physical controllers, and a pause menu.
-@available(iOS 18.0, *)
 public struct PlayView: View {
     let game: LibraryGame
     let romURL: URL
@@ -207,7 +206,6 @@ public struct PlayView: View {
         .navigationBarBackButtonHidden(true)
         .task {
             casting.beginGame(title: game.displayName, aspect: CGFloat(system.screenAspect))
-            GameModeSession.begin()
             startControllers()
             refreshSaveEntries()
             await boot()
@@ -218,7 +216,6 @@ public struct PlayView: View {
             navigator.pauseMenuOpen = false
             loadCoordinator.cancel()
             casting.endGame()
-            GameModeSession.end()
             Task { await leave(autoSave: true) }
         }
         .fileImporter(
@@ -697,7 +694,7 @@ public struct PlayView: View {
                     .font(.body.weight(.semibold))
                     .frame(width: 44, height: 44)
             }
-            .glassButton()
+            .buttonStyle(.glass)
             .tint(.white)
             .disabled(didLeave)
             .accessibilityLabel("Cancel")
@@ -727,7 +724,7 @@ public struct PlayView: View {
                     .foregroundStyle(.white.opacity(0.75))
                     .multilineTextAlignment(.center)
                 Button("Back to Library") { dismiss() }
-                    .prominentGlassButton()
+                    .buttonStyle(.glassProminent)
             }
             .padding(24)
             .frame(maxWidth: 420)
@@ -877,7 +874,7 @@ public struct PlayView: View {
     }
 
     private func reboot(autoResume: Bool) async {
-        sessionToken = PlaySessionLifecycle.bump(sessionToken)
+        sessionToken = sessionToken.bumped()
         casting.attach(video: nil)
         core?.stop()
         core = nil
@@ -953,8 +950,7 @@ public struct PlayView: View {
             return
         }
         // Stop the game first: its teardown flush would otherwise overwrite the imported file.
-        let reload = BatterySaveReload.shouldReloadAfterImport(for: system)
-        if reload, let running = core {
+        if let running = core {
             // Keep the session: if the save cannot be written, change nothing.
             if running.supportsSaveState, !autoResumePending, await !running.hadRuntimeError() {
                 busy = true
@@ -969,7 +965,7 @@ public struct PlayView: View {
                 }
             }
             guard !didLeave, core === running else { return }
-            sessionToken = PlaySessionLifecycle.bump(sessionToken)
+            sessionToken = sessionToken.bumped()
             casting.attach(video: nil)
             core = nil
             await running.stopAndWait()
@@ -993,7 +989,7 @@ public struct PlayView: View {
             saveImportError = error.localizedDescription
         }
         // Rechecked: the player may have left while the save was written.
-        if reload, !didLeave {
+        if !didLeave {
             menuOpen = false
             // Imported: boot fresh so the new battery save is what the game reads (a save
             // state would carry the old one). Failed: pick up from the save just written.
@@ -1025,7 +1021,7 @@ public struct PlayView: View {
                 NSLog("RP auto-save failed system=%@ error=%@", system.rawValue, String(describing: error))
             }
         }
-        sessionToken = PlaySessionLifecycle.bump(sessionToken)
+        sessionToken = sessionToken.bumped()
         shutdown()
         dismiss()
     }
@@ -1392,10 +1388,8 @@ private struct PadBacking: View {
     var body: some View {
         if radius > 0 {
             backing(RoundedRectangle(cornerRadius: radius, style: .continuous))
-        } else if #available(iOS 26.0, *) {
-            backing(ConcentricRectangle(corners: .concentric(minimum: 28), isUniform: true))
         } else {
-            backing(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            backing(ConcentricRectangle(corners: .concentric(minimum: 28), isUniform: true))
         }
     }
 
@@ -1407,7 +1401,7 @@ private struct PadBacking: View {
 }
 
 /// Reads the display's corner radius: a full-window view whose corners are concentric with
-/// the screen's (UIKit, iOS 26) reports its effective radius. Nothing on earlier systems.
+/// the screen's (UIKit) reports its effective radius.
 private struct DisplayCornerReader: UIViewRepresentable {
     let onChange: (CGFloat) -> Void
 
@@ -1428,16 +1422,14 @@ private struct DisplayCornerReader: UIViewRepresentable {
 
         override init(frame: CGRect) {
             super.init(frame: frame)
-            if #available(iOS 26.0, *) {
-                cornerConfiguration = .uniformCorners(radius: .containerConcentric())
-            }
+            cornerConfiguration = .uniformCorners(radius: .containerConcentric())
         }
 
         required init?(coder: NSCoder) { nil }
 
         override func layoutSubviews() {
             super.layoutSubviews()
-            guard #available(iOS 26.0, *), window != nil else { return }
+            guard window != nil else { return }
             let radius = effectiveRadius(corner: .bottomLeft)
             guard radius != reported else { return }
             reported = radius
@@ -1449,7 +1441,6 @@ private struct DisplayCornerReader: UIViewRepresentable {
 
 /// One in-game chrome button: glass, or filled when the button is on. Its corners match the
 /// pad's flat-sided buttons.
-@available(iOS 18.0, *)
 private struct ChromeButtonLabel: View {
     let symbol: String
     let tint: Color
@@ -1491,7 +1482,6 @@ final class MenuInputGateBox {
 /// Three views in a row: the middle one centred, the first ending and the last starting
 /// `spacing` from it. Its width counts the wider side twice, so a parent (ViewThatFits) only
 /// picks it when both sides fit with the middle one centred.
-@available(iOS 18.0, *)
 struct CentreRowLayout: Layout {
     var spacing: CGFloat
 

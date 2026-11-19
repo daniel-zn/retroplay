@@ -81,10 +81,6 @@ public enum NativeDriverRegistry {
         defer { lock.unlock() }
         return factories[system]
     }
-
-    public static func isRegistered(_ system: SystemID) -> Bool {
-        factory(for: system) != nil
-    }
 }
 
 /// Reusable RGBX8888 pixel buffer a driver writes each frame into (no per-frame allocation).

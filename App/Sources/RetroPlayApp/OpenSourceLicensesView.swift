@@ -19,7 +19,6 @@ struct OpenSourceComponent: Decodable, Identifiable, Hashable {
 
 /// Settings → Open Source Licenses: RetroPlay's own GPL notice, where to get the source,
 /// and every bundled component with its copyright line and full license text.
-@available(iOS 18.0, *)
 struct OpenSourceLicensesView: View {
     /// Public source for RetroPlay and its patches; each release is tagged with its version.
     static let sourceURL = URL(string: "https://github.com/daniel-zn/retroplay")!
@@ -118,7 +117,6 @@ struct OpenSourceLicensesView: View {
     }
 }
 
-@available(iOS 18.0, *)
 private struct ComponentLicenseView: View {
     let component: OpenSourceComponent
     @Environment(\.colorScheme) private var colorScheme
@@ -178,7 +176,6 @@ private struct ComponentLicenseView: View {
 
 /// Full license text, in the system monospaced face: legal text must stay readable,
 /// and the app's display font makes long passages hard to read.
-@available(iOS 18.0, *)
 private struct LicenseTextView: View {
     let title: String
     let fileName: String

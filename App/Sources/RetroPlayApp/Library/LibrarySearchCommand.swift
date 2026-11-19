@@ -15,7 +15,6 @@ extension FocusedValues {
 
 /// The app's keyboard commands, in iPadOS's menu bar and the Command-key overlay: Search Library
 /// (Command-F) puts the cursor in the library's search field.
-@available(iOS 18.0, *)
 public struct RetroPlayCommands: Commands {
     @FocusedValue(\.retroPlaySearchLibrary) private var searchLibrary
 

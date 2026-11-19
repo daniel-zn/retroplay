@@ -3,7 +3,6 @@ import UIKit
 import SwiftUI
 import RetroPlayCore
 
-@available(iOS 18.0, *)
 struct LibraryGridView<Header: View>: View {
     let games: [LibraryGame]
     let onSelect: (LibraryGame) -> Void
@@ -16,7 +15,7 @@ struct LibraryGridView<Header: View>: View {
     var missingGameIDs: Set<UUID> = []
     /// Takes controller moves (the main library, not search results).
     var controllerNavigation = false
-    let header: () -> Header
+    @ViewBuilder let header: () -> Header
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -36,26 +35,6 @@ struct LibraryGridView<Header: View>: View {
     /// Tiles per row, as the adaptive grid lays them out.
     private var columnCount: Int {
         max(1, Int((gridWidth + 12) / (tileMinimum + 12)))
-    }
-
-    init(
-        games: [LibraryGame],
-        onSelect: @escaping (LibraryGame) -> Void,
-        artworkProvider: @escaping (LibraryGame) -> CoverArt?,
-        onRequestDelete: ((LibraryGame) -> Void)? = nil,
-        lastPlayed: [UUID: Date] = [:],
-        missingGameIDs: Set<UUID> = [],
-        controllerNavigation: Bool = false,
-        @ViewBuilder header: @escaping () -> Header
-    ) {
-        self.controllerNavigation = controllerNavigation
-        self.lastPlayed = lastPlayed
-        self.missingGameIDs = missingGameIDs
-        self.games = games
-        self.onSelect = onSelect
-        self.artworkProvider = artworkProvider
-        self.onRequestDelete = onRequestDelete
-        self.header = header
     }
 
     var body: some View {
@@ -132,20 +111,10 @@ struct LibraryGridView<Header: View>: View {
         .onChange(of: navigator.isConnected) { _, connected in
             if !connected { focusedIndex = nil }
         }
-        #if DEBUG
-        // Screenshots of the collapsed title bar: `-RetroPlaySmokeScrolled YES`.
-        .task {
-            guard controllerNavigation, UserDefaults.standard.bool(forKey: "RetroPlaySmokeScrolled"),
-                  let last = games.last else { return }
-            try? await Task.sleep(for: .seconds(2))
-            proxy.scrollTo(last.id, anchor: .bottom)
-        }
-        #endif
         }
     }
 }
 
-@available(iOS 18.0, *)
 extension LibraryGridView {
     /// D-pad / stick move the cursor a tile (a row up or down); A plays the game under it.
     /// The first move only shows the cursor.
@@ -166,29 +135,6 @@ extension LibraryGridView {
     }
 }
 
-@available(iOS 18.0, *)
-extension LibraryGridView where Header == EmptyView {
-    init(
-        games: [LibraryGame],
-        onSelect: @escaping (LibraryGame) -> Void,
-        artworkProvider: @escaping (LibraryGame) -> CoverArt?,
-        onRequestDelete: ((LibraryGame) -> Void)? = nil,
-        lastPlayed: [UUID: Date] = [:],
-        missingGameIDs: Set<UUID> = []
-    ) {
-        self.init(
-            games: games,
-            onSelect: onSelect,
-            artworkProvider: artworkProvider,
-            onRequestDelete: onRequestDelete,
-            lastPlayed: lastPlayed,
-            missingGameIDs: missingGameIDs,
-            header: { EmptyView() }
-        )
-    }
-}
-
-@available(iOS 18.0, *)
 struct LibraryTileDeleteAccessibilityAction: ViewModifier {
     let game: LibraryGame
     let onRequestDelete: ((LibraryGame) -> Void)?

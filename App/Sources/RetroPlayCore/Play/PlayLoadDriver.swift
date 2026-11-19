@@ -172,7 +172,6 @@ public enum PlayLoadDriver {
 
         let outcome = RestartFromScratch.prepare(
             core: core,
-            operationInProgress: false,
             system: context.system,
             gameID: context.gameID,
             paths: context.paths,
@@ -182,25 +181,11 @@ public enum PlayLoadDriver {
             NSLog("RP_LOAD abandon after restart prepare")
             return
         }
-        guard outcome.shouldBootFresh else {
-            switch outcome {
-            case .saveCleanupFailed:
-                apply(.status("Restart failed"))
-                apply(.alert(
-                    "RetroPlay couldn't clear this game's save states. The current game is still running and was not restarted."
-                ))
-            case .ignored(let decision):
-                switch decision {
-                case .ignoreOperationInProgress:
-                    apply(.status("Wait for save/load to finish"))
-                case .ignoreNoActiveCore:
-                    apply(.status("Game is not running"))
-                case .restart:
-                    apply(.status("Restart failed"))
-                }
-            case .ready:
-                apply(.status("Restart failed"))
-            }
+        guard outcome == .ready else {
+            apply(.status("Restart failed"))
+            apply(.alert(
+                "RetroPlay couldn't clear this game's save states. The current game is still running and was not restarted."
+            ))
             return
         }
 

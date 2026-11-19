@@ -201,14 +201,12 @@ final class PlayLoadCommandTests: XCTestCase {
 
         let outcome = RestartFromScratch.prepare(
             core: core,
-            operationInProgress: false,
             system: .psp,
             gameID: gameID,
             paths: paths
         )
 
         XCTAssertEqual(outcome, .ready)
-        XCTAssertTrue(outcome.shouldBootFresh)
         XCTAssertTrue(core.stopCalled)
         XCTAssertTrue(SaveStateStore.entries(system: .psp, gameID: gameID, paths: paths).isEmpty)
     }
@@ -374,7 +372,6 @@ final class PlayLoadCommandTests: XCTestCase {
 
         let outcome = RestartFromScratch.prepare(
             core: core,
-            operationInProgress: false,
             system: .gba,
             gameID: gameID,
             paths: paths,
@@ -382,7 +379,6 @@ final class PlayLoadCommandTests: XCTestCase {
         )
 
         XCTAssertEqual(outcome, .saveCleanupFailed)
-        XCTAssertFalse(outcome.shouldBootFresh)
         XCTAssertTrue(core.pauseCalled)
         // The pause menu is still open; closing it is what resumes the game.
         XCTAssertFalse(core.resumeCalled)

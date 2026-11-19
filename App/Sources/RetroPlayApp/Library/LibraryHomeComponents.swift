@@ -88,7 +88,6 @@ enum LibraryLayout: String, CaseIterable, Identifiable {
     }
 }
 
-@available(iOS 18.0, *)
 struct SectionHeading: View {
     let title: String
     var trailing: String? = nil
@@ -117,7 +116,6 @@ struct SectionHeading: View {
 
 /// An icon button in the library's top bar, kept magenta whether the bar is clear (at the top)
 /// or has its scrolled background.
-@available(iOS 18.0, *)
 struct LibraryTopBarButton: View {
     let title: String
     let symbol: String
@@ -133,7 +131,6 @@ struct LibraryTopBarButton: View {
 }
 
 /// A top-bar icon: the plain symbol, laid out and spaced by the bar itself.
-@available(iOS 18.0, *)
 struct LibraryTopBarIcon: View {
     let symbol: String
 
@@ -149,7 +146,6 @@ struct LibraryTopBarIcon: View {
 }
 
 /// The bottom bar's status while something imports: a spinner and what it's doing.
-@available(iOS 18.0, *)
 struct LibraryImportStatus: View {
     let text: String
 
@@ -170,7 +166,6 @@ struct LibraryImportStatus: View {
 
 /// "+": add games, or saves for games already in the library. A menu like the filter's, so
 /// both open the same way from the same bar.
-@available(iOS 18.0, *)
 struct LibraryImportMenu: View {
     let onImportGames: () -> Void
     let onImportSaves: () -> Void
@@ -208,7 +203,6 @@ struct LibraryImportMenu: View {
 /// one menu behind a top-bar button. The filters list
 /// their game counts and mark the one showing; L1 / R1 on a controller step through the same
 /// list.
-@available(iOS 18.0, *)
 struct LibraryFilterMenu: View {
     @Binding var selection: SystemTab
     @Binding var sort: LibrarySort
@@ -267,7 +261,6 @@ struct LibraryFilterMenu: View {
 // MARK: - Empty states
 
 /// First run: explain what to do and what's supported, with one big Import button.
-@available(iOS 18.0, *)
 struct LibraryOnboardingView: View {
     let onImport: () -> Void
     @Environment(\.colorScheme) private var colorScheme
@@ -344,7 +337,6 @@ struct LibraryOnboardingView: View {
 }
 
 /// A system filter with no games in it.
-@available(iOS 18.0, *)
 struct EmptyFilterView: View {
     let tab: SystemTab
     let onImport: () -> Void
@@ -366,7 +358,7 @@ struct EmptyFilterView: View {
             }
             HStack(spacing: 10) {
                 Button("Show All", action: onShowAll)
-                    .glassButton()
+                    .buttonStyle(.glass)
                     .font(RetroPlayFont.callout)
                 Button(action: onImport) {
                     Label("Import", systemImage: "plus")

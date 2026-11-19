@@ -58,4 +58,4 @@ Play is full screen: no status bar, home indicator hidden, system edge gestures 
 
 ## Adding a core
 
-Implement `NativeEmulatorDriver` in `AppHost/Sources` behind the core's `RETROPLAY_HAS_*` flag and register it in a `*NativeBootstrap` with `NativeDriverRegistry.register(.system) { Driver() }`. All methods are called on the emulation thread.
+Implement `NativeEmulatorDriver` in `AppHost/Sources` behind the core's `RETROPLAY_HAS_*` flag and register it in `RetroPlayMacApp.init` (`AppHost/Sources/RetroPlayMacApp.swift`) with `NativeDriverRegistry.register(.system) { Driver() }`. All methods are called on the emulation thread.

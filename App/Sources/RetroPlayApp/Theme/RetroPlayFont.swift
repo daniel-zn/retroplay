@@ -9,7 +9,6 @@ import UIKit
 /// Every font scales with Dynamic Type from its system text style; the bundled file is
 /// registered on first use, and if it's missing the system face stands in at the same style.
 /// The face has one weight: no style asks for bold (iOS would thicken the outlines itself).
-@available(iOS 18.0, *)
 @MainActor
 enum RetroPlayFont {
     private static var didAttemptRegistration = false
@@ -127,7 +126,6 @@ enum RetroPlayFont {
 
 /// The face's letter spacing for every text below, growing with Dynamic Type. Set at each
 /// root: the app, and each sheet and full-screen cover.
-@available(iOS 18.0, *)
 private struct RetroPlayTypography: ViewModifier {
     @ScaledMetric(relativeTo: .body) private var tracking = RetroPlayTypeface.tracking
 
@@ -136,14 +134,12 @@ private struct RetroPlayTypography: ViewModifier {
     }
 }
 
-@available(iOS 18.0, *)
 extension View {
     func retroPlayTypography() -> some View {
         modifier(RetroPlayTypography())
     }
 }
 
-@available(iOS 18.0, *)
 extension RetroPlayTextStyle.Relative {
     var swiftUI: Font.TextStyle {
         switch self {

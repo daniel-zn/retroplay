@@ -4,7 +4,6 @@ import RetroPlayCore
 
 /// Settings → Saves Waiting for Games: saves imported for games not in the library
 /// (`KeptSaves`). Each goes to its game when the game is added; swipe to delete one.
-@available(iOS 18.0, *)
 struct KeptSavesView: View {
     let games: [LibraryGame]
     @Binding var saves: [KeptSave]
@@ -59,7 +58,6 @@ struct KeptSavesView: View {
     }
 }
 
-@available(iOS 18.0, *)
 private struct KeptSaveRow: View {
     let save: KeptSave
 

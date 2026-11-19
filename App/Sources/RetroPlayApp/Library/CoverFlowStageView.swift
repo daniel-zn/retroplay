@@ -240,11 +240,6 @@ struct CoverBoxTextures {
     func material(for face: CoverBoxEntity.Face) -> UnlitMaterial {
         let package = RetailPackage.of(game.systemID)
         let colors = BoxEdgeColors(system: game.systemID, package: package, cover: cover)
-        #if DEBUG
-        if UserDefaults.standard.bool(forKey: "RetroPlaySmokeBoxFaces") {
-            return textured(FaceLabel(face: face), width: faceSize(face).width, height: faceSize(face).height)
-        }
-        #endif
         switch face {
         case .front:
             // The art on the flat of the face: the rounded edges round it take the box's
@@ -319,21 +314,3 @@ struct BoxEdgeColors {
         }
     }
 }
-
-#if DEBUG
-/// `-RetroPlaySmokeBoxFaces YES`: each face labelled, to see which is which and its way up.
-private struct FaceLabel: View {
-    let face: CoverBoxEntity.Face
-
-    var body: some View {
-        let colors: [Color] = [.red, .blue, .green, .yellow, .purple, .orange]
-        ZStack(alignment: .topLeading) {
-            colors[face.rawValue]
-            Text("\(face)".uppercased() + " ↑")
-                .font(RetroPlayFont.fixed(18))
-                .foregroundStyle(.white)
-                .padding(4)
-        }
-    }
-}
-#endif

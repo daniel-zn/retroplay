@@ -18,7 +18,6 @@ final class SavePathsTests: XCTestCase {
     func testDocumentsTreeUsesGamesNotROMs() {
         let paths = SavePaths(fileManager: .default)
         XCTAssertTrue(paths.gamesDirectory.path.hasSuffix("/Games"))
-        XCTAssertEqual(paths.romsDirectory, paths.gamesDirectory)
         XCTAssertTrue(paths.savesDirectory.path.hasSuffix("/Saves"))
         XCTAssertTrue(paths.statesDirectory.path.hasSuffix("/States"))
         XCTAssertTrue(paths.cheatsDirectory.path.hasSuffix("/Cheats"))

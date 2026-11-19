@@ -97,13 +97,6 @@ final class PSPSaveFlowTests: XCTestCase {
         XCTAssertTrue(repaired.contains("CPUCore = \(PPSSPPDefaults.appStoreCPUCore.rawValue)"))
     }
 
-    func testBatterySaveReloadTargetsSystemsWithLiveBatteryIO() {
-        XCTAssertTrue(BatterySaveReload.shouldReloadAfterImport(for: .gba))
-        XCTAssertTrue(BatterySaveReload.shouldReloadAfterImport(for: .psp))
-        XCTAssertTrue(BatterySaveReload.shouldReloadAfterImport(for: .n64))
-        XCTAssertTrue(BatterySaveReload.shouldReloadAfterImport(for: .nds))
-    }
-
     /// `sceUtilitySavedata` draws labels and button icons through PPGe. Upstream
     /// `__PPGeInit` skips `ppge_atlas.zim` when `SYSPROP_IS_HEADLESS` is true.
     /// Official iOS and libretro report that property false; only the headless

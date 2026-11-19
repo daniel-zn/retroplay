@@ -197,14 +197,12 @@ final class SaveStateHistoryTests: XCTestCase {
 
         let outcome = RestartFromScratch.prepare(
             core: core,
-            operationInProgress: false,
             system: .psp,
             gameID: gameID,
             paths: paths
         )
 
         XCTAssertEqual(outcome, .ready)
-        XCTAssertTrue(outcome.shouldBootFresh)
         XCTAssertTrue(core.stopCalled)
         XCTAssertTrue(SaveStateStore.entries(system: .psp, gameID: gameID, paths: paths).isEmpty)
     }
@@ -220,14 +218,12 @@ final class SaveStateHistoryTests: XCTestCase {
 
         let outcome = RestartFromScratch.prepare(
             core: core,
-            operationInProgress: false,
             system: .gba,
             gameID: gameID,
             paths: paths
         )
 
         XCTAssertEqual(outcome, .ready)
-        XCTAssertTrue(outcome.shouldBootFresh)
         XCTAssertTrue(core.stopCalled)
         XCTAssertTrue(SaveStateStore.entries(system: .gba, gameID: gameID, paths: paths).isEmpty)
     }
@@ -243,7 +239,6 @@ final class SaveStateHistoryTests: XCTestCase {
 
         let outcome = RestartFromScratch.prepare(
             core: core,
-            operationInProgress: false,
             system: .gba,
             gameID: gameID,
             paths: paths,
@@ -251,7 +246,6 @@ final class SaveStateHistoryTests: XCTestCase {
         )
 
         XCTAssertEqual(outcome, .saveCleanupFailed)
-        XCTAssertFalse(outcome.shouldBootFresh)
         XCTAssertFalse(core.stopCalled)
         XCTAssertTrue(core.pauseCalled)
         // The pause menu is still open; closing it resumes the game.
@@ -270,7 +264,6 @@ final class SaveStateHistoryTests: XCTestCase {
 
         let outcome = RestartFromScratch.prepare(
             core: core,
-            operationInProgress: false,
             system: .psp,
             gameID: gameID,
             paths: paths
@@ -279,22 +272,6 @@ final class SaveStateHistoryTests: XCTestCase {
         XCTAssertEqual(outcome, .ready)
         XCTAssertTrue(core.pauseCalled)
         XCTAssertTrue(core.stopCalled)
-    }
-
-    @MainActor
-    func testRestartDecisionIgnoresBusyAndMissingCore() {
-        XCTAssertEqual(
-            RestartFromScratch.decide(hasActiveCore: true, operationInProgress: true),
-            .ignoreOperationInProgress
-        )
-        XCTAssertEqual(
-            RestartFromScratch.decide(hasActiveCore: false, operationInProgress: false),
-            .ignoreNoActiveCore
-        )
-        XCTAssertEqual(
-            RestartFromScratch.decide(hasActiveCore: true, operationInProgress: false),
-            .restart
-        )
     }
 
     func testDiscardPendingQuickSaveStopsFailedWriteFromShadowingCommittedSlot() throws {
@@ -328,19 +305,6 @@ final class SaveStateHistoryTests: XCTestCase {
         XCTAssertEqual(entries[0].slot, 0)
         XCTAssertEqual(entries[0].url, committed)
         XCTAssertEqual(try String(contentsOf: committed, encoding: .utf8), "good")
-    }
-
-    func testPlaybackControlStateAlternatesPauseAndResume() {
-        var state = PlaybackControlState.running
-        XCTAssertEqual(state.action, .pause)
-        XCTAssertEqual(state.accessibilityLabel, "Pause")
-        XCTAssertEqual(state.statusLine, "Running")
-
-        state.toggle()
-        XCTAssertEqual(state, .paused)
-        XCTAssertEqual(state.action, .resume)
-        XCTAssertEqual(state.accessibilityLabel, "Resume")
-        XCTAssertEqual(state.statusLine, "Paused")
     }
 
     private func makeSandboxPaths() throws -> (SavePaths, () -> Void) {

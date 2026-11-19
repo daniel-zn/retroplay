@@ -5,7 +5,6 @@ import RetroPlayCore
 
 /// Cover art, or — for the many games without one — a cartridge-style label:
 /// system-coloured gradient, scanlines, and the game's name in the app font.
-@available(iOS 18.0, *)
 struct GameArtworkView: View {
     let game: LibraryGame
     var artwork: UIImage?
@@ -110,7 +109,6 @@ struct GameArtworkView: View {
 }
 
 /// Small system pill ("GBA", "N64", …).
-@available(iOS 18.0, *)
 struct SystemBadge: View {
     enum Style {
         /// Dark translucent chip for use over art.
@@ -139,7 +137,6 @@ struct SystemBadge: View {
     }
 }
 
-@available(iOS 18.0, *)
 struct GameTileView: View {
     let game: LibraryGame
     var cover: CoverArt?

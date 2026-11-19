@@ -3,7 +3,6 @@ import RetroPlayCore
 import SwiftUI
 
 /// Adaptive chrome: true black sections in dark; light system backgrounds in light.
-@available(iOS 18.0, *)
 enum RetroPlayTheme {
     static let accent = Color(red: 0.84, green: 0.20, blue: 0.62)
 
@@ -114,7 +113,6 @@ enum RetroPlayTheme {
 }
 
 /// Springy press feedback for large tappable cards and tiles.
-@available(iOS 18.0, *)
 struct RetroPlayPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -125,7 +123,6 @@ struct RetroPlayPressStyle: ButtonStyle {
 }
 
 /// Filled accent capsule used for primary actions (Play, Import).
-@available(iOS 18.0, *)
 struct RetroPlayPrimaryButtonStyle: ButtonStyle {
     var tint: Color = RetroPlayTheme.accent
 
@@ -135,9 +132,7 @@ struct RetroPlayPrimaryButtonStyle: ButtonStyle {
             .foregroundStyle(.white)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
-            .retroPlayGlass(Capsule(), tint: tint) {
-                Capsule().fill(tint.opacity(configuration.isPressed ? 0.75 : 1))
-            }
+            .glassEffect(.regular.tint(tint).interactive(), in: Capsule())
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }

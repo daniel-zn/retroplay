@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import SwiftUI
 
-@available(iOS 18.0, *)
 @MainActor
 struct RetroPlayAlertAction: Identifiable {
     enum Role {
@@ -28,7 +27,6 @@ struct RetroPlayAlertAction: Identifiable {
     }
 }
 
-@available(iOS 18.0, *)
 @MainActor
 private struct RetroPlayAlertModifier: ViewModifier {
     let title: String
@@ -76,17 +74,14 @@ private struct RetroPlayAlertModifier: ViewModifier {
                                             .font(RetroPlayFont.headline)
                                             .frame(maxWidth: .infinity)
                                     }
-                                    .prominentGlassButton()
+                                    .buttonStyle(.glassProminent)
                                     .tint(tint(for: action.role))
                                 }
                             }
                         }
                         .padding(20)
                         .frame(maxWidth: 360)
-                        .retroPlayGlass(RoundedRectangle(cornerRadius: 18), interactive: false) {
-                            RoundedRectangle(cornerRadius: 18).fill(.regularMaterial)
-                            RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.16))
-                        }
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
                         .padding(24)
                         .accessibilityElement(children: .contain)
                         .accessibilityAddTraits(.isModal)
@@ -118,7 +113,6 @@ private struct RetroPlayAlertModifier: ViewModifier {
     }
 }
 
-@available(iOS 18.0, *)
 extension View {
     @MainActor
     func retroPlayAlert(
@@ -138,7 +132,6 @@ extension View {
     }
 }
 
-@available(iOS 18.0, *)
 struct RetroPlayUnavailableView: View {
     let title: String
     let systemImage: String

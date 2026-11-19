@@ -30,9 +30,6 @@ public struct SavePaths: Sendable {
         documentsURL.appendingPathComponent("Games", isDirectory: true)
     }
 
-    /// Legacy name; same folder as `gamesDirectory` after migration.
-    public var romsDirectory: URL { gamesDirectory }
-
     /// SRAM / in-game saves (and per-core memstick trees such as `Saves/psp-memstick`).
     public var savesDirectory: URL {
         documentsURL.appendingPathComponent("Saves", isDirectory: true)
