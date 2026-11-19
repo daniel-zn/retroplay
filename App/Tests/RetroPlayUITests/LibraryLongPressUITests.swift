@@ -102,7 +102,8 @@ final class LibraryLongPressUITests: XCTestCase {
                 Thread.sleep(forTimeInterval: 1)
                 continue
             }
-            if abs(cover.frame.midX - middleX) < 4 { return cover }
+            // Side covers' slots are a step (120 pt or more) away; a tap on the middle one plays it.
+            if abs(cover.frame.midX - middleX) < cover.frame.width / 4 { return cover }
             cover.tap()
             Thread.sleep(forTimeInterval: 1.2)
         }
