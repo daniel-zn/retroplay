@@ -648,7 +648,14 @@ public final class LibraryStore: ObservableObject {
         isScanningGamesFolder = true
         defer { isScanningGamesFolder = false }
 
-        let found = newGamesFolderFiles()
+        // The disk reads run off the main thread; only the bookkeeping comes back to it.
+        let folder = gamesDirectoryURL
+        let files = games.map { ($0.id, absoluteURL(for: $0).path) }
+        let scan = await Task.detached(priority: .utility) {
+            Self.scanGamesFolder(folder, files: files)
+        }.value
+
+        let found = newGamesFolderFiles(scan)
         if !found.isEmpty {
             let paths = savePaths
             let importer = importer
@@ -666,16 +673,41 @@ public final class LibraryStore: ObservableObject {
                 KeptSaves.attach(to: fresh, library: games, paths: savePaths, fileManager: fileManager)
             }
         }
-        applyFolderCovers()
-        refreshMissingGames()
+        applyFolderCovers(scan.images)
+        if scan.missing != missingGameIDs {
+            missingGameIDs = scan.missing
+        }
+    }
+
+    struct GamesFolderScan: Sendable {
+        /// Top-level names, hidden files left out.
+        var names: [String] = []
+        /// Track files the top-level .cue sheets name (they belong to that sheet's game).
+        var cueTracks: Set<String> = []
+        var images: [(url: URL, modified: Date)] = []
+        /// Games whose file is gone.
+        var missing: Set<UUID> = []
+    }
+
+    nonisolated static func scanGamesFolder(_ folder: URL, files: [(UUID, String)]) -> GamesFolderScan {
+        let fileManager = FileManager.default
+        var scan = GamesFolderScan()
+        scan.names = ((try? fileManager.contentsOfDirectory(atPath: folder.path)) ?? []).filter { !$0.hasPrefix(".") }
+        scan.cueTracks = Set(scan.names
+            .filter { ($0 as NSString).pathExtension.lowercased() == "cue" }
+            .flatMap { CueSheet.referencedFiles(at: folder.appendingPathComponent($0)) }
+            .map { $0.lowercased() })
+        scan.images = CustomCovers.imagesInGamesFolder(folder, fileManager: fileManager)
+        scan.missing = Set(files.filter { !fileManager.fileExists(atPath: $0.1) }.map(\.0))
+        return scan
     }
 
     /// Pictures dropped into Games/ (Files → RetroPlay → Games) named like a game become its
     /// cover; a picture is applied again only when it changes after the cover was set.
-    private func applyFolderCovers() {
+    private func applyFolderCovers(_ images: [(url: URL, modified: Date)]) {
         let covers = CoverArtStore(fileManager: fileManager, paths: savePaths)
         var changed = false
-        for (url, modified) in CustomCovers.imagesInGamesFolder(gamesDirectoryURL, fileManager: fileManager) {
+        for (url, modified) in images {
             guard let game = CustomCovers.game(forImageNamed: url.lastPathComponent, in: games) else { continue }
             if covers.origin(forGameID: game.id) == .custom,
                let current = covers.coverModified(forGameID: game.id), current >= modified {
@@ -702,31 +734,15 @@ public final class LibraryStore: ObservableObject {
         return missing
     }
 
-    public func refreshMissingGames() {
-        let missing = Set(games.filter { !fileManager.fileExists(atPath: absoluteURL(for: $0).path) }.map(\.id))
-        if missing != missingGameIDs {
-            missingGameIDs = missing
-        }
-    }
-
     /// Lists untracked top-level ROMs, renames base-name clashes, and reserves the final names.
-    private func newGamesFolderFiles() -> [ImportJob] {
-        guard let names = try? fileManager.contentsOfDirectory(atPath: gamesDirectoryURL.path) else {
-            return []
-        }
+    private func newGamesFolderFiles(_ scan: GamesFolderScan) -> [ImportJob] {
+        let visible = scan.names, cueTracks = scan.cueTracks
         let known = Set(games.map { $0.relativePath.lowercased() })
         var taken = Set(games.map { GameArtifactCleanup.baseName(of: $0.relativePath) })
         for name in reservedFileNames {
             taken.insert(GameArtifactCleanup.baseName(of: name))
         }
-        let visible = names.filter { !$0.hasPrefix(".") }
         let onDiskBases = Set(visible.map { GameArtifactCleanup.baseName(of: $0) })
-
-        // Track files a top-level .cue sheet names belong to that sheet's game.
-        let cueTracks = Set(visible
-            .filter { ($0 as NSString).pathExtension.lowercased() == "cue" }
-            .flatMap { CueSheet.referencedFiles(at: gamesDirectoryURL.appendingPathComponent($0)) }
-            .map { $0.lowercased() })
 
         var jobs: [ImportJob] = []
         for name in visible.sorted() {
