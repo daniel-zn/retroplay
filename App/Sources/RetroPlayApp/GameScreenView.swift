@@ -164,6 +164,7 @@ private final class DisplayLinkProxy: NSObject {
     }
 
     @objc func tick() {
+        let target = self.target
         MainActor.assumeIsolated {
             target?.refresh()
         }
