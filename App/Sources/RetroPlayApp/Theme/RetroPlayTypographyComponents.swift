@@ -132,26 +132,24 @@ extension View {
     }
 }
 
+/// The system's empty state, in the app's fonts with the title glitch.
 struct RetroPlayUnavailableView: View {
     let title: String
     let systemImage: String
     let description: String
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .imageScale(.large)
-                .foregroundStyle(.secondary)
-            Text(title)
-                .font(RetroPlayFont.titleFace(.title3))
-                .multilineTextAlignment(.center)
-                .retroPlayTitleGlitch(title)
+        ContentUnavailableView {
+            Label {
+                Text(title)
+                    .font(RetroPlayFont.titleFace(.title3))
+                    .retroPlayTitleGlitch(title)
+            } icon: {
+                Image(systemName: systemImage)
+            }
+        } description: {
             Text(description)
                 .font(RetroPlayFont.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
