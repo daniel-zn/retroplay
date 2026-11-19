@@ -453,7 +453,7 @@ public struct PlayView: View {
         return ZStack {
             // Full-height picture: a live but black-looking layer in the bars (see AmbientScreenView).
             if !fit, let core, !casting.isExternalDisplayConnected {
-                AmbientScreenView(store: core.video)
+                AmbientScreenView(store: core.video, paused: menuOpen)
                     .ignoresSafeArea()
             }
             // An overlay, so a picture wider than the safe area (DS side by side, edge to edge)
@@ -578,7 +578,7 @@ public struct PlayView: View {
                 ) == .castingRemote {
                     castingRemoteNote
                 } else {
-                    GameScreenView(store: core.video, smoothing: smoothScreen, sideBySide: dsSideBySide)
+                    GameScreenView(store: core.video, smoothing: smoothScreen, sideBySide: dsSideBySide, paused: menuOpen)
                 }
             } else {
                 Color.black

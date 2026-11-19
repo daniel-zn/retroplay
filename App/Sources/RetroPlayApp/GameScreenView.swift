@@ -13,12 +13,12 @@ struct GameScreenView: UIViewRepresentable {
     var smoothing: Bool
     /// DS in landscape: the frame's top and bottom halves (its two screens) side by side.
     var sideBySide = false
+    /// The game is paused (pause menu open): no frames come, so the display link stops too.
+    var paused = false
 
     func makeUIView(context: Context) -> GameScreenUIView {
         let view = GameScreenUIView()
-        view.store = store
-        view.smoothing = smoothing
-        view.sideBySide = sideBySide
+        updateUIView(view, context: context)
         return view
     }
 
@@ -26,10 +26,11 @@ struct GameScreenView: UIViewRepresentable {
         view.store = store
         view.smoothing = smoothing
         view.sideBySide = sideBySide
+        view.paused = paused
     }
 }
 
-final class GameScreenUIView: UIView {
+final class GameScreenUIView: UIView, DisplayLinkTarget {
     var store: VideoFrameStore? {
         didSet {
             if store !== oldValue {
@@ -67,6 +68,10 @@ final class GameScreenUIView: UIView {
 
     private let topHalf = CALayer()
     private let bottomHalf = CALayer()
+
+    var paused = false {
+        didSet { link?.isPaused = paused }
+    }
 
     private var link: CADisplayLink?
     private var seen: UInt64 = 0
@@ -118,14 +123,11 @@ final class GameScreenUIView: UIView {
         link = nil
         reportDisplaySize()
         guard window != nil else { return }
-        // Weak proxy: CADisplayLink retains its target.
-        let link = CADisplayLink(target: DisplayLinkProxy(self), selector: #selector(DisplayLinkProxy.tick))
-        link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
-        link.add(to: .main, forMode: .common)
-        self.link = link
+        link = DisplayLinkProxy.link(for: self, fps: 30...60)
+        link?.isPaused = paused
     }
 
-    fileprivate func refresh() {
+    func refresh() {
         guard let store, let frame = store.latest(newerThan: seen) else { return }
         seen = frame.sequence
         CATransaction.begin()
@@ -140,15 +142,28 @@ final class GameScreenUIView: UIView {
     }
 }
 
-private final class DisplayLinkProxy: NSObject {
-    weak var target: GameScreenUIView?
+/// A view that pulls the newest frame on every display link tick.
+@MainActor
+protocol DisplayLinkTarget: AnyObject {
+    func refresh()
+}
 
-    init(_ target: GameScreenUIView) {
-        self.target = target
+/// Weak proxy: CADisplayLink retains its target.
+private final class DisplayLinkProxy: NSObject {
+    weak var target: (any DisplayLinkTarget)?
+
+    @MainActor
+    static func link(for target: any DisplayLinkTarget, fps: ClosedRange<Float>) -> CADisplayLink {
+        let proxy = DisplayLinkProxy()
+        proxy.target = target
+        let link = CADisplayLink(target: proxy, selector: #selector(tick))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: fps.lowerBound, maximum: fps.upperBound,
+                                                        preferred: fps.upperBound)
+        link.add(to: .main, forMode: .common)
+        return link
     }
 
     @objc func tick() {
-        let target = self.target
         MainActor.assumeIsolated {
             target?.refresh()
         }
@@ -162,19 +177,21 @@ private final class DisplayLinkProxy: NSObject {
 /// image, so it costs next to nothing.
 struct AmbientScreenView: UIViewRepresentable {
     let store: VideoFrameStore
+    var paused = false
 
     func makeUIView(context: Context) -> AmbientScreenUIView {
         let view = AmbientScreenUIView()
-        view.store = store
+        updateUIView(view, context: context)
         return view
     }
 
     func updateUIView(_ view: AmbientScreenUIView, context: Context) {
         view.store = store
+        view.paused = paused
     }
 }
 
-final class AmbientScreenUIView: UIView {
+final class AmbientScreenUIView: UIView, DisplayLinkTarget {
     var store: VideoFrameStore? {
         didSet {
             if store !== oldValue {
@@ -182,6 +199,10 @@ final class AmbientScreenUIView: UIView {
                 layer.contents = nil
             }
         }
+    }
+
+    var paused = false {
+        didSet { link?.isPaused = paused }
     }
 
     private var link: CADisplayLink?
@@ -212,13 +233,11 @@ final class AmbientScreenUIView: UIView {
         link?.invalidate()
         link = nil
         guard window != nil else { return }
-        let link = CADisplayLink(target: AmbientLinkProxy(self), selector: #selector(AmbientLinkProxy.tick))
-        link.preferredFrameRateRange = CAFrameRateRange(minimum: 10, maximum: 15, preferred: 15)
-        link.add(to: .main, forMode: .common)
-        self.link = link
+        link = DisplayLinkProxy.link(for: self, fps: 10...15)
+        link?.isPaused = paused
     }
 
-    fileprivate func refresh() {
+    func refresh() {
         guard let store, let context, let frame = store.latest(newerThan: seen) else { return }
         seen = frame.sequence
         if CFGetTypeID(frame.contents) == CGImage.typeID {
@@ -253,21 +272,6 @@ extension AmbientScreenUIView {
                 let q = dst + y * outRow + x * 4
                 q[0] = p[2]; q[1] = p[1]; q[2] = p[0]; q[3] = 255  // BGRA → RGBX
             }
-        }
-    }
-}
-
-private final class AmbientLinkProxy: NSObject {
-    weak var target: AmbientScreenUIView?
-
-    init(_ target: AmbientScreenUIView) {
-        self.target = target
-    }
-
-    @objc func tick() {
-        let target = self.target
-        MainActor.assumeIsolated {
-            target?.refresh()
         }
     }
 }
