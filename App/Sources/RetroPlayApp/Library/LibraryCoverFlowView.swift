@@ -505,6 +505,8 @@ private struct CoverFlowRow: View, Equatable {
             // The cover facing front, whichever way it's turned in the row.
             CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing)
                 .frame(width: 260, height: 260)
+                .accessibilityElement()
+                .accessibilityIdentifier("library.coverPreview")
         }
     }
 }
