@@ -31,7 +31,8 @@ void LibretroHost_SetInput(LibretroHost* h, uint32_t joypad, float leftX, float 
 void LibretroHost_RunFrame(LibretroHost* h);
 void LibretroHost_Reset(LibretroHost* h);
 
-/// Last frame as tightly packed RGBA8 (valid until the next RunFrame), or NULL.
+/// The newest frame as tightly packed RGBA8 (valid until the next RunFrame), or NULL when none
+/// came since the last call (the core repeated its frame): the screen keeps what it shows.
 const uint8_t* LibretroHost_Frame(LibretroHost* h, int* outW, int* outH);
 /// Drain interleaved stereo Int16 audio. Returns frames written.
 int LibretroHost_ReadAudio(LibretroHost* h, int16_t* out, int maxFrames);

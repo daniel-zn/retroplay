@@ -23,7 +23,8 @@ void N64Host_SetKeys(N64HostHandle* h, uint32_t n64Bitmask, float stickX, float 
 void N64Host_RunFrame(N64HostHandle* h);
 void N64Host_Reset(N64HostHandle* h);
 
-/// Last frame as tightly packed RGBA8 (valid until the next RunFrame), or NULL.
+/// The newest frame as tightly packed RGBA8 (valid until the next RunFrame), or NULL when none
+/// came since the last call (the core repeated its frame): the screen keeps what it shows.
 const uint8_t* N64Host_Frame(N64HostHandle* h, int* outW, int* outH);
 
 /// Drain interleaved stereo Int16 audio. Returns frames written.

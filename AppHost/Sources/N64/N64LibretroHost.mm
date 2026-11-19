@@ -59,7 +59,8 @@ struct N64HostHandle {
     bool contextReady = false;
     /// GLideN64 finished a frame into the FBO; read back lazily in N64Host_Frame.
     bool hwFramePending = false;
-    bool hasFrame = false;
+    /// A frame came since the app last took one (a repeated frame doesn't count).
+    bool newFrame = false;
     enum retro_pixel_format pixelFormat = RETRO_PIXEL_FORMAT_0RGB1555;
 
     uint32_t joypadMask = 0;
@@ -230,7 +231,7 @@ static void video_refresh(const void *data, unsigned width, unsigned height, siz
                 }
             }
         }
-        gHost->hasFrame = true;
+        gHost->newFrame = true;
         return;
     }
 
@@ -238,7 +239,7 @@ static void video_refresh(const void *data, unsigned width, unsigned height, siz
     // the app takes the frame; fast-forward runs several frames per tick and only shows the last.
     if (!gHost->contextReady) return;
     gHost->hwFramePending = true;
-    gHost->hasFrame = true;
+    gHost->newFrame = true;
 }
 
 /// Read the whole FBO back (GLideN64 renders at the 640x480 screen size), flipped upright.
@@ -658,7 +659,7 @@ bool N64Host_LoadROM(N64HostHandle* h, const char* path, const char* sramPath) {
 
     retro_set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
     h->audio.clear();
-    h->hasFrame = false;
+    h->newFrame = false;
     h->loaded = true;
     loadSRAM(h);
     return true;
@@ -692,7 +693,7 @@ void N64Host_Reset(N64HostHandle* h) {
 }
 
 const uint8_t* N64Host_Frame(N64HostHandle* h, int* outW, int* outH) {
-    if (!h || !h->hasFrame) return nullptr;
+    if (!h || !h->newFrame) return nullptr;
     if (h->hwFramePending && h->contextReady) {
         readBackHWFrame(h);
         h->hwFramePending = false;
@@ -702,6 +703,7 @@ const uint8_t* N64Host_Frame(N64HostHandle* h, int* outW, int* outH) {
     if (h->frameW <= 0 || h->frameH <= 0 || h->rgba.size() < need) return nullptr;
     if (outW) *outW = h->frameW;
     if (outH) *outH = h->frameH;
+    h->newFrame = false;
     return h->rgba.data();
 }
 

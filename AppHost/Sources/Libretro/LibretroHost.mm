@@ -51,7 +51,8 @@ struct LibretroHost {
     std::vector<uint8_t> rgba;
     int frameW = 0;
     int frameH = 0;
-    bool hasFrame = false;
+    /// A frame came since the app last took one (a repeated frame doesn't count).
+    bool newFrame = false;
 
     uint32_t joypad = 0;
     int16_t leftX = 0;
@@ -201,7 +202,7 @@ static void video_refresh(const void *data, unsigned width, unsigned height, siz
             break;
         }
     }
-    gHost->hasFrame = true;
+    gHost->newFrame = true;
 #if DEBUG
     static int logged = 0;
     if (logged < 3 || (logged < 400 && logged % 120 == 0)) {
@@ -429,7 +430,7 @@ bool LibretroHost_Load(LibretroHost* h, const char* path, const char* sramPath, 
     h->sramPath = sramPath ? sramPath : "";
     h->defaults.clear();
     h->audio.clear();
-    h->hasFrame = false;
+    h->newFrame = false;
     h->pixelFormat = RETRO_PIXEL_FORMAT_0RGB1555;
     gHost = h;
 
@@ -515,10 +516,11 @@ void LibretroHost_Reset(LibretroHost* h) {
 }
 
 const uint8_t* LibretroHost_Frame(LibretroHost* h, int* outW, int* outH) {
-    if (!h || !h->hasFrame || h->frameW <= 0 || h->frameH <= 0) return nullptr;
+    if (!h || !h->newFrame || h->frameW <= 0 || h->frameH <= 0) return nullptr;
     if (h->rgba.size() < (size_t)h->frameW * (size_t)h->frameH * 4) return nullptr;
     if (outW) *outW = h->frameW;
     if (outH) *outH = h->frameH;
+    h->newFrame = false;
     return h->rgba.data();
 }
 
