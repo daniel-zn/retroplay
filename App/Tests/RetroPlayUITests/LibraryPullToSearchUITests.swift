@@ -91,6 +91,51 @@ final class LibraryPullToSearchUITests: XCTestCase {
         app.terminate()
     }
 
+    /// Cover Flow has nothing to scroll up to: a hard push up leaves the big title big (it
+    /// used to collapse into the bar's inline title and stay there). A pull down still shows
+    /// search, and a push up then hides it, back to the page at rest with the big title.
+    @MainActor
+    func testCoverFlowPushUpKeepsTheBigTitle() {
+        let app = launch(["-retroplay.libraryLayout", "coverFlow"])
+        waitForLibrary(app, "coverflow")
+        XCTAssertTrue(app.descendants(matching: .any)["coverFlow.position"].waitForExistence(timeout: 10), "no Cover Flow")
+        let window = app.windows.firstMatch
+        let field = app.searchFields.firstMatch
+        func drag(_ from: CGFloat, _ to: CGFloat, _ velocity: XCUIGestureVelocity) {
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+                .press(forDuration: 0.05,
+                       thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)),
+                       withVelocity: velocity, thenHoldForDuration: 0.05)
+        }
+        func searchShows() -> Bool { field.exists && field.isHittable && field.frame.height > 20 }
+        expectBigTitle(app, "at rest")
+        for (index, velocity) in [XCUIGestureVelocity.fast, .slow, .fast].enumerated() {
+            drag(0.75, 0.1, velocity)
+            Thread.sleep(forTimeInterval: 1.5)
+            expectBigTitle(app, "push up \(index + 1)")
+        }
+        attachScreen("coverflow-after-push-up")
+        drag(0.4, 0.75, .slow)
+        waitUntilStill(field)
+        XCTAssertTrue(searchShows(), "the pull down didn't show search")
+        drag(0.75, 0.1, .fast)
+        Thread.sleep(forTimeInterval: 1.5)
+        XCTAssertFalse(searchShows(), "the push up didn't hide search")
+        expectBigTitle(app, "push up from search")
+        app.terminate()
+    }
+
+    /// The big title shows, below the bar's buttons (the inline title sits beside them).
+    @MainActor
+    private func expectBigTitle(_ app: XCUIApplication, _ context: String) {
+        let titles = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "RetroPlay"))
+            .allElementsBoundByIndex.filter { $0.exists && $0.frame.height > 0 }
+        let buttons = app.navigationBars.buttons["library.settings"].firstMatch.frame
+        print("[push-up] \(context): titles \(titles.map { $0.frame }) buttons \(buttons)")
+        let big = titles.filter { $0.frame.height >= 40 && $0.frame.minY >= buttons.maxY - 2 && $0.isHittable }
+        XCTAssertFalse(big.isEmpty, "\(context): the big title collapsed: \(titles.map { $0.frame })")
+    }
+
     /// What showing and hiding the search field costs, in the grid and in Cover Flow (with the
     /// plain title and the glitching one): late frames (the main thread busy past a refresh) and
     /// how often the library's views were evaluated again, over slow and fast pulls down (the
