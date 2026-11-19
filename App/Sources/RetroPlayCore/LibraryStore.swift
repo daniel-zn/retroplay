@@ -692,6 +692,16 @@ public final class LibraryStore: ObservableObject {
         if changed { coversRevision += 1 }
     }
 
+    /// Checks one game's file (a tap): the others keep what the last full check found.
+    @discardableResult
+    public func refreshMissing(_ game: LibraryGame) -> Bool {
+        let missing = !fileManager.fileExists(atPath: absoluteURL(for: game).path)
+        if missing != missingGameIDs.contains(game.id) {
+            if missing { missingGameIDs.insert(game.id) } else { missingGameIDs.remove(game.id) }
+        }
+        return missing
+    }
+
     public func refreshMissingGames() {
         let missing = Set(games.filter { !fileManager.fileExists(atPath: absoluteURL(for: $0).path) }.map(\.id))
         if missing != missingGameIDs {

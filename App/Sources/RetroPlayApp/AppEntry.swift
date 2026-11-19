@@ -651,8 +651,7 @@ public struct RetroPlayRootView: View {
     private func play(_ game: LibraryGame, fromSearch: Bool = false) {
         // A game's core would write its old save over the one being imported.
         guard saveImports.allowsLaunchingGames else { return }
-        store.refreshMissingGames()
-        if store.missingGameIDs.contains(game.id) {
+        if store.refreshMissing(game) {
             missingGame = game
             showMissingGame = true
         } else {
