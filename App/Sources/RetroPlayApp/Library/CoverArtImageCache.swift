@@ -25,6 +25,8 @@ final class CoverArtImageCache: ObservableObject {
     init(covers: CoverArtStore = CoverArtStore()) {
         self.covers = covers
         cache.countLimit = 256
+        // Decoded covers are big (box art is 600 pixels tall): cap the bitmaps, not only the count.
+        cache.totalCostLimit = 96 << 20
     }
 
     func cover(for game: LibraryGame) -> CoverArt? {
@@ -41,7 +43,7 @@ final class CoverArtImageCache: ObservableObject {
         LibraryWorkProbe.coverReads += 1
         if let test = TestBoxArt.image(for: game) {
             boxArt.insert(game.id)
-            cache.setObject(test, forKey: key)
+            store(test, forKey: key)
             return test
         }
         #endif
@@ -57,8 +59,13 @@ final class CoverArtImageCache: ObservableObject {
         } else {
             boxArt.remove(game.id)
         }
-        cache.setObject(image, forKey: key)
+        store(image, forKey: key)
         return image
+    }
+
+    private func store(_ image: UIImage, forKey key: NSString) {
+        let pixels = image.size.width * image.scale * image.size.height * image.scale
+        cache.setObject(image, forKey: key, cost: Int(pixels) * 4)
     }
 
     /// The player's pictures replaced covers: drop everything cached and redraw.
