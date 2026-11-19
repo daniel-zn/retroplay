@@ -38,12 +38,11 @@ struct KeptSavesView: View {
         .navigationTitle(Self.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { if !saves.isEmpty { EditButton() } }
-        .retroPlayAlert(
-            "Couldn't Delete the Save",
-            message: deleteError ?? "",
-            isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } }),
-            actions: [.cancel("OK")]
-        )
+        .alert("Couldn't Delete the Save",
+               isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } }),
+               presenting: deleteError) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { Text($0) }
     }
 
     private func delete(_ offsets: IndexSet) {

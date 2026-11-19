@@ -230,33 +230,24 @@ public struct PlayView: View {
         }
         // Only the buttons dismiss these; each action owns its cleanup, so the
         // setters stay no-ops (a cancel here would end file access before Replace).
-        .retroPlayAlert(
-            "Replace Save?",
-            message: pendingImport.map {
-                "Replace the existing save \($0.plan.destinationURL.lastPathComponent) with \($0.plan.sourceDescription)?"
-            } ?? "",
-            isPresented: Binding(get: { pendingImport != nil }, set: { _ in }),
-            actions: [
-                .cancel("Cancel") { cancelPendingImport() },
-                .destructive("Replace") {
-                    guard let pending = pendingImport else { return }
-                    pendingImport = nil
-                    commitSaveImport(pending, overwrite: true)
-                }
-            ]
-        )
-        .retroPlayAlert(
-            "Import Save",
-            message: saveImportError ?? "",
-            isPresented: Binding(get: { saveImportError != nil }, set: { _ in }),
-            actions: [.cancel("OK") { saveImportError = nil }]
-        )
-        .retroPlayAlert(
-            "Play",
-            message: alertMessage ?? "",
-            isPresented: Binding(get: { alertMessage != nil }, set: { _ in }),
-            actions: [.cancel("OK") { alertMessage = nil }]
-        )
+        .alert("Replace Save?", isPresented: Binding(get: { pendingImport != nil }, set: { _ in }),
+               presenting: pendingImport) { pending in
+            Button("Cancel", role: .cancel) { cancelPendingImport() }
+            Button("Replace", role: .destructive) {
+                pendingImport = nil
+                commitSaveImport(pending, overwrite: true)
+            }
+        } message: {
+            Text("Replace the existing save \($0.plan.destinationURL.lastPathComponent) with \($0.plan.sourceDescription)?")
+        }
+        .alert("Import Save", isPresented: Binding(get: { saveImportError != nil }, set: { _ in }),
+               presenting: saveImportError) { _ in
+            Button("OK", role: .cancel) { saveImportError = nil }
+        } message: { Text($0) }
+        .alert("Play", isPresented: Binding(get: { alertMessage != nil }, set: { _ in }),
+               presenting: alertMessage) { _ in
+            Button("OK", role: .cancel) { alertMessage = nil }
+        } message: { Text($0) }
         .onChange(of: scenePhase) { _, newPhase in
             handleScenePhase(newPhase)
         }

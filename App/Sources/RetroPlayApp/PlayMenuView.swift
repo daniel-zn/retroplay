@@ -104,15 +104,12 @@ struct PlayMenuView: View {
             guard let event, event.context == .pauseMenu, !confirmRestart else { return }
             handle(event.command)
         }
-        .retroPlayAlert(
-            "Reset Game?",
-            message: "Every save state for this game is deleted and it starts over. In-game saves are kept.",
-            isPresented: $confirmRestart,
-            actions: [
-                .cancel("Cancel"),
-                .destructive("Reset") { onLoadCommand(.restartFromScratch) }
-            ]
-        )
+        .alert("Reset Game?", isPresented: $confirmRestart) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset", role: .destructive) { onLoadCommand(.restartFromScratch) }
+        } message: {
+            Text("Every save state for this game is deleted and it starts over. In-game saves are kept.")
+        }
     }
 
     private var content: some View {

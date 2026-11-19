@@ -24,6 +24,9 @@ final class LibraryLongPressUITests: XCTestCase {
                 XCTFail("no \(system.name) game in the library")
                 continue
             }
+            // The cover's slot at rest (the row moves under the menu).
+            waitUntilStill(cover)
+            let slot = cover.frame
             cover.press(forDuration: 1.2)
             let preview = app.descendants(matching: .any)["library.coverPreview"]
             guard preview.waitForExistence(timeout: 5) else {
@@ -32,7 +35,7 @@ final class LibraryLongPressUITests: XCTestCase {
             }
             waitUntilStill(preview)
             attachScreen("longpress-coverflow-\(system.name)")
-            let frame = preview.frame, slot = cover.frame
+            let frame = preview.frame
             // Every cover is as wide as its slot and as tall as its shape makes it.
             XCTAssertEqual(frame.width / frame.height, system.aspect, accuracy: 0.03,
                            "\(system.name): the preview is \(frame.size), not the cover's shape")

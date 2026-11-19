@@ -182,7 +182,7 @@ final class CoverBoxEntity {
     }
 
     init(game: LibraryGame, cover: CoverArt?, missing: Bool, metrics: CoverFlow.Metrics, dark: Bool) {
-        let aspect = CoverBoxTextures.aspect(game: game, cover: cover)
+        let aspect = Double(CoverArt.aspect(cover, game: game))
         let drawn = metrics.coverSize(aspect: aspect)
         let depth = (metrics.coverWidth * CoverFlow.boxDepth(game.systemID)).rounded()
         size = (drawn.width, drawn.height, depth)
@@ -228,13 +228,6 @@ struct CoverBoxTextures {
                                             cornerRadius: radius, splitFaces: true)
         meshes.setObject(mesh, forKey: key)
         return mesh
-    }
-
-    static func aspect(game: LibraryGame, cover: CoverArt?) -> Double {
-        if let cover, cover.isBoxArt, cover.image.size.height > 0 {
-            return min(max(Double(cover.image.size.width / cover.image.size.height), 0.5), 1.6)
-        }
-        return Double(RetroPlayTheme.boxArtAspect(game.systemID))
     }
 
     func material(for face: CoverBoxEntity.Face) -> UnlitMaterial {

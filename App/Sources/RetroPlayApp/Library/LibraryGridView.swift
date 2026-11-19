@@ -72,6 +72,8 @@ struct LibraryGridView<Header: View>: View {
                         )
                         .accessibilityHint(missingGameIDs.contains(game.id) ? "The game file was removed in Files" : "Starts the game")
                         .modifier(LibraryTileDeleteAccessibilityAction(game: game, onRequestDelete: onRequestDelete))
+                        .contentShape(.contextMenuPreview,
+                                      GameTileCoverOutline(aspect: CoverArt.aspect(artworkProvider(game), game: game)))
                         .contextMenu {
                             Button {
                                 onSelect(game)

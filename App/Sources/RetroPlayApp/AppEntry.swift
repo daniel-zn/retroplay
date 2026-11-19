@@ -315,11 +315,12 @@ public struct RetroPlayRootView: View {
             // No Done button: swipe down closes it, like the other sheets.
             .presentationDragIndicator(.visible)
         }
-        .retroPlayAlert(
+        .alert(
             alert?.title ?? "",
-            message: alert?.message ?? "",
             isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } }),
-            actions: alertActions
+            presenting: alert,
+            actions: alertButtons,
+            message: { Text($0.message) }
         )
     }
 
@@ -607,24 +608,28 @@ public struct RetroPlayRootView: View {
                 if playGame?.id == game.id { playGame = nil }
             }
         }
+        // Deletes start from an alert, which the system dismisses after this runs: a follow-up
+        // alert is shown on the next turn so the dismissal doesn't clear it.
+        var followUp: LibraryAlert?
         do {
             let cleanup = try store.remove(game)
             if cleanup.retainedPSPSavedata, let reason = cleanup.retainedPSPSavedataReason {
-                alert = .pspSaveRetained(reason)
+                followUp = .pspSaveRetained(reason)
             }
         } catch {
-            alert = .deleteFailed(error.localizedDescription)
+            followUp = .deleteFailed(error.localizedDescription)
         }
+        if let followUp { Task { alert = followUp } }
     }
 
-    private var alertActions: [RetroPlayAlertAction] {
+    @ViewBuilder
+    private func alertButtons(_ alert: LibraryAlert) -> some View {
         switch alert {
-        case .missingGame(let game):
-            [.cancel("OK"), .destructive("Delete") { deleteGame(game) }]
-        case .confirmDelete(let game):
-            [.cancel("Cancel"), .destructive("Delete") { deleteGame(game) }]
+        case .missingGame(let game), .confirmDelete(let game):
+            Button(alert.isMissingGame ? "OK" : "Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { deleteGame(game) }
         default:
-            [.cancel("OK")]
+            Button("OK", role: .cancel) {}
         }
     }
 
@@ -873,6 +878,10 @@ private enum LibraryAlert {
     case confirmDelete(LibraryGame)
     case deleteFailed(String)
     case pspSaveRetained(String)
+
+    var isMissingGame: Bool {
+        if case .missingGame = self { true } else { false }
+    }
 
     var title: String {
         switch self {

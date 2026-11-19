@@ -145,15 +145,6 @@ struct GameTileView: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
-    /// The cover's shape: box art keeps its own (a European N64 box is portrait), anything
-    /// else takes the system's retail box shape.
-    private var coverAspect: CGFloat {
-        if let cover, cover.isBoxArt, cover.image.size.height > 0 {
-            return min(max(cover.image.size.width / cover.image.size.height, 0.5), 1.6)
-        }
-        return RetroPlayTheme.boxArtAspect(game.systemID)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Every tile has the same square slot, so rows line up whatever the systems; the
@@ -167,7 +158,7 @@ struct GameTileView: View {
                         isBoxArt: cover?.isBoxArt ?? false,
                         cornerRadius: 8
                     )
-                    .aspectRatio(coverAspect, contentMode: .fit)
+                    .aspectRatio(CoverArt.aspect(cover, game: game), contentMode: .fit)
                     // Box art carries the system's own branding, and any other cover the
                     // system's package band.
                     .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 6, y: 3)
@@ -193,5 +184,19 @@ struct GameTileView: View {
             return lastPlayed.formatted(.relative(presentation: .named, unitsStyle: .abbreviated))
         }
         return RetroPlayTheme.shortName(game.systemID)
+    }
+}
+
+/// Where a tile's cover is drawn: its square slot at the top, the cover standing on the slot's
+/// bottom edge in its own shape. The long press lifts just this.
+struct GameTileCoverOutline: Shape {
+    let aspect: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let side = rect.width
+        let size = aspect >= 1 ? CGSize(width: side, height: side / aspect) : CGSize(width: side * aspect, height: side)
+        let cover = CGRect(x: rect.minX + (side - size.width) / 2, y: rect.minY + side - size.height,
+                           width: size.width, height: size.height)
+        return Path(roundedRect: cover, cornerRadius: 8, style: .continuous)
     }
 }

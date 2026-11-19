@@ -9,6 +9,15 @@ struct CoverArt {
     let image: UIImage
     /// A whole cover with its own shape, drawn edge to edge; icons are fitted instead.
     let isBoxArt: Bool
+
+    /// The cover's shape (width / height): box art keeps its own (a European N64 box is
+    /// portrait), anything else takes the system's retail box shape.
+    static func aspect(_ cover: CoverArt?, game: LibraryGame) -> CGFloat {
+        if let cover, cover.isBoxArt, cover.image.size.height > 0 {
+            return min(max(cover.image.size.width / cover.image.size.height, 0.5), 1.6)
+        }
+        return RetroPlayTheme.boxArtAspect(game.systemID)
+    }
 }
 
 /// In-memory cover cache so grid tiles do not re-read JPEGs on every SwiftUI pass.

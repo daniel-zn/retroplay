@@ -502,36 +502,25 @@ private struct CoverFlowRow: View, Equatable {
                 }
             }
         } preview: {
-            // The cover facing front, whichever way it's turned in the row.
-            CoverFlowCover(game: game, cover: artworkProvider(game), missing: missing)
-                .frame(width: 260, height: 260)
+            // The cover facing front, whichever way it's turned in the row, at its size in the
+            // row: the preview is exactly the cover, nothing around it.
+            let cover = artworkProvider(game)
+            let size = metrics.coverSize(aspect: Double(CoverArt.aspect(cover, game: game)))
+            CoverFlowCover(game: game, cover: cover, missing: missing)
+                .frame(width: size.width, height: size.height)
                 .accessibilityElement()
                 .accessibilityIdentifier("library.coverPreview")
         }
     }
 }
 
-/// One cover facing front in its square slot, standing on the bottom edge in its own shape (the
-/// long-press preview).
+/// One cover facing front, filling its frame (the long-press preview).
 private struct CoverFlowCover: View {
     let game: LibraryGame
     let cover: CoverArt?
     let missing: Bool
 
-    private var aspect: CGFloat {
-        if let cover, cover.isBoxArt, cover.image.size.height > 0 {
-            return min(max(cover.image.size.width / cover.image.size.height, 0.5), 1.6)
-        }
-        return RetroPlayTheme.boxArtAspect(game.systemID)
-    }
-
     var body: some View {
-        Color.clear
-            .overlay(alignment: .bottom) { front }
-            .accessibilityHidden(true)
-    }
-
-    private var front: some View {
         GameArtworkView(
             game: game,
             artwork: cover?.image,
@@ -539,7 +528,6 @@ private struct CoverFlowCover: View {
             cornerRadius: 10,
             labelTitleSize: 16
         )
-        .aspectRatio(aspect, contentMode: .fit)
         .opacity(missing ? 0.45 : 1)
         .overlay(alignment: .topTrailing) {
             if missing {
