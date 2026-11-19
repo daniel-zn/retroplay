@@ -52,15 +52,15 @@ final class LargeTitleUITests: XCTestCase {
         attach("large-title-\(title)-\(size)")
     }
 
-    /// 42 points at the default size: about 50 tall. The old 30-point one was about 36.
+    /// 42 points at the default size: about 50 tall. The old 30-point one was about 36. The grid's
+    /// and Settings' titles are checked the same way in `testGlitchingTitleSitsWhereTheSystemTitleDoes`
+    /// (its launches with the bar's own title), so only Cover Flow's has its own launches here.
     @MainActor
     func testLibraryTitleIsALargeNavigationTitle() {
-        for (size, minimum) in [("UICTContentSizeCategoryL", 44.0), ("UICTContentSizeCategoryAccessibilityXXXL", 44.0)] {
-            for layout in ["grid", "coverFlow"] {
-                let app = launch(["-UIPreferredContentSizeCategoryName", size, "-retroplay.libraryLayout", layout])
-                check(app, "RetroPlay", "\(layout)-\(size)", minimumHeight: minimum)
-                app.terminate()
-            }
+        for size in ["UICTContentSizeCategoryL", "UICTContentSizeCategoryAccessibilityXXXL"] {
+            let app = launch(["-UIPreferredContentSizeCategoryName", size, "-retroplay.libraryLayout", "coverFlow"])
+            check(app, "RetroPlay", "coverFlow-\(size)", minimumHeight: 44)
+            app.terminate()
         }
     }
 
@@ -145,6 +145,10 @@ final class LargeTitleUITests: XCTestCase {
                     print("[large-title] \(title) \(size) \(kind): bar \(bar.frame) ink \(String(describing: best))")
                     attach("title-place-\(title)-\(size)-\(kind)")
                     ink[kind] = best
+                    // The bar's own big title (the glitch off): large, whole and at the top.
+                    if frame != nil {
+                        check(app, title, "\(arguments.last ?? "")-\(size)", minimumHeight: 44)
+                    }
                     app.terminate()
                 }
                 print("[large-title] place \(title) \(size): system \(String(describing: ink["system"])) glitching \(String(describing: ink["glitching"]))")
@@ -185,14 +189,5 @@ final class LargeTitleUITests: XCTestCase {
         else { return nil }
         return CGRect(x: rect.minX + CGFloat(left) / scale, y: rect.minY + CGFloat(top) / scale,
                       width: CGFloat(right - left + 1) / scale, height: CGFloat(bottom - top + 1) / scale)
-    }
-
-    @MainActor
-    func testSettingsTitleIsALargeNavigationTitle() {
-        for (size, minimum) in [("UICTContentSizeCategoryL", 44.0), ("UICTContentSizeCategoryAccessibilityXXXL", 44.0)] {
-            let app = launch(["-UIPreferredContentSizeCategoryName", size, "-RetroPlaySmokeSettings", "YES"])
-            check(app, "Settings", size, minimumHeight: minimum)
-            app.terminate()
-        }
     }
 }

@@ -53,12 +53,14 @@ final class LandscapeCentreRowUITests: XCTestCase {
             add(note)
             return false
         }
-        // The game runs a moment so the picture is drawn behind the controls.
-        Thread.sleep(forTimeInterval: 6)
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = "row-\(system)-\(look)"
-        shot.lifetime = .keepAlways
-        add(shot)
+        // The row is checked as soon as the controls are there (the frames don't need the game's
+        // picture; LandscapeControlsLookUITests shows them over running games).
+        defer {
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "row-\(system)-\(look)"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
 
         let window = app.windows.firstMatch.frame
         let context = "\(system) \(look)"

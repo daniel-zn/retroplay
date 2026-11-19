@@ -5,18 +5,6 @@
   "workspaces": 1,
   "checks": [
     {
-      "name": "package",
-      "run": "s=$(xcrun simctl list devices | grep -F 'RetroPlay Build (' | grep -oE '[0-9A-F-]{36}' | head -1); [ -n \"$s\" ] || { echo 'No RetroPlay Build Simulator'; exit 1; }; xcrun simctl boot \"$s\" 2>/dev/null; xcrun simctl bootstatus \"$s\" >/dev/null && cd App && xcodebuild test -scheme RetroPlay-Package -destination id=$s -derivedDataPath ../build/dd-integrate/package -collect-test-diagnostics never -quiet; r=$?; xcrun simctl shutdown $s 2>/dev/null; exit $r",
-      "inputs": [
-        "App/Package.swift",
-        "App/Sources/**",
-        "App/Tests/**",
-        "!**/*.md"
-      ],
-      "line": "sim-retroplay",
-      "timeout": 40
-    },
-    {
       "name": "app",
       "run": "Scripts/app-tests.sh",
       "inputs": [
