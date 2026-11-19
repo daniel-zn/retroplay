@@ -72,14 +72,17 @@ public enum BoxArt {
     }
 
     /// The box art for a disc code: the exact release first, else its title in another region.
-    public static func match(serial: String, serials: [String: [String]], in names: [String]) -> String? {
+    public static func match(serial: String, serials: [String: [String]], in index: Index) -> String? {
         guard let releases = serials[normalizedSerial(serial)] else { return nil }
-        let available = Set(names)
-        if let exact = releases.first(where: available.contains) { return exact }
+        if let exact = releases.first(where: index.contains) { return exact }
         for release in releases {
-            if let match = bestMatch(title: release, fileName: release, in: names) { return match }
+            if let match = bestMatch(title: release, fileName: release, in: index) { return match }
         }
         return nil
+    }
+
+    public static func match(serial: String, serials: [String: [String]], in names: [String]) -> String? {
+        match(serial: serial, serials: serials, in: Index(names))
     }
 
     /// Release names (without ".png") listed in a folder's HTML index.
@@ -101,13 +104,39 @@ public enum BoxArt {
 
     // MARK: - Matching
 
+    /// A folder's release names grouped by normalised title once, so matching a whole library
+    /// doesn't normalise every name again for each game.
+    public struct Index: Sendable {
+        private let names: [String]
+        private let available: Set<String>
+        /// Positions in `names`, in list order.
+        private let byTitle: [String: [Int]]
+
+        public init(_ names: [String]) {
+            self.names = names
+            available = Set(names)
+            byTitle = Dictionary(grouping: names.indices) { BoxArt.normalizedTitle(names[$0]) }
+        }
+
+        func contains(_ name: String) -> Bool { available.contains(name) }
+
+        /// Every name whose title is one of these, in list order.
+        func names(titled titles: Set<String>) -> [String] {
+            titles.flatMap { byTitle[$0] ?? [] }.sorted().map { names[$0] }
+        }
+    }
+
     /// The best release for a game: an exact title match, preferring the region named in
     /// the file name, then USA, World, Europe, Japan; never betas, demos or re-releases.
-    public static func bestMatch(title: String, fileName: String, in names: [String]) -> String? {
+    public static func bestMatch(title: String, fileName: String, in index: Index) -> String? {
         let wanted = Set([normalizedTitle(title), normalizedTitle(fileName)].filter { !$0.isEmpty })
         let fileTags = tags(of: (fileName as NSString).deletingPathExtension)
-        let matches = names.filter { wanted.contains(normalizedTitle($0)) }
+        let matches = index.names(titled: wanted)
         return matches.min { score($0, fileTags: fileTags) < score($1, fileTags: fileTags) }
+    }
+
+    public static func bestMatch(title: String, fileName: String, in names: [String]) -> String? {
+        bestMatch(title: title, fileName: fileName, in: Index(names))
     }
 
     /// Title words only: no bracketed tags, case, punctuation, articles or "&" / "and" differences.
@@ -128,12 +157,14 @@ public enum BoxArt {
     /// ("Super Mario Bros. 3").
     static func stripExtension(_ name: String) -> String {
         let ext = (name as NSString).pathExtension.lowercased()
-        let known = Set(SystemID.allCases.flatMap(\.fileExtensions))
-        return known.contains(ext) ? (name as NSString).deletingPathExtension : name
+        return romExtensions.contains(ext) ? (name as NSString).deletingPathExtension : name
     }
 
+    private static let romExtensions = Set(SystemID.allCases.flatMap(\.fileExtensions))
+    nonisolated(unsafe) private static let tagPattern = try! NSRegularExpression(pattern: #"[\(\[]([^\)\]]*)[\)\]]"#)
+
     static func tags(of name: String) -> [String] {
-        let pattern = try! NSRegularExpression(pattern: #"[\(\[]([^\)\]]*)[\)\]]"#)
+        let pattern = tagPattern
         let range = NSRange(name.startIndex..., in: name)
         return pattern.matches(in: name, range: range).compactMap {
             Range($0.range(at: 1), in: name).map { String(name[$0]).lowercased() }

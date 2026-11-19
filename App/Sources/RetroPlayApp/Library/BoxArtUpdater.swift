@@ -63,15 +63,14 @@ final class BoxArtUpdater {
         for (system, systemGames) in Dictionary(grouping: pending, by: \.systemID) {
             guard Self.isEnabled, let names = await names(for: system) else { continue }
             let serials = systemGames.contains { $0.pspProductID != nil } ? await serials(for: system) : [:]
+            // Matching reads the whole folder list: off the main thread, the list grouped once.
+            let matches = await Task.detached(priority: .utility) {
+                Self.match(systemGames, names: names, serials: serials)
+            }.value
             var done: [UUID] = []
-            for game in systemGames {
+            for (game, match) in zip(systemGames, matches) {
                 guard Self.isEnabled else { break }
-                let fileName = (game.relativePath as NSString).lastPathComponent
-                // The disc's own code names the exact release, whatever the file is called.
-                let bySerial = game.pspProductID.flatMap { BoxArt.match(serial: $0, serials: serials, in: names) }
-                guard let name = bySerial
-                    ?? BoxArt.bestMatch(title: game.displayName, fileName: fileName, in: names)
-                else {
+                guard let name = match else {
                     done.append(game.id)
                     continue
                 }
@@ -83,6 +82,17 @@ final class BoxArtUpdater {
                 done.append(game.id)
             }
             indexCache.markLookedUp(done)
+        }
+    }
+
+    nonisolated private static func match(_ games: [LibraryGame], names: [String],
+                                          serials: [String: [String]]) -> [String?] {
+        let index = BoxArt.Index(names)
+        return games.map { game in
+            let fileName = (game.relativePath as NSString).lastPathComponent
+            // The disc's own code names the exact release, whatever the file is called.
+            return game.pspProductID.flatMap { BoxArt.match(serial: $0, serials: serials, in: index) }
+                ?? BoxArt.bestMatch(title: game.displayName, fileName: fileName, in: index)
         }
     }
 
