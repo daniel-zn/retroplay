@@ -89,23 +89,20 @@ final class LibraryLongPressUITests: XCTestCase {
     }
 
     /// Moves the row until a cover of `system` is in the middle (a tap on a side cover brings it
-    /// there); that cover's button.
+    /// there; one on the middle cover plays it); that cover's button. The covers are listed in
+    /// row order and `coverFlow.position` is the middle one's index.
     @MainActor
     private func bringToMiddle(_ app: XCUIApplication, _ system: String) -> XCUIElement? {
-        let middleX = app.windows.firstMatch.frame.midX
-        for _ in 0..<8 {
-            let covers = app.buttons.allElementsBoundByIndex.filter {
-                $0.label.hasSuffix(", \(system)") && $0.frame.height > 100
-            }
-            guard let cover = covers.min(by: { abs($0.frame.midX - middleX) < abs($1.frame.midX - middleX) }) else {
-                app.windows.firstMatch.swipeLeft()
-                Thread.sleep(forTimeInterval: 1)
-                continue
-            }
-            // Side covers' slots are a step (120 pt or more) away; a tap on the middle one plays it.
-            if abs(cover.frame.midX - middleX) < cover.frame.width / 4 { return cover }
-            cover.tap()
-            Thread.sleep(forTimeInterval: 1.2)
+        let position = app.descendants(matching: .any)["coverFlow.position"]
+        for _ in 0..<6 {
+            guard position.exists, let middle = Int(position.value as? String ?? "") else { return nil }
+            let covers = app.buttons.allElementsBoundByIndex.filter { $0.label.contains(", ") && $0.frame.height > 100 }
+            print("[long-press] middle \(middle) of \(covers.map { "\($0.label) \(Int($0.frame.midX))" })")
+            guard middle < covers.count else { return nil }
+            if covers[middle].label.hasSuffix(", \(system)") { return covers[middle] }
+            guard let target = covers.first(where: { $0.label.hasSuffix(", \(system)") }) else { return nil }
+            target.tap()
+            Thread.sleep(forTimeInterval: 1.5)
         }
         return nil
     }
