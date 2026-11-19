@@ -40,23 +40,11 @@ public struct RetroPlayRootView: View {
     /// hides the keyboard.
     @State private var searchScrollOffset: CGFloat = 0
     @State private var searchDragStart: CGFloat?
-    @State private var importErrorMessage: String?
-    @State private var showImportError = false
-    @State private var gamePendingDelete: LibraryGame?
-    @State private var showDeleteConfirm = false
-    @State private var deleteErrorMessage: String?
-    @State private var showDeleteError = false
-    @State private var deleteRetentionNotice: String?
-    @State private var showDeleteRetentionNotice = false
-    @State private var showLibraryLoadError = false
-    @State private var importNotice: String?
-    @State private var showImportNotice = false
+    @State private var alert: LibraryAlert?
     /// Import results that came in while a game was open; shown once it closes.
     @State private var pendingImportResults: [ImportResultAlert] = []
     /// Settings → Import Games…: open the picker once the Settings sheet is gone.
     @State private var importAfterSettingsDismiss = false
-    @State private var missingGame: LibraryGame?
-    @State private var showMissingGame = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var coverCache = CoverArtImageCache()
@@ -173,7 +161,7 @@ public struct RetroPlayRootView: View {
         .onAppear {
             refreshActivity()
             RetroPlayNavigationBarChrome.apply(colorScheme: colorScheme)
-            showLibraryLoadError = store.libraryLoadFailureMessage != nil
+            if let message = store.libraryLoadFailureMessage { alert = .libraryUnavailable(message) }
             #if DEBUG
             // Debug builds only — Mac/sim smoke: -RetroPlaySmokeSystem <SystemID raw value>,
             // optionally -RetroPlaySmokeGame <part of the title> to pick one of that system's games.
@@ -274,7 +262,11 @@ public struct RetroPlayRootView: View {
             }
         }
         .onChange(of: store.libraryLoadFailureMessage) { _, message in
-            showLibraryLoadError = message != nil
+            if let message {
+                alert = .libraryUnavailable(message)
+            } else if case .libraryUnavailable = alert {
+                alert = nil
+            }
         }
         // One picker for both: two .fileImporter modifiers on one view don't both present.
         .fileImporter(
@@ -324,66 +316,10 @@ public struct RetroPlayRootView: View {
             .presentationDragIndicator(.visible)
         }
         .retroPlayAlert(
-            "Library Unavailable",
-            message: store.libraryLoadFailureMessage
-                ?? "Your library file could not be read. A copy was kept; games in Files → RetroPlay → Games are added back automatically.",
-            isPresented: $showLibraryLoadError,
-            actions: [.cancel("OK")]
-        )
-        .retroPlayAlert(
-            "Import failed",
-            message: importErrorMessage ?? "Could not import the selected files.",
-            isPresented: $showImportError,
-            actions: [.cancel("OK")]
-        )
-        .retroPlayAlert(
-            "Import",
-            message: importNotice ?? "",
-            isPresented: $showImportNotice,
-            actions: [.cancel("OK")]
-        )
-        .retroPlayAlert(
-            "Game File Missing",
-            message: missingGame.map {
-                "\($0.displayName) is no longer in Files → RetroPlay → Games. Put the file back to keep playing, or delete the game to also remove its saves and states."
-            } ?? "This game's file is no longer in the Games folder.",
-            isPresented: $showMissingGame,
-            actions: [
-                .cancel("OK") { missingGame = nil },
-                .destructive("Delete") {
-                    if let missingGame {
-                        deleteGame(missingGame)
-                    }
-                    missingGame = nil
-                }
-            ]
-        )
-        .retroPlayAlert(
-            "Delete Game?",
-            message: gamePendingDelete.map {
-                "This removes \($0.displayName) from the library and deletes its imported file, saves, and states on this device."
-            } ?? "This removes the selected game and its data from this device.",
-            isPresented: $showDeleteConfirm,
-            actions: [
-                .cancel("Cancel") { gamePendingDelete = nil },
-                .destructive("Delete") {
-                    if let gamePendingDelete {
-                        deleteGame(gamePendingDelete)
-                    }
-                }
-            ]
-        )
-        .retroPlayAlert(
-            "Couldn't Delete",
-            message: deleteErrorMessage ?? "The game file or save data could not be removed.",
-            isPresented: $showDeleteError,
-            actions: [.cancel("OK")]
-        )
-        .retroPlayAlert(
-            "PSP Save Data Retained",
-            message: deleteRetentionNotice ?? "Battery save data was left on the virtual memory stick.",
-            isPresented: $showDeleteRetentionNotice,
-            actions: [.cancel("OK")]
+            alert?.title ?? "",
+            message: alert?.message ?? "",
+            isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } }),
+            actions: alertActions
         )
     }
 
@@ -652,8 +588,7 @@ public struct RetroPlayRootView: View {
         // A game's core would write its old save over the one being imported.
         guard saveImports.allowsLaunchingGames else { return }
         if store.refreshMissing(game) {
-            missingGame = game
-            showMissingGame = true
+            alert = .missingGame(game)
         } else {
             if fromSearch { recordSearch() }
             playGame = game
@@ -661,8 +596,7 @@ public struct RetroPlayRootView: View {
     }
 
     private func requestDelete(_ game: LibraryGame) {
-        gamePendingDelete = game
-        showDeleteConfirm = true
+        alert = .confirmDelete(game)
     }
 
     private func deleteGame(_ game: LibraryGame) {
@@ -676,14 +610,22 @@ public struct RetroPlayRootView: View {
         do {
             let cleanup = try store.remove(game)
             if cleanup.retainedPSPSavedata, let reason = cleanup.retainedPSPSavedataReason {
-                deleteRetentionNotice = reason
-                showDeleteRetentionNotice = true
+                alert = .pspSaveRetained(reason)
             }
         } catch {
-            deleteErrorMessage = error.localizedDescription
-            showDeleteError = true
+            alert = .deleteFailed(error.localizedDescription)
         }
-        gamePendingDelete = nil
+    }
+
+    private var alertActions: [RetroPlayAlertAction] {
+        switch alert {
+        case .missingGame(let game):
+            [.cancel("OK"), .destructive("Delete") { deleteGame(game) }]
+        case .confirmDelete(let game):
+            [.cancel("Cancel"), .destructive("Delete") { deleteGame(game) }]
+        default:
+            [.cancel("OK")]
+        }
     }
 
     /// Box art for games that don't have it yet (Settings → Download Box Art).
@@ -916,12 +858,43 @@ public struct RetroPlayRootView: View {
 
     private func show(_ result: ImportResultAlert) {
         switch result {
-        case .notice(let message):
-            importNotice = message
-            showImportNotice = true
-        case .error(let message):
-            importErrorMessage = message
-            showImportError = true
+        case .notice(let message): alert = .importNotice(message)
+        case .error(let message): alert = .importFailed(message)
+        }
+    }
+}
+
+/// The library shows one alert at a time.
+private enum LibraryAlert {
+    case libraryUnavailable(String)
+    case importFailed(String)
+    case importNotice(String)
+    case missingGame(LibraryGame)
+    case confirmDelete(LibraryGame)
+    case deleteFailed(String)
+    case pspSaveRetained(String)
+
+    var title: String {
+        switch self {
+        case .libraryUnavailable: "Library Unavailable"
+        case .importFailed: "Import failed"
+        case .importNotice: "Import"
+        case .missingGame: "Game File Missing"
+        case .confirmDelete: "Delete Game?"
+        case .deleteFailed: "Couldn't Delete"
+        case .pspSaveRetained: "PSP Save Data Retained"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .libraryUnavailable(let message), .importFailed(let message), .importNotice(let message),
+             .deleteFailed(let message), .pspSaveRetained(let message):
+            message
+        case .missingGame(let game):
+            "\(game.displayName) is no longer in Files → RetroPlay → Games. Put the file back to keep playing, or delete the game to also remove its saves and states."
+        case .confirmDelete(let game):
+            "This removes \(game.displayName) from the library and deletes its imported file, saves, and states on this device."
         }
     }
 }
