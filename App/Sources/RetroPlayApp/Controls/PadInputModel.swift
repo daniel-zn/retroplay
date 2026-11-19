@@ -19,15 +19,20 @@ struct PadTouchOutput: Equatable, Sendable {
 /// Merges on-screen touch, physical controllers and keyboard into one
 /// `EmulatorInputState` for the core, and exposes held state for the pad visuals.
 ///
-/// Pad visuals observe this model directly, so a button press re-renders only the
-/// buttons — not the whole Play screen.
+/// Pad visuals observe only `buttons`, `stick` and `releaseCount`, each set only when it
+/// changes: a button press re-renders the buttons, not the whole Play screen, and a stick or
+/// DS-screen move doesn't re-render the buttons.
 @MainActor
 @Observable
 final class PadInputModel {
     let system: SystemID
 
-    private(set) var touch = PadTouchOutput.idle
-    private(set) var physical = PhysicalPadState.neutral
+    @ObservationIgnored private var touch = PadTouchOutput.idle
+    @ObservationIgnored private var physical = PhysicalPadState.neutral
+    /// Union of every source, for button highlights.
+    private(set) var buttons: UInt32 = 0
+    /// Stick position for the on-screen nub (touch wins while a finger is on it).
+    private(set) var stick = SIMD2<Float>.zero
     /// Bumped by `releaseAll()` so the touch surface can re-apply fingers still held.
     private(set) var releaseCount = 0
 
@@ -43,18 +48,8 @@ final class PadInputModel {
         ControllerMapping.map(physical, for: system)
     }
 
-    /// Union of every source, for button highlights.
-    var buttons: UInt32 { touch.buttons | physicalMapped.buttons }
-
     func isHeld(_ bits: UInt32) -> Bool {
         bits != 0 && buttons & bits == bits
-    }
-
-    /// Stick position for the on-screen nub (touch wins while a finger is on it).
-    var stick: (x: Float, y: Float) {
-        if touch.stickX != 0 || touch.stickY != 0 { return (touch.stickX, touch.stickY) }
-        let mapped = physicalMapped
-        return (mapped.analogX, mapped.analogY)
     }
 
     var state: EmulatorInputState {
@@ -106,6 +101,9 @@ final class PadInputModel {
 
     private func publish() {
         let next = state
+        if next.buttons != buttons { buttons = next.buttons }
+        let nub = SIMD2(next.analogX, next.analogY)
+        if nub != stick { stick = nub }
         guard next != lastSent else { return }
         lastSent = next
         onChange?(next)
