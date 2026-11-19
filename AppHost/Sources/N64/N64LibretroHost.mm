@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #import "N64LibretroHost.h"
+#import "Libretro/LibretroCommon.h"
 
 #import <TargetConditionals.h>
 #import <OpenGLES/ES3/gl.h>
@@ -7,17 +8,8 @@
 #import <OpenGLES/EAGL.h>
 #import <Foundation/Foundation.h>
 
-#include "libretro.h"
-
-#include <algorithm>
-#include <dlfcn.h>
-#include <cstdio>
 #include <cstdarg>
-#include <cstdlib>
-#include <cstring>
-#include <map>
-#include <string>
-#include <vector>
+#include <dlfcn.h>
 
 // mupen64plus-next exports the libretro C API.
 extern "C" {
@@ -79,7 +71,7 @@ struct N64HostHandle {
     std::string saveDir;
     std::string lastVideoPath;
     // Defaults the core declares via SET_CORE_OPTIONS* / SET_VARIABLES.
-    std::map<std::string, std::string> optionDefaults;
+    retroplay::OptionDefaults optionDefaults;
 };
 
 static N64HostHandle *gHost = nullptr;
@@ -87,38 +79,22 @@ static N64HostHandle *gHost = nullptr;
 // ~0.5 s of stereo audio; the emulation thread drains it after every frame.
 static const size_t kMaxAudioSamples = 44100;
 
-static void trimAudio(N64HostHandle *h) {
-    if (h->audio.size() > kMaxAudioSamples) {
-        h->audio.erase(h->audio.begin(), h->audio.end() - (std::ptrdiff_t)kMaxAudioSamples);
-    }
-}
-
 static void audio_sample(int16_t left, int16_t right) {
     if (!gHost) return;
-    gHost->audio.push_back(left);
-    gHost->audio.push_back(right);
-    trimAudio(gHost);
+    const int16_t frame[2] = {left, right};
+    retroplay::appendAudio(gHost->audio, frame, 2, kMaxAudioSamples);
 }
 
 static size_t audio_sample_batch(const int16_t *data, size_t frames) {
-    if (!gHost || !data) return frames;
-    gHost->audio.insert(gHost->audio.end(), data, data + frames * 2);
-    trimAudio(gHost);
+    if (gHost && data) retroplay::appendAudio(gHost->audio, data, frames * 2, kMaxAudioSamples);
     return frames;
 }
+
 static void input_poll(void) {}
 
 static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id) {
-    if (!gHost || port != 0) return 0;
-    if (device == RETRO_DEVICE_JOYPAD) {
-        if (id == RETRO_DEVICE_ID_JOYPAD_MASK) return (int16_t)(gHost->joypadMask & 0xFFFF);
-        if (id <= RETRO_DEVICE_ID_JOYPAD_R3) return (gHost->joypadMask & (1u << id)) ? 1 : 0;
-    }
-    if (device == RETRO_DEVICE_ANALOG && index == RETRO_DEVICE_INDEX_ANALOG_LEFT) {
-        if (id == RETRO_DEVICE_ID_ANALOG_X) return gHost->stickX;
-        if (id == RETRO_DEVICE_ID_ANALOG_Y) return gHost->stickY;
-    }
-    return 0;
+    if (!gHost) return 0;
+    return retroplay::inputState(gHost->joypadMask, gHost->stickX, gHost->stickY, port, device, index, id);
 }
 
 /// Map RetroPlay N64Input (m64p BUTTON bits) → libretro joypad bits (alternate_mapping layout).
@@ -198,39 +174,7 @@ static void video_refresh(const void *data, unsigned width, unsigned height, siz
         const int h = (int)height;
         gHost->frameW = w;
         gHost->frameH = h;
-        gHost->rgba.resize((size_t)w * (size_t)h * 4);
-        const uint8_t *src = (const uint8_t *)data;
-        for (int y = 0; y < h; y++) {
-            uint8_t *dst = gHost->rgba.data() + (size_t)y * (size_t)w * 4;
-            const uint8_t *row = src + (size_t)y * pitch;
-            if (gHost->pixelFormat == RETRO_PIXEL_FORMAT_XRGB8888) {
-                for (int x = 0; x < w; x++) {
-                    // XRGB little-endian: B G R X (or XRGB as bytes varies; libretro is 0x00RRGGBB in native)
-                    uint32_t px = ((const uint32_t *)row)[x];
-                    dst[x*4+0] = (px >> 16) & 0xff; // R
-                    dst[x*4+1] = (px >> 8) & 0xff;  // G
-                    dst[x*4+2] = px & 0xff;         // B
-                    dst[x*4+3] = 0xff;
-                }
-            } else if (gHost->pixelFormat == RETRO_PIXEL_FORMAT_RGB565) {
-                for (int x = 0; x < w; x++) {
-                    uint16_t px = ((const uint16_t *)row)[x];
-                    dst[x*4+0] = ((px >> 11) & 0x1f) * 255 / 31;
-                    dst[x*4+1] = ((px >> 5) & 0x3f) * 255 / 63;
-                    dst[x*4+2] = (px & 0x1f) * 255 / 31;
-                    dst[x*4+3] = 0xff;
-                }
-            } else {
-                // 0RGB1555
-                for (int x = 0; x < w; x++) {
-                    uint16_t px = ((const uint16_t *)row)[x];
-                    dst[x*4+0] = ((px >> 10) & 0x1f) * 255 / 31;
-                    dst[x*4+1] = ((px >> 5) & 0x1f) * 255 / 31;
-                    dst[x*4+2] = (px & 0x1f) * 255 / 31;
-                    dst[x*4+3] = 0xff;
-                }
-            }
-        }
+        retroplay::convertFrame(gHost->rgba, data, w, h, pitch, gHost->pixelFormat);
         gHost->newFrame = true;
         return;
     }
@@ -365,36 +309,6 @@ static const char *hostOptionOverride(const char *key) {
     return nullptr;
 }
 
-// A null default_value means the first listed value, per libretro.h.
-static void recordDefault(N64HostHandle *h, const char *key, const char *def,
-                          const struct retro_core_option_value *values) {
-    if (!key) return;
-    if (!def && values && values[0].value) def = values[0].value;
-    if (def) h->optionDefaults[key] = def;
-}
-
-static void recordV1Defaults(N64HostHandle *h, const struct retro_core_option_definition *defs) {
-    for (; defs && defs->key; defs++)
-        recordDefault(h, defs->key, defs->default_value, defs->values);
-}
-
-static void recordV2Defaults(N64HostHandle *h, const struct retro_core_option_v2_definition *defs) {
-    for (; defs && defs->key; defs++)
-        recordDefault(h, defs->key, defs->default_value, defs->values);
-}
-
-// Legacy form: value is "Description; default|other|...".
-static void recordVariableDefaults(N64HostHandle *h, const struct retro_variable *vars) {
-    for (; vars && vars->key; vars++) {
-        if (!vars->value) continue;
-        const char *p = strstr(vars->value, "; ");
-        if (!p) continue;
-        p += 2;
-        const char *end = strchr(p, '|');
-        h->optionDefaults[vars->key] = end ? std::string(p, (size_t)(end - p)) : std::string(p);
-    }
-}
-
 static bool environ_cb(unsigned cmd, void *data) {
     if (!gHost) return false;
     switch (cmd) {
@@ -449,24 +363,24 @@ static bool environ_cb(unsigned cmd, void *data) {
         return true;
     }
     case RETRO_ENVIRONMENT_SET_VARIABLES:
-        recordVariableDefaults(gHost, (const struct retro_variable *)data);
+        retroplay::recordVariableDefaults(gHost->optionDefaults, (const struct retro_variable *)data);
         return true;
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS:
-        recordV1Defaults(gHost, (const struct retro_core_option_definition *)data);
+        retroplay::recordDefaults(gHost->optionDefaults, (const struct retro_core_option_definition *)data);
         return true;
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_INTL: {
         auto *intl = (const struct retro_core_options_intl *)data;
-        if (intl) recordV1Defaults(gHost, intl->us);
+        if (intl) retroplay::recordDefaults(gHost->optionDefaults, intl->us);
         return true;
     }
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2: {
         auto *opts = (const struct retro_core_options_v2 *)data;
-        if (opts) recordV2Defaults(gHost, opts->definitions);
+        if (opts) retroplay::recordDefaults(gHost->optionDefaults, opts->definitions);
         return true;
     }
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL: {
         auto *intl = (const struct retro_core_options_v2_intl *)data;
-        if (intl && intl->us) recordV2Defaults(gHost, intl->us->definitions);
+        if (intl && intl->us) retroplay::recordDefaults(gHost->optionDefaults, intl->us->definitions);
         return true;
     }
     case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
@@ -525,36 +439,14 @@ N64HostHandle* N64Host_Create(void) {
 // Battery saves (EEPROM / SRAM / FlashRAM / Controller Pak) live in one libretro
 // SAVE_RAM block. mupen never writes it to disk itself, so the host does.
 static void loadSRAM(N64HostHandle *h) {
-    h->sramShadow.clear();
-    if (h->sramPath.empty()) return;
-    auto *mem = (uint8_t *)retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
-    const size_t size = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
-    if (!mem || size == 0) return;
-    FILE *f = fopen(h->sramPath.c_str(), "rb");
-    if (f) {
-        const size_t n = fread(mem, 1, size, f);
-        fclose(f);
-        fprintf(stderr, "N64Host: loaded %zu bytes of save RAM\n", n);
-    }
-    h->sramShadow.assign(mem, mem + size);
+    retroplay::loadSaveRAM(h->sramPath, (uint8_t *)retro_get_memory_data(RETRO_MEMORY_SAVE_RAM),
+                           retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), h->sramShadow);
 }
 
 static void flushSRAM(N64HostHandle *h) {
-    if (!h->loaded || h->sramPath.empty()) return;
-    auto *mem = (const uint8_t *)retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
-    const size_t size = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
-    if (!mem || size == 0) return;
-    if (h->sramShadow.size() == size && memcmp(h->sramShadow.data(), mem, size) == 0) return;
-    const std::string tmp = h->sramPath + ".tmp";
-    FILE *f = fopen(tmp.c_str(), "wb");
-    if (!f) return;
-    const bool ok = fwrite(mem, 1, size, f) == size;
-    fclose(f);
-    if (ok && rename(tmp.c_str(), h->sramPath.c_str()) == 0) {
-        h->sramShadow.assign(mem, mem + size);
-    } else {
-        remove(tmp.c_str());
-    }
+    if (!h->loaded) return;
+    retroplay::flushSaveRAM(h->sramPath, (const uint8_t *)retro_get_memory_data(RETRO_MEMORY_SAVE_RAM),
+                            retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), h->sramShadow);
 }
 
 // retro_init creates mupen's 8 MiB emulation coroutine and never frees it, so
@@ -594,18 +486,10 @@ bool N64Host_LoadROM(N64HostHandle* h, const char* path, const char* sramPath) {
     destroyGL(h);
     h->sramPath = sramPath ? sramPath : "";
 
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        fprintf(stderr, "N64Host: fopen failed\n");
+    if (!retroplay::readFile(path, h->romBytes)) {
+        fprintf(stderr, "N64Host: the ROM could not be read\n");
         return false;
     }
-    fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (sz <= 0) { fclose(f); return false; }
-    h->romBytes.resize((size_t)sz);
-    if (fread(h->romBytes.data(), 1, (size_t)sz, f) != (size_t)sz) { fclose(f); return false; }
-    fclose(f);
 
     gHost = h;
     h->hwValid = false;
@@ -668,11 +552,8 @@ bool N64Host_LoadROM(N64HostHandle* h, const char* path, const char* sramPath) {
 void N64Host_SetKeys(N64HostHandle* h, uint32_t n64Bitmask, float stickX, float stickY) {
     if (!h) return;
     h->joypadMask = mapN64ToJoypad(n64Bitmask);
-    // libretro analog is ±0x7fff with Y pointing DOWN; RetroPlay Y points up.
-    const float x = std::clamp(stickX, -1.0f, 1.0f);
-    const float y = std::clamp(stickY, -1.0f, 1.0f);
-    h->stickX = (int16_t)(x * 32767.0f);
-    h->stickY = (int16_t)(-y * 32767.0f);
+    h->stickX = retroplay::analogX(stickX);
+    h->stickY = retroplay::analogY(stickY);
 }
 
 void N64Host_RunFrame(N64HostHandle* h) {
@@ -708,12 +589,7 @@ const uint8_t* N64Host_Frame(N64HostHandle* h, int* outW, int* outH) {
 }
 
 int N64Host_ReadAudio(N64HostHandle* h, int16_t* out, int maxFrames) {
-    if (!h || !out || maxFrames <= 0) return 0;
-    const size_t frames = std::min(h->audio.size() / 2, (size_t)maxFrames);
-    if (frames == 0) return 0;
-    memcpy(out, h->audio.data(), frames * 2 * sizeof(int16_t));
-    h->audio.erase(h->audio.begin(), h->audio.begin() + (std::ptrdiff_t)(frames * 2));
-    return (int)frames;
+    return h ? retroplay::readAudio(h->audio, out, maxFrames) : 0;
 }
 
 double N64Host_FrameRate(N64HostHandle* h) { return h ? h->fps : 60.0; }
@@ -730,38 +606,25 @@ bool N64Host_SaveState(N64HostHandle* h, const char* path) {
     size_t sz = retro_serialize_size();
     if (!sz) return false;
     std::vector<uint8_t> buf(sz);
-    if (!retro_serialize(buf.data(), sz)) return false;
-    FILE *f = fopen(path, "wb");
-    if (!f) return false;
-    bool ok = fwrite(buf.data(), 1, sz, f) == sz;
-    fclose(f);
-    return ok;
+    return retro_serialize(buf.data(), sz) && retroplay::writeFile(path, buf.data(), sz);
 }
 
 bool N64Host_LoadState(N64HostHandle* h, const char* path) {
     if (!h || !h->loaded || !path) return false;
     gHost = h;
     if (h->context) [EAGLContext setCurrentContext:h->context];
-    FILE *f = fopen(path, "rb");
-    if (!f) return false;
-    fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (sz <= 0) { fclose(f); return false; }
+    std::vector<uint8_t> buf;
+    if (!retroplay::readFile(path, buf)) return false;
     // mupen's retro_unserialize returns true even when the load job fails, and
     // its retro_savestate_result is not exported from the dylib. Reject what the
     // core would reject before handing it over: the wrong size (truncated, other
     // core) or a header that is not "M64+SAVE" with major version 1. The core's
     // remaining check (ROM MD5) is not repeated here.
     const size_t expected = retro_serialize_size();
-    if (expected == 0 || (size_t)sz != expected) {
-        fprintf(stderr, "N64Host: state size %ld != %zu, refusing load\n", sz, expected);
-        fclose(f);
+    if (expected == 0 || buf.size() != expected) {
+        fprintf(stderr, "N64Host: state size %zu != %zu, refusing load\n", buf.size(), expected);
         return false;
     }
-    std::vector<uint8_t> buf((size_t)sz);
-    if (fread(buf.data(), 1, (size_t)sz, f) != (size_t)sz) { fclose(f); return false; }
-    fclose(f);
     if (memcmp(buf.data(), "M64+SAVE", 8) != 0 || buf[8] != 0x00 || buf[9] != 0x01) {
         fprintf(stderr, "N64Host: not a mupen64plus 1.x state, refusing load\n");
         return false;

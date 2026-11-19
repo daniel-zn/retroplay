@@ -1,18 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #import "LibretroHost.h"
+#import "LibretroCommon.h"
 
 #import <Foundation/Foundation.h>
 
-#include "libretro.h"
-
-#include <algorithm>
 #include <cstdarg>
-#include <cstdio>
-#include <cstring>
 #include <dlfcn.h>
-#include <map>
-#include <string>
-#include <vector>
 
 /// The libretro C API, resolved from one core image.
 struct LibretroAPI {
@@ -68,7 +61,7 @@ struct LibretroHost {
     std::vector<uint8_t> sramShadow;
 
     std::map<std::string, std::string> overrides;
-    std::map<std::string, std::string> defaults;
+    retroplay::OptionDefaults defaults;
 };
 
 static LibretroHost *gHost = nullptr;
@@ -123,39 +116,22 @@ static bool resolveAPI(void *handle, LibretroAPI &api) {
 
 // MARK: - Callbacks
 
-static void trimAudio(LibretroHost *h) {
-    if (h->audio.size() > h->maxAudioSamples) {
-        h->audio.erase(h->audio.begin(), h->audio.end() - (std::ptrdiff_t)h->maxAudioSamples);
-    }
-}
-
 static void audio_sample(int16_t left, int16_t right) {
     if (!gHost) return;
-    gHost->audio.push_back(left);
-    gHost->audio.push_back(right);
-    trimAudio(gHost);
+    const int16_t frame[2] = {left, right};
+    retroplay::appendAudio(gHost->audio, frame, 2, gHost->maxAudioSamples);
 }
 
 static size_t audio_sample_batch(const int16_t *data, size_t frames) {
-    if (!gHost || !data) return frames;
-    gHost->audio.insert(gHost->audio.end(), data, data + frames * 2);
-    trimAudio(gHost);
+    if (gHost && data) retroplay::appendAudio(gHost->audio, data, frames * 2, gHost->maxAudioSamples);
     return frames;
 }
 
 static void input_poll(void) {}
 
 static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id) {
-    if (!gHost || port != 0) return 0;
-    if (device == RETRO_DEVICE_JOYPAD) {
-        if (id == RETRO_DEVICE_ID_JOYPAD_MASK) return (int16_t)(gHost->joypad & 0xFFFF);
-        if (id <= RETRO_DEVICE_ID_JOYPAD_R3) return (gHost->joypad & (1u << id)) ? 1 : 0;
-    }
-    if (device == RETRO_DEVICE_ANALOG && index == RETRO_DEVICE_INDEX_ANALOG_LEFT) {
-        if (id == RETRO_DEVICE_ID_ANALOG_X) return gHost->leftX;
-        if (id == RETRO_DEVICE_ID_ANALOG_Y) return gHost->leftY;
-    }
-    return 0;
+    if (!gHost) return 0;
+    return retroplay::inputState(gHost->joypad, gHost->leftX, gHost->leftY, port, device, index, id);
 }
 
 static void video_refresh(const void *data, unsigned width, unsigned height, size_t pitch) {
@@ -165,43 +141,7 @@ static void video_refresh(const void *data, unsigned width, unsigned height, siz
     const int h = (int)height;
     gHost->frameW = w;
     gHost->frameH = h;
-    gHost->rgba.resize((size_t)w * (size_t)h * 4);
-    const uint8_t *src = (const uint8_t *)data;
-    for (int y = 0; y < h; y++) {
-        uint8_t *dst = gHost->rgba.data() + (size_t)y * (size_t)w * 4;
-        const uint8_t *row = src + (size_t)y * pitch;
-        switch (gHost->pixelFormat) {
-        case RETRO_PIXEL_FORMAT_XRGB8888:
-            for (int x = 0; x < w; x++) {
-                const uint32_t px = ((const uint32_t *)row)[x];
-                dst[x * 4 + 0] = (px >> 16) & 0xff;
-                dst[x * 4 + 1] = (px >> 8) & 0xff;
-                dst[x * 4 + 2] = px & 0xff;
-                dst[x * 4 + 3] = 0xff;
-            }
-            break;
-        case RETRO_PIXEL_FORMAT_RGB565:
-            for (int x = 0; x < w; x++) {
-                const uint16_t px = ((const uint16_t *)row)[x];
-                const uint8_t r = (px >> 11) & 0x1f, g = (px >> 5) & 0x3f, b = px & 0x1f;
-                dst[x * 4 + 0] = (uint8_t)((r << 3) | (r >> 2));
-                dst[x * 4 + 1] = (uint8_t)((g << 2) | (g >> 4));
-                dst[x * 4 + 2] = (uint8_t)((b << 3) | (b >> 2));
-                dst[x * 4 + 3] = 0xff;
-            }
-            break;
-        default: // 0RGB1555
-            for (int x = 0; x < w; x++) {
-                const uint16_t px = ((const uint16_t *)row)[x];
-                const uint8_t r = (px >> 10) & 0x1f, g = (px >> 5) & 0x1f, b = px & 0x1f;
-                dst[x * 4 + 0] = (uint8_t)((r << 3) | (r >> 2));
-                dst[x * 4 + 1] = (uint8_t)((g << 3) | (g >> 2));
-                dst[x * 4 + 2] = (uint8_t)((b << 3) | (b >> 2));
-                dst[x * 4 + 3] = 0xff;
-            }
-            break;
-        }
-    }
+    retroplay::convertFrame(gHost->rgba, data, w, h, pitch, gHost->pixelFormat);
     gHost->newFrame = true;
 #if DEBUG
     static int logged = 0;
@@ -225,14 +165,6 @@ static void RETRO_CALLCONV host_log(enum retro_log_level level, const char *fmt,
     vsnprintf(line, sizeof line, fmt, ap);
     va_end(ap);
     NSLog(@"RP_LIBRETRO %s: %s", gHost ? gHost->name.c_str() : "?", line);
-}
-
-// A null default_value means the first listed value, per libretro.h.
-static void recordDefault(LibretroHost *h, const char *key, const char *def,
-                          const struct retro_core_option_value *values) {
-    if (!key) return;
-    if (!def && values && values[0].value) def = values[0].value;
-    if (def) h->defaults[key] = def;
 }
 
 static bool environ_cb(unsigned cmd, void *data) {
@@ -267,36 +199,24 @@ static bool environ_cb(unsigned cmd, void *data) {
         *(unsigned *)data = RETRO_LANGUAGE_ENGLISH;
         return true;
     case RETRO_ENVIRONMENT_SET_VARIABLES:
-        // Legacy form: "Description; default|other|…".
-        for (auto *v = (const struct retro_variable *)data; v && v->key; v++) {
-            if (!v->value) continue;
-            const char *p = strstr(v->value, "; ");
-            if (!p) continue;
-            p += 2;
-            const char *end = strchr(p, '|');
-            h->defaults[v->key] = end ? std::string(p, (size_t)(end - p)) : std::string(p);
-        }
+        retroplay::recordVariableDefaults(h->defaults, (const struct retro_variable *)data);
         return true;
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS:
-        for (auto *d = (const struct retro_core_option_definition *)data; d && d->key; d++)
-            recordDefault(h, d->key, d->default_value, d->values);
+        retroplay::recordDefaults(h->defaults, (const struct retro_core_option_definition *)data);
         return true;
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_INTL: {
         auto *intl = (const struct retro_core_options_intl *)data;
-        for (auto *d = intl ? intl->us : nullptr; d && d->key; d++)
-            recordDefault(h, d->key, d->default_value, d->values);
+        if (intl) retroplay::recordDefaults(h->defaults, intl->us);
         return true;
     }
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2: {
         auto *opts = (const struct retro_core_options_v2 *)data;
-        for (auto *d = opts ? opts->definitions : nullptr; d && d->key; d++)
-            recordDefault(h, d->key, d->default_value, d->values);
+        if (opts) retroplay::recordDefaults(h->defaults, opts->definitions);
         return true;
     }
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL: {
         auto *intl = (const struct retro_core_options_v2_intl *)data;
-        for (auto *d = (intl && intl->us) ? intl->us->definitions : nullptr; d && d->key; d++)
-            recordDefault(h, d->key, d->default_value, d->values);
+        if (intl && intl->us) retroplay::recordDefaults(h->defaults, intl->us->definitions);
         return true;
     }
     case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
@@ -350,36 +270,14 @@ static bool environ_cb(unsigned cmd, void *data) {
 // MARK: - Save RAM
 
 static void loadSRAM(LibretroHost *h) {
-    h->sramShadow.clear();
-    if (h->sramPath.empty()) return;
-    auto *mem = (uint8_t *)h->api.get_memory_data(RETRO_MEMORY_SAVE_RAM);
-    const size_t size = h->api.get_memory_size(RETRO_MEMORY_SAVE_RAM);
-    if (!mem || size == 0) return;
-    if (FILE *f = fopen(h->sramPath.c_str(), "rb")) {
-        fread(mem, 1, size, f);
-        fclose(f);
-    }
-    h->sramShadow.assign(mem, mem + size);
+    retroplay::loadSaveRAM(h->sramPath, (uint8_t *)h->api.get_memory_data(RETRO_MEMORY_SAVE_RAM),
+                           h->api.get_memory_size(RETRO_MEMORY_SAVE_RAM), h->sramShadow);
 }
 
 static void flushSRAM(LibretroHost *h) {
-    if (!h->loaded || h->sramPath.empty()) return;
-    auto *mem = (const uint8_t *)h->api.get_memory_data(RETRO_MEMORY_SAVE_RAM);
-    const size_t size = h->api.get_memory_size(RETRO_MEMORY_SAVE_RAM);
-    if (!mem || size == 0) return;
-    if (h->sramShadow.size() == size && memcmp(h->sramShadow.data(), mem, size) == 0) return;
-    // Nothing was ever written: don't leave an all-zero file behind for games without saves.
-    if (h->sramShadow.empty() && std::all_of(mem, mem + size, [](uint8_t b) { return b == 0; })) return;
-    const std::string tmp = h->sramPath + ".tmp";
-    FILE *f = fopen(tmp.c_str(), "wb");
-    if (!f) return;
-    const bool ok = fwrite(mem, 1, size, f) == size;
-    fclose(f);
-    if (ok && rename(tmp.c_str(), h->sramPath.c_str()) == 0) {
-        h->sramShadow.assign(mem, mem + size);
-    } else {
-        remove(tmp.c_str());
-    }
+    if (!h->loaded) return;
+    retroplay::flushSaveRAM(h->sramPath, (const uint8_t *)h->api.get_memory_data(RETRO_MEMORY_SAVE_RAM),
+                            h->api.get_memory_size(RETRO_MEMORY_SAVE_RAM), h->sramShadow);
 }
 
 static void unloadGame(LibretroHost *h) {
@@ -449,23 +347,8 @@ bool LibretroHost_Load(LibretroHost* h, const char* path, const char* sramPath, 
     info.path = path;
     h->content.clear();
     if (!sys.need_fullpath) {
-        FILE *f = fopen(path, "rb");
-        if (!f) {
-            h->error = "the game file could not be read";
-            if (errorOut) *errorOut = h->error.c_str();
-            unloadGame(h);
-            return false;
-        }
-        fseek(f, 0, SEEK_END);
-        const long size = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        if (size > 0) {
-            h->content.resize((size_t)size);
-            if (fread(h->content.data(), 1, (size_t)size, f) != (size_t)size) h->content.clear();
-        }
-        fclose(f);
-        if (h->content.empty()) {
-            h->error = "the game file is empty or unreadable";
+        if (!retroplay::readFile(path, h->content)) {
+            h->error = "the game file is missing, empty or unreadable";
             if (errorOut) *errorOut = h->error.c_str();
             unloadGame(h);
             return false;
@@ -498,9 +381,8 @@ bool LibretroHost_Load(LibretroHost* h, const char* path, const char* sramPath, 
 void LibretroHost_SetInput(LibretroHost* h, uint32_t joypad, float leftX, float leftY) {
     if (!h) return;
     h->joypad = joypad;
-    // libretro analog is ±0x7fff with Y pointing down; RetroPlay's Y points up.
-    h->leftX = (int16_t)(std::clamp(leftX, -1.0f, 1.0f) * 32767.0f);
-    h->leftY = (int16_t)(-std::clamp(leftY, -1.0f, 1.0f) * 32767.0f);
+    h->leftX = retroplay::analogX(leftX);
+    h->leftY = retroplay::analogY(leftY);
 }
 
 void LibretroHost_RunFrame(LibretroHost* h) {
@@ -525,12 +407,7 @@ const uint8_t* LibretroHost_Frame(LibretroHost* h, int* outW, int* outH) {
 }
 
 int LibretroHost_ReadAudio(LibretroHost* h, int16_t* out, int maxFrames) {
-    if (!h || !out || maxFrames <= 0) return 0;
-    const size_t frames = std::min(h->audio.size() / 2, (size_t)maxFrames);
-    if (frames == 0) return 0;
-    memcpy(out, h->audio.data(), frames * 2 * sizeof(int16_t));
-    h->audio.erase(h->audio.begin(), h->audio.begin() + (std::ptrdiff_t)(frames * 2));
-    return (int)frames;
+    return h ? retroplay::readAudio(h->audio, out, maxFrames) : 0;
 }
 
 double LibretroHost_FrameRate(LibretroHost* h) { return h ? h->fps : 60.0; }
@@ -548,28 +425,15 @@ bool LibretroHost_SaveState(LibretroHost* h, const char* path) {
     const size_t size = h->api.serialize_size();
     if (!size) return false;
     std::vector<uint8_t> buf(size);
-    if (!h->api.serialize(buf.data(), size)) return false;
-    FILE *f = fopen(path, "wb");
-    if (!f) return false;
-    const bool ok = fwrite(buf.data(), 1, size, f) == size;
-    fclose(f);
-    return ok;
+    return h->api.serialize(buf.data(), size) && retroplay::writeFile(path, buf.data(), size);
 }
 
 bool LibretroHost_LoadState(LibretroHost* h, const char* path) {
     if (!h || !h->loaded || !path) return false;
     gHost = h;
-    FILE *f = fopen(path, "rb");
-    if (!f) return false;
-    fseek(f, 0, SEEK_END);
-    const long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (size <= 0) { fclose(f); return false; }
-    std::vector<uint8_t> buf((size_t)size);
-    const bool read = fread(buf.data(), 1, (size_t)size, f) == (size_t)size;
-    fclose(f);
+    std::vector<uint8_t> buf;
     // A state from another core or a truncated file: refuse rather than hand it over.
     const size_t expected = h->api.serialize_size();
-    if (!read || expected == 0 || (size_t)size > expected) return false;
+    if (!retroplay::readFile(path, buf) || expected == 0 || buf.size() > expected) return false;
     return h->api.unserialize(buf.data(), buf.size());
 }
