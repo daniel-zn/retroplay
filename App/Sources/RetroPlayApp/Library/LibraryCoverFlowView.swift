@@ -508,8 +508,15 @@ private struct CoverFlowRow: View, Equatable {
             let size = metrics.coverSize(aspect: Double(CoverArt.aspect(cover, game: game)))
             CoverFlowCover(game: game, cover: cover, missing: missing)
                 .frame(width: size.width, height: size.height)
-                .accessibilityElement()
-                .accessibilityIdentifier("library.coverPreview")
+                .accessibilityHidden(true)
+                // One element exactly the cover's frame: the art's blurred fill reaches past
+                // the cover (clipped when drawn) and would widen an element made of the art.
+                .overlay {
+                    Rectangle().fill(.clear)
+                        .accessibilityElement()
+                        .accessibilityLabel(game.displayName)
+                        .accessibilityIdentifier("library.coverPreview")
+                }
         }
     }
 }

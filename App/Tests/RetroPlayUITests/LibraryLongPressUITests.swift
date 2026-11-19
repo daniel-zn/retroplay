@@ -36,10 +36,13 @@ final class LibraryLongPressUITests: XCTestCase {
             waitUntilStill(preview)
             attachScreen("longpress-coverflow-\(system.name)")
             let frame = preview.frame
-            // Every cover is as wide as its slot and as tall as its shape makes it.
+            print("[long-press] \(system.name): slot \(slot), preview \(frame)")
+            // Every cover is as wide as its slot and as tall as its shape makes it. The system
+            // may shrink the lifted preview a little to fit it above the menu (264 of 276 pt
+            // on an iPhone 17 Pro), so the width gets 5% (the old 260 pt square was 16 pt off).
             XCTAssertEqual(frame.width / frame.height, system.aspect, accuracy: 0.03,
                            "\(system.name): the preview is \(frame.size), not the cover's shape")
-            XCTAssertEqual(frame.width, slot.width, accuracy: 2,
+            XCTAssertEqual(frame.width, slot.width, accuracy: slot.width * 0.05,
                            "\(system.name): the preview is \(frame.width) wide, the cover \(slot.width)")
             dismissMenu(app)
         }
