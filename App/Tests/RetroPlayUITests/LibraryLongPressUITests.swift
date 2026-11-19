@@ -88,8 +88,7 @@ final class LibraryLongPressUITests: XCTestCase {
         }
     }
 
-    /// Moves the row until a cover of `system` is in the middle (a tap on a side cover brings it
-    /// there; one on the middle cover plays it); that cover's button. The covers are listed in
+    /// Moves the row until a cover of `system` is in the middle; that cover's button. The covers are listed in
     /// row order and `coverFlow.position` is the middle one's index.
     @MainActor
     private func bringToMiddle(_ app: XCUIApplication, _ system: String) -> XCUIElement? {
@@ -101,7 +100,12 @@ final class LibraryLongPressUITests: XCTestCase {
             guard middle < covers.count else { return nil }
             if covers[middle].label.hasSuffix(", \(system)") { return covers[middle] }
             guard let target = covers.first(where: { $0.label.hasSuffix(", \(system)") }) else { return nil }
-            target.tap()
+            // Dragged the distance between their slots and held (no fling): a tap at a side
+            // cover's frame can land on the middle one, which stacks over its slot.
+            let from = covers[middle].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            from.press(forDuration: 0.1,
+                       thenDragTo: from.withOffset(CGVector(dx: covers[middle].frame.midX - target.frame.midX, dy: 0)),
+                       withVelocity: .slow, thenHoldForDuration: 0.3)
             Thread.sleep(forTimeInterval: 1.5)
         }
         return nil
