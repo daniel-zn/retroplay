@@ -315,13 +315,7 @@ public struct RetroPlayRootView: View {
             // No Done button: swipe down closes it, like the other sheets.
             .presentationDragIndicator(.visible)
         }
-        .alert(
-            alert?.title ?? "",
-            isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } }),
-            presenting: alert,
-            actions: alertButtons,
-            message: { Text($0.message) }
-        )
+        .modifier(LibraryAlertPresenter(alert: $alert, buttons: alertButtons))
     }
 
     private var libraryNavigation: some View {
@@ -866,6 +860,22 @@ public struct RetroPlayRootView: View {
         case .notice(let message): alert = .importNotice(message)
         case .error(let message): alert = .importFailed(message)
         }
+    }
+}
+
+/// The library's alert, in its own modifier so the library's long body type-checks in time.
+private struct LibraryAlertPresenter<Buttons: View>: ViewModifier {
+    @Binding var alert: LibraryAlert?
+    let buttons: (LibraryAlert) -> Buttons
+
+    func body(content: Content) -> some View {
+        content.alert(
+            alert?.title ?? "",
+            isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } }),
+            presenting: alert,
+            actions: buttons,
+            message: { (alert: LibraryAlert) in Text(alert.message) }
+        )
     }
 }
 
