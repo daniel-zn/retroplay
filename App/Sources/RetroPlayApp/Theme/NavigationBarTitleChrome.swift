@@ -2,8 +2,10 @@
 import SwiftUI
 import UIKit
 
-/// Navigation bar chrome: clear at the top (the large / custom title shows on the canvas) and
-/// iOS's own blurred background once content scrolls under it. Also set
+/// Navigation bar chrome: on iOS 26 no bar of its own, at the top or scrolled: no background,
+/// no hairline; content passes under the glass buttons and iOS's scroll edge effect keeps the
+/// title readable over it. Before iOS 26 (no scroll edge effect), iOS's own blurred background
+/// once content scrolls under it. Also set
 /// `UINavigationBar.appearance()` so it sticks even when the local VC has no nav yet.
 @available(iOS 18.0, *)
 @MainActor
@@ -16,9 +18,14 @@ enum RetroPlayNavigationBarChrome {
         let foreground: UIColor =
             colorScheme == .dark ? .white : .label
 
-        // Scrolled: iOS's own bar background, so content blurs under it as everywhere else.
+        // Scrolled: on iOS 26 the scroll edge effect under a clear bar, as Apple's own apps; the
+        // default background drew a grey band with a hairline under the collapsed title.
         let standard = UINavigationBarAppearance()
-        standard.configureWithDefaultBackground()
+        if #available(iOS 26.0, *) {
+            standard.configureWithTransparentBackground()
+        } else {
+            standard.configureWithDefaultBackground()
+        }
         standard.shadowColor = .clear
         standard.titleTextAttributes = [
             .foregroundColor: foreground,
@@ -165,7 +172,8 @@ struct NavigationBarTitleChrome: UIViewControllerRepresentable {
 
 @available(iOS 18.0, *)
 extension View {
-    /// Clear scroll-edge + opaque collapsed bar; white large title on black canvas.
+    /// The bar's look (`RetroPlayNavigationBarChrome`): no bar of its own on iOS 26; the title
+    /// in the app's italic.
     func retroPlayNavigationTitleChrome(for colorScheme: ColorScheme) -> some View {
         background(NavigationBarTitleChrome(colorScheme: colorScheme))
             .onAppear { RetroPlayNavigationBarChrome.apply(colorScheme: colorScheme) }

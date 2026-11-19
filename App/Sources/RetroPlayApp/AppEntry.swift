@@ -524,6 +524,7 @@ public struct RetroPlayRootView: View {
                 PlayView(game: game, romURL: store.absoluteURL(for: game))
             }
         }
+        .retroPlayScrollEdge()
         #if DEBUG
         .libraryWorkProbe()
         #endif

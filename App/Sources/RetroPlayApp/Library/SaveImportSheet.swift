@@ -54,6 +54,7 @@ struct SaveImportSheet: View {
                 if !batch.items.isEmpty { actions }
             }
         }
+        .retroPlayScrollEdge()
         .environment(\.font, RetroPlayFont.callout)
         .retroPlayTypography()
         .tint(RetroPlayTheme.accent)
