@@ -161,7 +161,7 @@ public enum BoxArt {
     }
 
     private static let romExtensions = Set(SystemID.allCases.flatMap(\.fileExtensions))
-    nonisolated(unsafe) private static let tagPattern = try! NSRegularExpression(pattern: #"[\(\[]([^\)\]]*)[\)\]]"#)
+    private static let tagPattern = try! NSRegularExpression(pattern: #"[\(\[]([^\)\]]*)[\)\]]"#)
 
     static func tags(of name: String) -> [String] {
         let pattern = tagPattern

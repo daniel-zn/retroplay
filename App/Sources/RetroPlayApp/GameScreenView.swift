@@ -148,11 +148,11 @@ protocol DisplayLinkTarget: AnyObject {
     func refresh()
 }
 
-/// Weak proxy: CADisplayLink retains its target.
+/// Weak proxy: CADisplayLink retains its target. The link runs on the main run loop.
+@MainActor
 private final class DisplayLinkProxy: NSObject {
     weak var target: (any DisplayLinkTarget)?
 
-    @MainActor
     static func link(for target: any DisplayLinkTarget, fps: ClosedRange<Float>) -> CADisplayLink {
         let proxy = DisplayLinkProxy()
         proxy.target = target
@@ -164,10 +164,7 @@ private final class DisplayLinkProxy: NSObject {
     }
 
     @objc func tick() {
-        let target = self.target
-        MainActor.assumeIsolated {
-            target?.refresh()
-        }
+        target?.refresh()
     }
 }
 
