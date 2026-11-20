@@ -93,7 +93,7 @@ Built by `App/Vendor/build-libretro-cores-ios.sh` from unmodified checkouts (com
 **Compatibility.** Every new license combines with GPL-3.0: the GPL-2.0-or-later and LGPL cores upgrade to v3, bsnes is GPL-3.0 itself, and GPLv3 s.13 explicitly allows linking with AGPLv3 code (clownmdemu). The AGPL's extra s.13 duty (offer source to users who interact over a network) does not apply to an offline emulator, and the app already publishes its complete source. Nothing is non-commercial. See red flags 9-11.
 
 ### App resources
-- **You're Gone Thin** (CC0-1.0), upright and italic: You're Gone by Ray Larabie made slightly lighter (the fonts repo's `youre-gone-thin`). The SHA-256s match `YoureGoneThin-SOURCE.md`. CC0 needs no notice; the license, with the original's license record and Ray Larabie's credit, is bundled as `YoureGoneThin-LICENSE.txt`.
+- **You're Gone Thin** (CC0-1.0), upright and italic: You're Gone by Ray Larabie made slightly lighter (built by `Design/Fonts/youre-gone-thin/`). The SHA-256s match `YoureGoneThin-SOURCE.md`. CC0 needs no notice; the license, with the original's license record and Ray Larabie's credit, is bundled as `YoureGoneThin-LICENSE.txt`.
 - **PPSSPP assets.** All are byte-identical to ppsspp@98e70c8ca3. Provenance is in `notes-ppsspp.md`.
 
 ## Red flags

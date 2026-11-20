@@ -7,15 +7,15 @@ upright (`YoureGoneThin-Regular.otf`, PostScript `YoureGoneThin-Regular`); title
 italic (`YoureGoneThin-Italic.otf`, PostScript `YoureGoneThin-Italic`), made the same way from
 the original italic.
 
-- Built by `youre-gone-thin/build.py` in the fonts repository (github.com/daniel-zn/fonts),
-  commit `e545e6b8631f2d2de5bab0a890e543f56ed4ac11`, which also holds the original files, the
-  validation and previews. The files here are copied from it unchanged.
+- Built by `Design/Fonts/youre-gone-thin/build.py` in this repository, which also holds the
+  original files, the validation and the rebuild instructions (`README.md` there). Its
+  `build.sh` writes these files in place, and the same sources always build the same bytes.
 - Sources: `Youre Gone.otf` (SHA-256 `1e1a01c9760372d50ba233822df234fe982552feb861aff585edcfb070f7066d`)
   and `Youre Gone It.otf` (SHA-256 `dbba476d8173dc8e975a53810d29d80884c6dd36e210bc2d293f39170dcf5060`)
   from `you-re-gone.zip` (SHA-256 `9acd7561cca69258b7d1bdd6ea908b5bf94abd7cfcfa51f1f85d52db73c3c092`),
   downloaded from 1001fonts.com.
-- Bundled: `YoureGoneThin-Regular.otf` (SHA-256 `c3c51c01b492a8216a72ba1e1901e746fd894e72f6e294427228e25a6c427663`),
-  `YoureGoneThin-Italic.otf` (SHA-256 `d9b085ba43cca0be3c898ce8d1b9e27e2d49e8d67f66ca7115133b8ad3701b31`).
+- Bundled: `YoureGoneThin-Regular.otf` (SHA-256 `6ef6bce5a2823ef9888927809d6de0b3dbb2752a50f4136e583dfce5e16e4049`),
+  `YoureGoneThin-Italic.otf` (SHA-256 `12afc43368d58264b4c8b282acf172b92f404a3e78c29b1a7d141b0a054e0d49`).
 - License: CC0 1.0 (public domain dedication, https://creativecommons.org/publicdomain/zero/1.0/),
   as the original, and the derivative is dedicated the same way. The original's license record
   and Ray Larabie's credit are in `YoureGoneThin-LICENSE.txt`.

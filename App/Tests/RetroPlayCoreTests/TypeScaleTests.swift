@@ -4,7 +4,7 @@ import XCTest
 @testable import RetroPlayCore
 
 /// Every text in the app is set in You're Gone Thin (You're Gone by Ray Larabie, slightly
-/// lighter; built in the fonts repo): the one bundled face is the one Info.plist
+/// lighter; built by Design/Fonts/youre-gone-thin): the one bundled face is the one Info.plist
 /// lists, it registers, and every style resolves to it (not a fallback, and not a synthesised
 /// bold or italic: the app uses its one upright weight). It's a capitals face (its lowercase
 /// keys draw the capitals), so text needs no case change, and it has the characters the app's
