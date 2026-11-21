@@ -13,16 +13,27 @@ final class LibraryImportUITests: XCTestCase {
     }
 
     @MainActor
-    private func launch(importSeconds: Double) -> XCUIApplication {
+    private func launch(importSeconds: Double? = nil, _ more: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-retroplay.libraryLayout", "grid",
-            "-RetroPlayTestImportSeconds", "\(importSeconds)",
             // The bar's own title, so its subtitle is in the accessibility tree.
             "-RetroPlayTitleGlitchFrame", "-1",
-        ]
+        ] + (importSeconds.map { ["-RetroPlayTestImportSeconds", "\($0)"] } ?? []) + more
         app.launchRetroPlay()
         return app
+    }
+
+    /// The bar's title and game count, measured (their fonts set their widths).
+    @MainActor
+    private func titleFrames(_ app: XCUIApplication, _ context: String) -> (title: CGRect, subtitle: CGRect, label: String) {
+        let title = app.navigationBars.staticTexts["RetroPlay"].firstMatch
+        let count = subtitle(app)
+        XCTAssertTrue(title.waitForExistence(timeout: 30), "\(context): no title")
+        XCTAssertTrue(count.waitForExistence(timeout: 10), "\(context): no game count under the title")
+        waitUntilStill(count)
+        print("[import] \(context): title \(title.frame), subtitle “\(count.label)” \(count.frame)")
+        return (title.frame, count.frame, count.label)
     }
 
     private func importButton(_ app: XCUIApplication) -> XCUIElement {
@@ -33,20 +44,9 @@ final class LibraryImportUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Import Test")).firstMatch
     }
 
-    /// The game count under the title ("8 games").
+    /// The game count under the title ("8 games", "GBA · 2 of 9 games").
     private func subtitle(_ app: XCUIApplication) -> XCUIElement {
         app.navigationBars.staticTexts.matching(NSPredicate(format: "label ENDSWITH[c] %@", " games")).firstMatch
-    }
-
-    /// Width per character: the RetroPlay font's capitals run much wider than the system
-    /// font's lower case, so a subtitle that fell back to the system font shows here.
-    @MainActor
-    private func subtitleWidthPerCharacter(_ app: XCUIApplication, _ context: String) -> CGFloat {
-        let text = subtitle(app)
-        XCTAssertTrue(text.waitForExistence(timeout: 10), "\(context): no game count under the title")
-        waitUntilStill(text)
-        print("[import] \(context): subtitle “\(text.label)” \(text.frame)")
-        return text.frame.width / CGFloat(max(text.label.count, 1))
     }
 
     /// The import's button joins the top bar's group on its leading side while the copy runs,
@@ -64,7 +64,6 @@ final class LibraryImportUITests: XCTestCase {
         XCTAssertTrue(plus.exists)
         XCTAssertLessThan(button.frame.maxX, plus.frame.minX + 1, "the import button isn't before +: \(button.frame) vs \(plus.frame)")
         XCTAssertEqual(button.frame.midY, plus.frame.midY, accuracy: 2, "the import button isn't in the row")
-        let during = subtitleWidthPerCharacter(app, "during")
 
         button.tap()
         let row = app.descendants(matching: .any)["library.imports.item"].firstMatch
@@ -77,9 +76,47 @@ final class LibraryImportUITests: XCTestCase {
 
         XCTAssertTrue(button.waitForNonExistence(timeout: 40), "the import button stays after the import")
         XCTAssertTrue(importedTile(app).waitForExistence(timeout: 10), "the imported game isn't in the library")
-        let after = subtitleWidthPerCharacter(app, "after")
-        XCTAssertEqual(during, after, accuracy: after * 0.05, "the subtitle changed its font while importing")
+        Thread.sleep(forTimeInterval: 1)
+        let after = titleFrames(app, "after the import")
         attachScreen("import-done")
+        app.terminate()
+
+        // The same library, launched fresh: the title and count in the RetroPlay font. After
+        // the import (the count changed, the button came and went) they must still match.
+        let fresh = launch()
+        let launched = titleFrames(fresh, "fresh launch")
+        XCTAssertEqual(after.title.width, launched.title.width, accuracy: 1, "the title lost its font after the import")
+        // The import switched the filter to its system, so the count reads differently; per
+        // character, the RetroPlay font's capitals run far wider than the system font's lower case.
+        func perCharacter(_ frames: (title: CGRect, subtitle: CGRect, label: String)) -> CGFloat {
+            frames.subtitle.width / CGFloat(max(frames.label.count, 1))
+        }
+        XCTAssertEqual(perCharacter(after), perCharacter(launched), accuracy: perCharacter(launched) * 0.12,
+                       "the game count lost its font after the import")
+        fresh.terminate()
+    }
+
+    /// A copy whose source stops answering (a pipe nothing writes, as an SMB share gone quiet
+    /// while the app was away) never freezes the library, and its cancel ends it.
+    @MainActor
+    func testStalledImportCancels() {
+        let app = launch(["-RetroPlayTestImportStall", "YES"])
+        let button = importButton(app)
+        XCTAssertTrue(button.waitForExistence(timeout: 30), "no import button while a game imports")
+        XCUIDevice.shared.press(.home)
+        Thread.sleep(forTimeInterval: 2)
+        app.activate()
+        XCTAssertTrue(waitFor("isHittable == true", button, timeout: 10), "the library doesn't respond after coming back")
+        button.tap()
+        let cancel = app.buttons["library.imports.cancel"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "no Cancel in the import status (frozen?)")
+        attachScreen("import-status-stalled")
+        cancel.tap()
+        XCTAssertTrue(button.waitForNonExistence(timeout: 15), "the stalled import didn't stop")
+        XCTAssertFalse(app.alerts.firstMatch.exists, "a cancelled import shows an alert")
+        // Still responsive: Settings opens.
+        app.navigationBars.buttons["library.settings"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier ==[c] %@", "Settings")).firstMatch.waitForExistence(timeout: 10), "Settings doesn't open after the stalled import")
         app.terminate()
     }
 
