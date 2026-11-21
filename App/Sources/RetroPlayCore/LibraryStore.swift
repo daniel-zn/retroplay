@@ -469,7 +469,7 @@ public final class LibraryStore: ObservableObject {
                     let temporary = paths.gamesDirectory
                         .appendingPathComponent(".importing-\(UUID().uuidString)-\(job.destinationName)")
                     do {
-                        try fileManager.copyItem(at: source, to: temporary)
+                        try copyFile(source, to: temporary)
                         try fileManager.moveItem(at: temporary, to: destination)
                     } catch {
                         try? fileManager.removeItem(at: temporary)
@@ -525,7 +525,7 @@ public final class LibraryStore: ObservableObject {
                 let accessed = track.startAccessingSecurityScopedResource()
                 defer { if accessed { track.stopAccessingSecurityScopedResource() } }
                 try coordinatedRead(of: track) { readURL in
-                    try fileManager.copyItem(at: readURL, to: temporary.appendingPathComponent(track.lastPathComponent))
+                    try copyFile(readURL, to: temporary.appendingPathComponent(track.lastPathComponent))
                 }
             }
             try fileManager.moveItem(at: temporary, to: folder)
@@ -533,6 +533,26 @@ public final class LibraryStore: ObservableObject {
             try? fileManager.removeItem(at: temporary)
             throw error
         }
+    }
+
+    /// Tests: a pause after each chunk a game copy writes, so a copy lasts long enough to watch.
+    nonisolated(unsafe) public static var testChunkPause: TimeInterval = 0
+
+    /// Copies a picked file a megabyte at a time.
+    nonisolated static func copyFile(_ source: URL, to destination: URL) throws {
+        let input = try FileHandle(forReadingFrom: source)
+        defer { try? input.close() }
+        guard FileManager.default.createFile(atPath: destination.path, contents: nil) else {
+            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: destination.path])
+        }
+        let output = try FileHandle(forWritingTo: destination)
+        defer { try? output.close() }
+        while try autoreleasepool(invoking: { () throws -> Bool in
+            guard let chunk = try input.read(upToCount: 1 << 20), !chunk.isEmpty else { return false }
+            try output.write(contentsOf: chunk)
+            if testChunkPause > 0 { Thread.sleep(forTimeInterval: testChunkPause) }
+            return true
+        }) {}
     }
 
     /// Runs `body` inside an `NSFileCoordinator` read of `url`, passing the URL to read from.

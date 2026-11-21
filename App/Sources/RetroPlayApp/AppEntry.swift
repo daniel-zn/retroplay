@@ -185,6 +185,18 @@ public struct RetroPlayRootView: View {
                 try? Data(count: 8_192).write(to: save)
                 handleSaveImport(.success([folder]))
             }
+            // `-RetroPlayTestImportSeconds N`: import a 16 MB "Import Test.gba" (picked from
+            // tmp, as from Files) that takes about N seconds to copy.
+            if let seconds = Double(UserDefaults.standard.string(forKey: "RetroPlayTestImportSeconds") ?? ""), seconds > 0 {
+                let file = FileManager.default.temporaryDirectory.appendingPathComponent("Import Test.gba")
+                let chunks = 16
+                try? Data(count: chunks << 20).write(to: file)
+                LibraryStore.testChunkPause = seconds / Double(chunks)
+                for game in store.games where game.relativePath.hasPrefix("Import Test") {
+                    _ = try? store.remove(game)
+                }
+                handleImport(.success([file]))
+            }
             // `-RetroPlaySmokeSaveScan YES`: a save scan that runs until it's stopped, to see
             // the library while saves are found.
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSaveScan"), let id = saveImports.beginScan() {
