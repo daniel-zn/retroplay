@@ -132,4 +132,69 @@ final class LibraryImportBatchTests: XCTestCase {
         XCTAssertEqual(Set(store.games.map(\.relativePath)), ["Zelda.gba", "Dropped.nds"])
         XCTAssertEqual(try gamesFolderContents(store), ["Dropped.nds", "Zelda.gba"])
     }
+    // MARK: - Stopped copies (3)
+
+    /// A picked file big enough to copy in several megabyte chunks, slowed down so it can be
+    /// stopped mid-copy.
+    private func slowImport(_ store: LibraryStore) throws -> Task<LibraryImportSummary, Error> {
+        let big = root.appendingPathComponent("inbox-big", isDirectory: true).appendingPathComponent("Big.gba")
+        try fm.createDirectory(at: big.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(count: 6 << 20).write(to: big)
+        LibraryStore.testChunkPause = 0.1
+        addTeardownBlock { LibraryStore.testChunkPause = 0 }
+        return Task { try await store.importInBackground(from: [big]) }
+    }
+
+    /// Waits until the copy has written a chunk.
+    private func waitForCopy(_ store: LibraryStore) async throws {
+        for _ in 0..<100 where store.imports.items.first?.copied ?? 0 == 0 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let item = try XCTUnwrap(store.imports.items.first)
+        XCTAssertEqual(item.state, .copying)
+        XCTAssertEqual(item.total, 6 << 20)
+        XCTAssertGreaterThan(item.copied, 0)
+    }
+
+    func testCancelledCopyLeavesNothingBehind() async throws {
+        let store = LibraryStore(fileManager: fm, documentsDirectoryURL: root)
+        let task = try slowImport(store)
+        try await waitForCopy(store)
+        XCTAssertTrue(store.imports.isRunning)
+
+        store.imports.cancel(try XCTUnwrap(store.imports.items.first).id)
+        let summary = try await task.value
+
+        XCTAssertEqual(summary.cancelled, ["Big.gba"])
+        XCTAssertTrue(summary.added.isEmpty)
+        XCTAssertTrue(summary.failed.isEmpty)
+        XCTAssertTrue(store.games.isEmpty)
+        XCTAssertEqual(store.importsInProgress, 0)
+        XCTAssertEqual(store.imports.items.map(\.state), [.cancelled])
+        XCTAssertEqual(try gamesFolderContents(store), [], "a partial copy is left in Games/")
+    }
+
+    /// iOS ending the background time stops every copy; each is a failure that says why.
+    func testStoppedCopyFailsWithTheReason() async throws {
+        let store = LibraryStore(fileManager: fm, documentsDirectoryURL: root)
+        let task = try slowImport(store)
+        try await waitForCopy(store)
+
+        store.imports.stopAll(reason: "Stopped in the background.")
+        let summary = try await task.value
+
+        XCTAssertEqual(summary.failed, [LibraryImportFailure(fileName: "Big.gba", reason: "Stopped in the background.")])
+        XCTAssertTrue(summary.cancelled.isEmpty)
+        XCTAssertTrue(store.games.isEmpty)
+        XCTAssertFalse(store.imports.isRunning)
+        XCTAssertEqual(store.imports.items.map(\.state), [.failed("Stopped in the background.")])
+        XCTAssertEqual(try gamesFolderContents(store), [], "a partial copy is left in Games/")
+
+        // The next import starts a new round: the stopped one is no longer listed.
+        LibraryStore.testChunkPause = 0
+        let again = try await store.importInBackground(from: [inboxFile("Small.gba")])
+        XCTAssertEqual(again.added.map(\.relativePath), ["Small.gba"])
+        XCTAssertEqual(store.imports.items.map(\.name), ["Small.gba"])
+        XCTAssertEqual(store.imports.items.map(\.state), [.done])
+    }
 }

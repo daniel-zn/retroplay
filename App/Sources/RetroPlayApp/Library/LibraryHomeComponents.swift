@@ -145,7 +145,7 @@ struct LibraryTopBarIcon: View {
     }
 }
 
-/// The bottom bar's status while something imports: a spinner and what it's doing.
+/// The bottom bar's status while saves are found: a spinner and what it's doing.
 struct LibraryImportStatus: View {
     let text: String
 
@@ -161,6 +161,96 @@ struct LibraryImportStatus: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(text)
+    }
+}
+
+/// The top bar's button while games copy in: a spinning progress symbol; tapped, a popover
+/// lists each copy with its progress, how it ended, and a cancel.
+struct LibraryImportsButton: View {
+    @ObservedObject var imports: GameImports
+    @State private var showsStatus = false
+
+    var body: some View {
+        Button { showsStatus = true } label: {
+            LibraryTopBarIcon(symbol: "progress.indicator")
+                .symbolEffect(.variableColor.iterative, options: .repeating)
+        }
+        .accessibilityLabel("Imports")
+        .accessibilityValue(summary)
+        .accessibilityIdentifier("library.imports")
+        .popover(isPresented: $showsStatus) {
+            LibraryImportList(imports: imports)
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private var summary: String {
+        let running = imports.items.filter(\.isRunning).count
+        return "Importing \(gameCountText(running))"
+    }
+}
+
+/// Each game of this round of imports: its name, then its copy's progress or how it ended.
+private struct LibraryImportList: View {
+    @ObservedObject var imports: GameImports
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(imports.items) { item in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.name)
+                                .lineLimit(2)
+                            Text(detail(item))
+                                .font(RetroPlayFont.footnote)
+                                .monospacedDigit()
+                                .foregroundStyle(isFailed(item) ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("library.imports.item")
+                        Spacer(minLength: 0)
+                        if item.isRunning {
+                            Button("Cancel", systemImage: "xmark.circle.fill", role: .cancel) {
+                                imports.cancel(item.id)
+                            }
+                            .labelStyle(.iconOnly)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Cancel \(item.name)")
+                            .accessibilityIdentifier("library.imports.cancel")
+                        }
+                    }
+                    if item.isRunning {
+                        ProgressView(value: item.fraction ?? 0)
+                            .accessibilityIdentifier("library.imports.progress")
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 280, maxWidth: 360)
+    }
+
+    private func isFailed(_ item: GameImports.Item) -> Bool {
+        if case .failed = item.state { return true }
+        return false
+    }
+
+    private func detail(_ item: GameImports.Item) -> String {
+        switch item.state {
+        case .waiting:
+            return "Waiting"
+        case .copying:
+            let copied = item.copied.formatted(.byteCount(style: .file))
+            guard let total = item.total, let fraction = item.fraction else { return copied }
+            return "\(copied) of \(total.formatted(.byteCount(style: .file))) · \(fraction.formatted(.percent.precision(.fractionLength(0))))"
+        case .done:
+            return "Imported"
+        case .failed(let reason):
+            return reason
+        case .cancelled:
+            return "Cancelled"
+        }
     }
 }
 

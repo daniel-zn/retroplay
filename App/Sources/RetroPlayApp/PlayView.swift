@@ -1350,24 +1350,6 @@ public struct PlayView: View {
     #endif
 }
 
-/// `UIApplication.beginBackgroundTask`, ended once (by the owner or on expiry).
-@MainActor
-private final class BackgroundTask {
-    private var id = UIBackgroundTaskIdentifier.invalid
-
-    init(name: String) {
-        id = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
-            MainActor.assumeIsolated { self?.end() }
-        }
-    }
-
-    func end() {
-        guard id != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(id)
-        id = .invalid
-    }
-}
-
 /// The portrait pad's backing: its bottom corners follow the screen's rounded corners, and
 /// the top corners match them.
 private struct PadBacking: View {

@@ -24,6 +24,8 @@ public struct LibraryImportSummary: Sendable, Equatable {
     public var unsupported: [String] = []
     /// Picked files that could not be read or copied.
     public var failed: [LibraryImportFailure] = []
+    /// Picked files whose copy the player cancelled (nothing of them is left).
+    public var cancelled: [String] = []
     /// Pictures picked with (or after) their games and set as those games' covers.
     public var covers: [String] = []
 
@@ -41,6 +43,8 @@ public final class LibraryStore: ObservableObject {
     @Published public private(set) var libraryLoadFailureMessage: String?
     /// Files currently being copied in by `importInBackground`.
     @Published public private(set) var importsInProgress = 0
+    /// What those copies are doing, one by one.
+    public let imports = GameImports()
     /// Rows whose ROM is no longer in Documents/Games (removed via Files). Saves are kept.
     @Published public private(set) var missingGameIDs: Set<UUID> = []
     /// Copy of an unreadable `library.json`, taken before anything could overwrite it.
@@ -233,7 +237,7 @@ public final class LibraryStore: ObservableObject {
             }
             let accessed = picture.startAccessingSecurityScopedResource()
             defer { if accessed { picture.stopAccessingSecurityScopedResource() } }
-            let data = try? Self.coordinatedRead(of: picture) { try Data(contentsOf: $0) }
+            let data = try? CoordinatedRead.run(picture) { try Data(contentsOf: $0) }
             if let data, (try? covers.installCustom(data, forGameID: game.id)) == true {
                 summary.covers.append(picture.lastPathComponent)
             } else {
@@ -248,6 +252,7 @@ public final class LibraryStore: ObservableObject {
     private func importGamesInBackground(from urls: [URL]) async throws -> LibraryImportSummary {
         try ensureDirectories()
         let plan = planImport(urls)
+        let control = imports.begin(plan.jobs)
         importsInProgress += plan.jobs.count
         defer {
             importsInProgress -= plan.jobs.count
@@ -262,9 +267,18 @@ public final class LibraryStore: ObservableObject {
             let paths = self.savePaths
             let importer = self.importer
             let staged = await Task.detached(priority: .userInitiated) {
-                Self.stage(jobs, existing: existing, paths: paths, importer: importer)
+                Self.stage(jobs, existing: existing, paths: paths, importer: importer, control: control)
             }.value
-            return try self.commit(staged, plan: plan)
+            do {
+                let summary = try self.commit(staged, plan: plan, stopped: self.imports.stopReasons)
+                for (job, item) in zip(jobs, staged) {
+                    self.imports.finish(job.id, item.importState(stopped: self.imports.stopReasons[job.id]))
+                }
+                return summary
+            } catch {
+                for job in jobs { self.imports.finish(job.id, .failed(error.localizedDescription)) }
+                throw error
+            }
         }
         lastImportBatch = Task { _ = await batch.result }
         let summary = try await batch.value
@@ -276,6 +290,7 @@ public final class LibraryStore: ObservableObject {
     }
 
     struct ImportJob: Sendable {
+        let id = UUID()
         let source: URL
         let originalName: String
         /// Relative to Games/. A PS1 `.cue` goes in its own folder ("Folder/Game.cue") with
@@ -305,6 +320,26 @@ public final class LibraryStore: ObservableObject {
         case added(LibraryGame, URL)
         case duplicate(String)
         case failed(LibraryImportFailure)
+        case cancelled(UUID, String)
+
+        func importState(stopped reason: String?) -> GameImports.State {
+            switch self {
+            case .added, .duplicate: return .done
+            case .failed(let failure): return .failed(failure.reason)
+            case .cancelled: return reason.map { .failed($0) } ?? .cancelled
+            }
+        }
+    }
+
+    /// A background import's cancels and progress reports, by job.
+    struct ImportControl: Sendable {
+        var cancellations: [UUID: ImportCancellation] = [:]
+        /// Bytes copied so far, of the total when known.
+        var progress: @Sendable (UUID, Int64, Int64?) -> Void = { _, _, _ in }
+
+        func cancellation(for job: ImportJob) -> ImportCancellation {
+            cancellations[job.id] ?? ImportCancellation()
+        }
     }
 
     /// Picks each destination name on the main actor and reserves it.
@@ -420,14 +455,15 @@ public final class LibraryStore: ObservableObject {
         _ jobs: [ImportJob],
         existing: [ExistingFile],
         paths: SavePaths,
-        importer: ROMImporter
+        importer: ROMImporter,
+        control: ImportControl = ImportControl()
     ) -> [StagedFile] {
         let fileManager = FileManager.default
         let covers = CoverArtStore(fileManager: fileManager, paths: paths)
         var known = existing
         var staged: [StagedFile] = []
         for job in jobs {
-            let result = stageFile(job, known: known, paths: paths, importer: importer, fileManager: fileManager)
+            let result = stageFile(job, known: known, paths: paths, importer: importer, fileManager: fileManager, control: control)
             if case .added(let entry, let destination) = result {
                 known.append(ExistingFile(url: destination, name: job.destinationName))
                 _ = try? covers.installFromGameFile(
@@ -446,7 +482,8 @@ public final class LibraryStore: ObservableObject {
         known: [ExistingFile],
         paths: SavePaths,
         importer: ROMImporter,
-        fileManager: FileManager
+        fileManager: FileManager,
+        control: ImportControl
     ) -> StagedFile {
         let accessed = job.source.startAccessingSecurityScopedResource()
         defer {
@@ -454,22 +491,28 @@ public final class LibraryStore: ObservableObject {
                 job.source.stopAccessingSecurityScopedResource()
             }
         }
+        let cancellation = control.cancellation(for: job)
         do {
-            // A coordinated read makes iCloud Drive download a placeholder before it is read.
-            return try coordinatedRead(of: job.source) { source -> StagedFile in
+            // A coordinated read makes iCloud Drive (or an SMB share) fetch the file before it
+            // is read; a cancel ends the read, the copy inside it, and the coordination.
+            return try CoordinatedRead.run(job.source, cancellation) { source -> StagedFile in
                 if Self.isDuplicate(source, originalName: job.originalName, of: known) {
                     return .duplicate(job.originalName)
                 }
 
                 let destination = paths.gamesDirectory.appendingPathComponent(job.destinationName)
                 if job.destinationName.contains("/") {
-                    try copyDiscFolder(job, sheet: source, to: destination, fileManager: fileManager)
+                    try copyDiscFolder(job, sheet: source, to: destination, fileManager: fileManager,
+                                       cancellation: cancellation, control: control)
                 } else {
                     // Copy under a hidden name first so a Games/ scan never sees a partial file.
                     let temporary = paths.gamesDirectory
                         .appendingPathComponent(".importing-\(UUID().uuidString)-\(job.destinationName)")
+                    let total = fileSize(source)
                     do {
-                        try copyFile(source, to: temporary)
+                        try copyFile(source, to: temporary, cancellation: cancellation) {
+                            control.progress(job.id, $0, total)
+                        }
                         try fileManager.moveItem(at: temporary, to: destination)
                     } catch {
                         try? fileManager.removeItem(at: temporary)
@@ -493,6 +536,8 @@ public final class LibraryStore: ObservableObject {
                     throw error
                 }
             }
+        } catch is CancellationError {
+            return .cancelled(job.id, job.originalName)
         } catch {
             return .failed(LibraryImportFailure(fileName: job.originalName, reason: error.localizedDescription))
         }
@@ -504,7 +549,9 @@ public final class LibraryStore: ObservableObject {
         _ job: ImportJob,
         sheet: URL,
         to destination: URL,
-        fileManager: FileManager
+        fileManager: FileManager,
+        cancellation: ImportCancellation,
+        control: ImportControl
     ) throws {
         let pickedNames = Set(job.companions.map { $0.lastPathComponent.lowercased() })
         let missing = job.expectedCompanions.filter { !pickedNames.contains($0.lowercased()) }
@@ -521,12 +568,22 @@ public final class LibraryStore: ObservableObject {
         do {
             try fileManager.createDirectory(at: temporary, withIntermediateDirectories: true)
             try fileManager.copyItem(at: sheet, to: temporary.appendingPathComponent(job.originalName))
-            for track in job.companions {
+            let sizes = job.companions.map { track -> Int64? in
                 let accessed = track.startAccessingSecurityScopedResource()
                 defer { if accessed { track.stopAccessingSecurityScopedResource() } }
-                try coordinatedRead(of: track) { readURL in
-                    try copyFile(readURL, to: temporary.appendingPathComponent(track.lastPathComponent))
+                return fileSize(track)
+            }
+            let total = sizes.contains(nil) ? nil : sizes.reduce(0) { $0 + ($1 ?? 0) }
+            var before: Int64 = 0
+            for (track, size) in zip(job.companions, sizes) {
+                let accessed = track.startAccessingSecurityScopedResource()
+                defer { if accessed { track.stopAccessingSecurityScopedResource() } }
+                let base = before
+                try CoordinatedRead.run(track, cancellation) { readURL in
+                    try copyFile(readURL, to: temporary.appendingPathComponent(track.lastPathComponent),
+                                 cancellation: cancellation) { control.progress(job.id, base + $0, total) }
                 }
+                before += size ?? 0
             }
             try fileManager.moveItem(at: temporary, to: folder)
         } catch {
@@ -538,8 +595,14 @@ public final class LibraryStore: ObservableObject {
     /// Tests: a pause after each chunk a game copy writes, so a copy lasts long enough to watch.
     nonisolated(unsafe) public static var testChunkPause: TimeInterval = 0
 
-    /// Copies a picked file a megabyte at a time.
-    nonisolated static func copyFile(_ source: URL, to destination: URL) throws {
+    /// Copies a picked file a megabyte at a time, reporting the bytes copied so far and stopping
+    /// at the next megabyte once cancelled (the caller removes the partial copy).
+    nonisolated static func copyFile(
+        _ source: URL,
+        to destination: URL,
+        cancellation: ImportCancellation,
+        progress: (Int64) -> Void
+    ) throws {
         let input = try FileHandle(forReadingFrom: source)
         defer { try? input.close() }
         guard FileManager.default.createFile(atPath: destination.path, contents: nil) else {
@@ -547,29 +610,16 @@ public final class LibraryStore: ObservableObject {
         }
         let output = try FileHandle(forWritingTo: destination)
         defer { try? output.close() }
+        var copied: Int64 = 0
         while try autoreleasepool(invoking: { () throws -> Bool in
+            try cancellation.check()
             guard let chunk = try input.read(upToCount: 1 << 20), !chunk.isEmpty else { return false }
             try output.write(contentsOf: chunk)
+            copied += Int64(chunk.count)
+            progress(copied)
             if testChunkPause > 0 { Thread.sleep(forTimeInterval: testChunkPause) }
             return true
         }) {}
-    }
-
-    /// Runs `body` inside an `NSFileCoordinator` read of `url`, passing the URL to read from.
-    nonisolated static func coordinatedRead<T>(of url: URL, _ body: (URL) throws -> T) throws -> T {
-        var coordinationError: NSError?
-        var outcome: Result<T, Error>?
-        NSFileCoordinator(filePresenter: nil).coordinate(
-            readingItemAt: url,
-            options: [],
-            error: &coordinationError
-        ) { readURL in
-            outcome = Result { try body(readURL) }
-        }
-        if let outcome {
-            return try outcome.get()
-        }
-        throw coordinationError ?? CocoaError(.fileReadUnknown)
     }
 
     nonisolated private static func rollBack(_ staged: [StagedFile], paths: SavePaths) {
@@ -584,7 +634,8 @@ public final class LibraryStore: ObservableObject {
         }
     }
 
-    private func commit(_ staged: [StagedFile], plan: ImportPlan) throws -> LibraryImportSummary {
+    /// `stopped`: imports `GameImports.stopAll` ended, by job, with why; they count as failed.
+    private func commit(_ staged: [StagedFile], plan: ImportPlan, stopped: [UUID: String] = [:]) throws -> LibraryImportSummary {
         var summary = LibraryImportSummary()
         summary.unsupported = plan.unsupported
         summary.duplicates = plan.inGamesFolder
@@ -597,6 +648,12 @@ public final class LibraryStore: ObservableObject {
                 summary.duplicates.append(name)
             case .failed(let failure):
                 summary.failed.append(failure)
+            case .cancelled(let id, let name):
+                if let reason = stopped[id] {
+                    summary.failed.append(LibraryImportFailure(fileName: name, reason: reason))
+                } else {
+                    summary.cancelled.append(name)
+                }
             }
         }
         guard !summary.added.isEmpty else { return summary }

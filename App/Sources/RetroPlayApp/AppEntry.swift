@@ -26,6 +26,9 @@ public struct RetroPlayRootView: View {
     /// Stop sets it: the scan's listings and coordinated reads end at their next check.
     @State private var saveScanCancellation: ImportCancellation?
     @State private var showSettings = false
+    /// The import button in the top bar (follows `importsInProgress`, animated).
+    @State private var showsImports = false
+    @State private var importTime: ImportBackgroundTime?
     @State private var playGame: LibraryGame?
     @State private var navigator = ControllerNavigator()
     /// The library's search field (iOS's own, in the navigation bar's drawer): shown by a pull
@@ -159,6 +162,7 @@ public struct RetroPlayRootView: View {
         .onAppear { appearance.applyToWindows() }
         .onChange(of: appearanceRaw) { appearance.applyToWindows() }
         .onAppear {
+            if importTime == nil { importTime = ImportBackgroundTime(store) }
             refreshActivity()
             RetroPlayNavigationBarChrome.apply(colorScheme: colorScheme)
             if let message = store.libraryLoadFailureMessage { alert = .libraryUnavailable(message) }
@@ -235,6 +239,9 @@ public struct RetroPlayRootView: View {
         }
         .onChange(of: colorScheme) { _, scheme in
             RetroPlayNavigationBarChrome.apply(colorScheme: scheme)
+        }
+        .onChange(of: store.importsInProgress > 0) { _, running in
+            withAnimation { showsImports = running }
         }
         .onReceive(NotificationCenter.default.publisher(
             for: UIContentSizeCategory.didChangeNotification
@@ -417,10 +424,13 @@ public struct RetroPlayRootView: View {
             .onSubmit(of: .search) { recordSearch() }
             .toolbar {
                 // Import first (adds to the library), then the filter, and Settings at the edge,
-                // as across iOS: the system's own items, one glass group. It never changes while
-                // something imports (that shows in the bottom bar).
+                // as across iOS: the system's own items, one glass group. While games copy in,
+                // their status joins the group at its start.
                 let counts = tabCounts
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    if showsImports {
+                        LibraryImportsButton(imports: store.imports)
+                    }
                     LibraryImportMenu(
                         onImportGames: { openImporter(.games) },
                         onImportSaves: { openImporter(.saves) }
@@ -437,9 +447,8 @@ public struct RetroPlayRootView: View {
                         showSettings = true
                     }
                 }
-                // What's importing, as Mail shows its status: the bottom bar's status item, with
-                // Stop beside it while saves are found (a big folder can take a while, and games
-                // can't start meanwhile). Games copy without a stop.
+                // Saves being found, as Mail shows its status: the bottom bar's status item, with
+                // Stop beside it (a big folder can take a while, and games can't start meanwhile).
                 if saveImports.phase == .scanning {
                     ToolbarItem(placement: .status) {
                         LibraryImportStatus(text: "Finding saves")
@@ -451,11 +460,6 @@ public struct RetroPlayRootView: View {
                         }
                         .accessibilityLabel("Stop Finding Saves")
                         .accessibilityIdentifier("library.stopFindingSaves")
-                    }
-                } else if store.importsInProgress > 0 {
-                    ToolbarItem(placement: .status) {
-                        LibraryImportStatus(text: "Importing \(gameCountText(store.importsInProgress))")
-                            .accessibilityIdentifier("library.importingGames")
                     }
                 }
             }
@@ -656,7 +660,8 @@ public struct RetroPlayRootView: View {
         case .failure(let error):
             presentImportResult(.error(error.localizedDescription))
         case .success(let urls):
-            // Copies run off the main actor; the toolbar shows progress until rows appear.
+            // Copies run off the main actor; the top bar's import button shows their progress
+            // until rows appear.
             Task {
                 do {
                     let summary = try await store.importInBackground(from: urls)
@@ -671,7 +676,7 @@ public struct RetroPlayRootView: View {
                     let notices = Self.importNotices(for: summary)
                     if !notices.isEmpty {
                         presentImportResult(.notice(notices.joined(separator: "\n\n")))
-                    } else if summary.added.isEmpty, summary.covers.isEmpty, !urls.isEmpty {
+                    } else if summary.added.isEmpty, summary.covers.isEmpty, summary.cancelled.isEmpty, !urls.isEmpty {
                         presentImportResult(.error(
                             "No supported games in the selection. Unzip archives first; a picture becomes a cover when it's named like a game's file."
                         ))
