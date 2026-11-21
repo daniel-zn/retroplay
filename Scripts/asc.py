@@ -22,6 +22,8 @@ Steps (each is safe to run again):
   whatsnew FILE      sets the editable version's What's New (en-US) to the text in FILE
   build NUMBER       attaches TestFlight build NUMBER to the editable version
   submit             submits the editable version for App Review (prints what's missing if it can't)
+  crashes [DIR] [N]  the newest N (10) crashes testers sent from TestFlight, with their notes; their
+                     crash logs saved to DIR (unsymbolicated: symbolicate with the build's dSYMs)
 
 The key needs App Manager (or Admin). It's never printed.
 """
@@ -374,6 +376,28 @@ def submit():
     print(f"{v['attributes']['versionString']} submitted: {r['data']['attributes']['state']}")
 
 
+def crashes(folder=None, count=10):
+    a = app()
+    subs = must("crashes", call("GET", f"/v1/apps/{a['id']}/betaFeedbackCrashSubmissions"
+                                       f"?sort=-createdDate&limit={count}&include=build"))
+    builds = {b["id"]: b["attributes"].get("version") for b in subs.get("included", []) if b["type"] == "builds"}
+    for c in subs["data"]:
+        at = c["attributes"]
+        build = builds.get(((c.get("relationships") or {}).get("build") or {}).get("data", {}).get("id"), "?")
+        print(f"{at.get('createdDate')}  build {build}  {at.get('deviceModel')} iOS {at.get('osVersion')}  "
+              f"{c['id']}  {at.get('comment') or ''}")
+        if folder:
+            log = call("GET", f"/v1/betaFeedbackCrashSubmissions/{c['id']}/crashLog")
+            text = (log.get("data") or {}).get("attributes", {}).get("logText")
+            if text:
+                path = pathlib.Path(folder) / f"{at.get('createdDate', c['id']).replace(':', '-')}-build{build}.crash"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+                print("   ", path)
+            else:
+                print("    no crash log:", log.get("error", ""), str(log.get("body", ""))[:200])
+
+
 if __name__ == "__main__":
     step = sys.argv[1] if len(sys.argv) > 1 else "status"
     if step == "register":
@@ -402,5 +426,7 @@ if __name__ == "__main__":
         attach_build(sys.argv[2])
     elif step == "submit":
         submit()
+    elif step == "crashes":
+        crashes(sys.argv[2] if len(sys.argv) > 2 else None, int(sys.argv[3]) if len(sys.argv) > 3 else 10)
     else:
         sys.exit(__doc__)
