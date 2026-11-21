@@ -201,6 +201,14 @@ public struct RetroPlayRootView: View {
                 }
                 handleImport(.success([file]))
             }
+            // `-RetroPlayTestImportStall YES`: import "Stalled Test.gba", a pipe nothing writes,
+            // so its copy waits forever, as from a share that stopped answering.
+            if UserDefaults.standard.bool(forKey: "RetroPlayTestImportStall") {
+                let file = FileManager.default.temporaryDirectory.appendingPathComponent("Stalled Test.gba")
+                try? FileManager.default.removeItem(at: file)
+                mkfifo(file.path, 0o644)
+                handleImport(.success([file]))
+            }
             // `-RetroPlaySmokeSaveScan YES`: a save scan that runs until it's stopped, to see
             // the library while saves are found.
             if UserDefaults.standard.bool(forKey: "RetroPlaySmokeSaveScan"), let id = saveImports.beginScan() {

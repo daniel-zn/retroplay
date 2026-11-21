@@ -197,4 +197,29 @@ final class LibraryImportBatchTests: XCTestCase {
         XCTAssertEqual(store.imports.items.map(\.name), ["Small.gba"])
         XCTAssertEqual(store.imports.items.map(\.state), [.done])
     }
+    /// A copy whose source never answers (a pipe nothing writes, as a share that stopped
+    /// responding) still stops on cancel, and leaves nothing behind.
+    func testStalledCopyCancels() async throws {
+        let store = LibraryStore(fileManager: fm, documentsDirectoryURL: root)
+        let stalled = root.appendingPathComponent("Stalled.gba")
+        XCTAssertEqual(mkfifo(stalled.path, 0o644), 0)
+        let task = Task { try await store.importInBackground(from: [stalled]) }
+        for _ in 0..<50 where store.imports.items.isEmpty {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertTrue(store.imports.isRunning)
+
+        let start = Date()
+        store.imports.cancel(try XCTUnwrap(store.imports.items.first).id)
+        let summary = try await task.value
+
+        XCTAssertLessThan(Date().timeIntervalSince(start), 7, "the stalled copy held the cancel")
+        XCTAssertEqual(summary.cancelled, ["Stalled.gba"])
+        XCTAssertTrue(store.games.isEmpty)
+        XCTAssertEqual(try gamesFolderContents(store), [], "a partial copy is left in Games/")
+        // Let the stuck read end.
+        let writer = FileHandle(forWritingAtPath: stalled.path)
+        try writer?.close()
+    }
 }

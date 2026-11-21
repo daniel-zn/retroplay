@@ -87,7 +87,17 @@ public final class LibraryStore: ObservableObject {
         try? savePaths.migrateLegacyLayout(fileManager: fileManager)
         try? savePaths.migrateAppDataOutOfDocuments(fileManager: fileManager)
         try? ensureDirectories()
+        removePartialCopies()
         load()
+    }
+
+    /// Copies an import left half done when the app was ended mid-copy (their hidden
+    /// `.importing-…` names), at launch, before any import starts.
+    private func removePartialCopies() {
+        let games = savePaths.gamesDirectory
+        for name in (try? fileManager.contentsOfDirectory(atPath: games.path)) ?? [] where name.hasPrefix(".importing-") {
+            try? fileManager.removeItem(at: games.appendingPathComponent(name))
+        }
     }
 
     /// Documents/Games — sandbox copies of user-picked files only.
@@ -201,13 +211,13 @@ public final class LibraryStore: ObservableObject {
     public func importSummary(from urls: [URL]) throws -> LibraryImportSummary {
         let pictures = urls.filter(CustomCovers.isImage)
         var summary = try importGames(from: urls.filter { !CustomCovers.isImage($0) })
-        applyPickedCovers(pictures, to: &summary)
+        applyPickedCovers(pictures, Self.readPictures(pictures), to: &summary)
         return summary
     }
 
     private func importGames(from urls: [URL]) throws -> LibraryImportSummary {
         try ensureDirectories()
-        let plan = planImport(urls)
+        let plan = planImport(urls, cueSheets: Self.readCueSheets(urls))
         defer { releaseReservations(plan.jobs) }
         let staged = Self.stage(plan.jobs, existing: existingLibraryFiles(), paths: savePaths, importer: importer)
         return try commit(staged, plan: plan)
@@ -221,23 +231,21 @@ public final class LibraryStore: ObservableObject {
     public func importInBackground(from urls: [URL]) async throws -> LibraryImportSummary {
         let pictures = urls.filter(CustomCovers.isImage)
         var summary = try await importGamesInBackground(from: urls.filter { !CustomCovers.isImage($0) })
-        applyPickedCovers(pictures, to: &summary)
+        let images = await Task.detached(priority: .userInitiated) { Self.readPictures(pictures) }.value
+        applyPickedCovers(pictures, images, to: &summary)
         return summary
     }
 
     /// Pictures picked in Import become the covers of the games they're named after (picked in
     /// the same batch or already in the library); a picture matching no game is skipped.
-    private func applyPickedCovers(_ pictures: [URL], to summary: inout LibraryImportSummary) {
+    private func applyPickedCovers(_ pictures: [URL], _ images: [Data?], to summary: inout LibraryImportSummary) {
         guard !pictures.isEmpty else { return }
         let covers = CoverArtStore(fileManager: fileManager, paths: savePaths)
-        for picture in pictures {
+        for (picture, data) in zip(pictures, images) {
             guard let game = CustomCovers.game(forImageNamed: picture.lastPathComponent, in: games) else {
                 summary.unsupported.append(picture.lastPathComponent)
                 continue
             }
-            let accessed = picture.startAccessingSecurityScopedResource()
-            defer { if accessed { picture.stopAccessingSecurityScopedResource() } }
-            let data = try? CoordinatedRead.run(picture) { try Data(contentsOf: $0) }
             if let data, (try? covers.installCustom(data, forGameID: game.id)) == true {
                 summary.covers.append(picture.lastPathComponent)
             } else {
@@ -249,9 +257,20 @@ public final class LibraryStore: ObservableObject {
         if !summary.covers.isEmpty { coversRevision += 1 }
     }
 
+    /// The picked pictures' bytes (nil: unreadable), read off the main actor.
+    nonisolated static func readPictures(_ pictures: [URL]) -> [Data?] {
+        pictures.map { picture in
+            let accessed = picture.startAccessingSecurityScopedResource()
+            defer { if accessed { picture.stopAccessingSecurityScopedResource() } }
+            return try? CoordinatedRead.run(picture) { try Data(contentsOf: $0) }
+        }
+    }
+
     private func importGamesInBackground(from urls: [URL]) async throws -> LibraryImportSummary {
         try ensureDirectories()
-        let plan = planImport(urls)
+        // Nothing reads a picked file on the main actor: a stalled share would freeze the app.
+        let cueSheets = await Task.detached(priority: .userInitiated) { Self.readCueSheets(urls) }.value
+        let plan = planImport(urls, cueSheets: cueSheets)
         let control = imports.begin(plan.jobs)
         importsInProgress += plan.jobs.count
         defer {
@@ -342,18 +361,27 @@ public final class LibraryStore: ObservableObject {
         }
     }
 
-    /// Picks each destination name on the main actor and reserves it.
-    private func planImport(_ urls: [URL]) -> ImportPlan {
+    /// The track names each picked `.cue` sheet lists.
+    nonisolated static func readCueSheets(_ urls: [URL]) -> [URL: [String]] {
+        var sheets: [URL: [String]] = [:]
+        for cue in urls where cue.pathExtension.lowercased() == "cue" {
+            let accessed = cue.startAccessingSecurityScopedResource()
+            sheets[cue] = CueSheet.referencedFiles(at: cue)
+            if accessed { cue.stopAccessingSecurityScopedResource() }
+        }
+        return sheets
+    }
+
+    /// Picks each destination name on the main actor and reserves it. Reads no picked file
+    /// (`cueSheets` were read off it).
+    private func planImport(_ urls: [URL], cueSheets: [URL: [String]]) -> ImportPlan {
         var plan = ImportPlan()
         var taken = takenBaseNames()
         let gamesFolder = Self.resolvedPath(of: gamesDirectoryURL)
         // A PS1 disc picked as .cue + .bin: the tracks travel with their sheet.
         var tracksForCue: [URL: (picked: [URL], expected: [String])] = [:]
         var companionPaths = Set<String>()
-        for cue in urls where cue.pathExtension.lowercased() == "cue" {
-            let accessed = cue.startAccessingSecurityScopedResource()
-            let names = CueSheet.referencedFiles(at: cue)
-            if accessed { cue.stopAccessingSecurityScopedResource() }
+        for (cue, names) in cueSheets {
             let picked = names.compactMap { name in
                 urls.first { $0.lastPathComponent.lowercased() == name.lowercased() }
             }
@@ -402,10 +430,12 @@ public final class LibraryStore: ObservableObject {
         return plan
     }
 
-    /// Absolute path with `..` and symlinks resolved (the picker may hand back `/private/var/…`
-    /// for a sandbox folder this app knows as `/var/…`).
+    /// Absolute path with `..` resolved and `/private/var/…` (as the picker may hand back a
+    /// sandbox folder this app knows as `/var/…`) as `/var/…`. From the path alone: resolving
+    /// symlinks would ask the file system, and a picked file's share may not answer.
     nonisolated static func resolvedPath(of url: URL) -> String {
-        url.standardizedFileURL.resolvingSymlinksInPath().path
+        let path = url.standardizedFileURL.path
+        return path.hasPrefix("/private/") ? String(path.dropFirst("/private".count)) : path
     }
 
     private func releaseReservations(_ jobs: [ImportJob]) {
