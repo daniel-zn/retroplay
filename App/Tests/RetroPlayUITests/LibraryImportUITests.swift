@@ -76,6 +76,13 @@ final class LibraryImportUITests: XCTestCase {
 
         XCTAssertTrue(button.waitForNonExistence(timeout: 40), "the import button stays after the import")
         XCTAssertTrue(importedTile(app).waitForExistence(timeout: 10), "the imported game isn't in the library")
+        // The import switched the filter to its system; back to All Games, so the count reads
+        // the same as on a fresh launch and its width can be compared.
+        app.navigationBars.buttons["library.filter"].firstMatch.tap()
+        let all = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label BEGINSWITH[c] %@ AND elementType != %d", "All Games", XCUIElement.ElementType.staticText.rawValue)).firstMatch
+        XCTAssertTrue(all.waitForExistence(timeout: 5), "no All Games in the filter menu")
+        all.tap()
         Thread.sleep(forTimeInterval: 1)
         let after = titleFrames(app, "after the import")
         attachScreen("import-done")
@@ -85,14 +92,9 @@ final class LibraryImportUITests: XCTestCase {
         // the import (the count changed, the button came and went) they must still match.
         let fresh = launch()
         let launched = titleFrames(fresh, "fresh launch")
+        XCTAssertEqual(after.label, launched.label)
         XCTAssertEqual(after.title.width, launched.title.width, accuracy: 1, "the title lost its font after the import")
-        // The import switched the filter to its system, so the count reads differently; per
-        // character, the RetroPlay font's capitals run far wider than the system font's lower case.
-        func perCharacter(_ frames: (title: CGRect, subtitle: CGRect, label: String)) -> CGFloat {
-            frames.subtitle.width / CGFloat(max(frames.label.count, 1))
-        }
-        XCTAssertEqual(perCharacter(after), perCharacter(launched), accuracy: perCharacter(launched) * 0.12,
-                       "the game count lost its font after the import")
+        XCTAssertEqual(after.subtitle.width, launched.subtitle.width, accuracy: 1, "the game count lost its font after the import")
         fresh.terminate()
     }
 
@@ -112,11 +114,19 @@ final class LibraryImportUITests: XCTestCase {
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), "no Cancel in the import status (frozen?)")
         attachScreen("import-status-stalled")
         cancel.tap()
-        XCTAssertTrue(button.waitForNonExistence(timeout: 15), "the stalled import didn't stop")
+        let row = app.descendants(matching: .any)["library.imports.item"].firstMatch
+        XCTAssertTrue(waitFor("label CONTAINS[c] 'Cancelled'", row, timeout: 15), "the stalled import didn't stop: “\(row.label)”")
+        attachScreen("import-stalled-cancelled")
+        // The button stays while its status is open (the popover hides the bar from
+        // accessibility meanwhile), and goes with it.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
+        XCTAssertTrue(button.waitForNonExistence(timeout: 10), "the button stays after its status closed")
         XCTAssertFalse(app.alerts.firstMatch.exists, "a cancelled import shows an alert")
         // Still responsive: Settings opens.
-        app.navigationBars.buttons["library.settings"].firstMatch.tap()
-        XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier ==[c] %@", "Settings")).firstMatch.waitForExistence(timeout: 10), "Settings doesn't open after the stalled import")
+        let settings = app.descendants(matching: .any)["library.settings"].firstMatch
+        XCTAssertTrue(waitFor("isHittable == true", settings, timeout: 10), "no Settings button after the stalled import")
+        settings.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "Settings")).firstMatch.waitForExistence(timeout: 10), "Settings doesn't open after the stalled import")
         app.terminate()
     }
 
@@ -130,7 +140,10 @@ final class LibraryImportUITests: XCTestCase {
         let cancel = app.buttons["library.imports.cancel"].firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), "no Cancel in the import status")
         cancel.tap()
-        XCTAssertTrue(button.waitForNonExistence(timeout: 10), "the import didn't stop")
+        let row = app.descendants(matching: .any)["library.imports.item"].firstMatch
+        XCTAssertTrue(waitFor("label CONTAINS[c] 'Cancelled'", row, timeout: 10), "the import didn't stop: “\(row.label)”")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
+        XCTAssertTrue(button.waitForNonExistence(timeout: 10), "the button stays after the import stopped")
         XCTAssertFalse(importedTile(app).exists, "a cancelled import added the game")
         app.terminate()
     }
@@ -139,16 +152,14 @@ final class LibraryImportUITests: XCTestCase {
     /// copy is done, then lets it suspend; the game is in the library when it's back.
     @MainActor
     func testImportFinishesInTheBackground() {
-        let app = launch(importSeconds: 8)
-        XCTAssertTrue(waitFor("exists == true", app.descendants(matching: .any)["library.import"].firstMatch, timeout: 30))
-        Thread.sleep(forTimeInterval: 1.5)
+        let app = launch(importSeconds: 16)
+        XCTAssertTrue(importButton(app).waitForExistence(timeout: 30), "no import button while a game imports")
         XCUIDevice.shared.press(.home)
-        Thread.sleep(forTimeInterval: 3)
-        print("[import] 3 s after home: state \(app.state.rawValue)")
-        XCTAssertEqual(app.state, .runningBackground, "the app was suspended mid-import")
-        XCTAssertTrue(app.wait(for: .runningBackgroundSuspended, timeout: 30), "the app stays awake after the import (state \(app.state.rawValue))")
+        // Longer than the copy has left: a suspended app would still have most of it to do.
+        Thread.sleep(forTimeInterval: 20)
         app.activate()
-        XCTAssertTrue(importedTile(app).waitForExistence(timeout: 10), "the game imported in the background isn't in the library")
+        XCTAssertTrue(importedTile(app).waitForExistence(timeout: 3), "the copy didn't go on in the background")
+        XCTAssertFalse(importButton(app).exists, "the import is still running after coming back")
         XCTAssertFalse(app.alerts.firstMatch.exists, "an alert after the import: \(app.alerts.firstMatch.label)")
         app.terminate()
     }

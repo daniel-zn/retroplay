@@ -28,6 +28,9 @@ public struct RetroPlayRootView: View {
     @State private var showSettings = false
     /// The import button in the top bar (follows `importsInProgress`, animated).
     @State private var showsImports = false
+    /// The imports' popover is open: their button stays until it closes (removing a
+    /// popover's anchor while it's up leaves it stranded over a dead bar).
+    @State private var showsImportStatus = false
     @State private var importTime: ImportBackgroundTime?
     @State private var playGame: LibraryGame?
     @State private var navigator = ControllerNavigator()
@@ -248,8 +251,8 @@ public struct RetroPlayRootView: View {
         .onChange(of: colorScheme) { _, scheme in
             RetroPlayNavigationBarChrome.apply(colorScheme: scheme)
         }
-        .onChange(of: store.importsInProgress > 0) { _, running in
-            withAnimation { showsImports = running }
+        .onChange(of: store.importsInProgress > 0 || showsImportStatus) { _, shows in
+            withAnimation { showsImports = shows }
         }
         .onReceive(NotificationCenter.default.publisher(
             for: UIContentSizeCategory.didChangeNotification
@@ -437,7 +440,7 @@ public struct RetroPlayRootView: View {
                 let counts = tabCounts
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if showsImports {
-                        LibraryImportsButton(imports: store.imports)
+                        LibraryImportsButton(imports: store.imports, showsStatus: $showsImportStatus)
                     }
                     LibraryImportMenu(
                         onImportGames: { openImporter(.games) },

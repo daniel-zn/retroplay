@@ -168,12 +168,12 @@ struct LibraryImportStatus: View {
 /// lists each copy with its progress, how it ended, and a cancel.
 struct LibraryImportsButton: View {
     @ObservedObject var imports: GameImports
-    @State private var showsStatus = false
+    @Binding var showsStatus: Bool
 
     var body: some View {
         Button { showsStatus = true } label: {
             LibraryTopBarIcon(symbol: "progress.indicator")
-                .symbolEffect(.variableColor.iterative, options: .repeating)
+                .symbolEffect(.variableColor.iterative, options: .repeating, isActive: imports.isRunning)
         }
         .accessibilityLabel("Imports")
         .accessibilityValue(summary)
