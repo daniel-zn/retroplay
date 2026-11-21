@@ -419,7 +419,7 @@ public struct RetroPlayRootView: View {
             // landscape), with the game count under it.
             .retroPlayLargeTitle("RetroPlay", subtitle: librarySubtitle)
             .toolbarColorScheme(colorScheme, for: .navigationBar)
-            .retroPlayNavigationTitleChrome(for: colorScheme)
+            .retroPlayNavigationTitleChrome(for: colorScheme, content: [librarySubtitle, "\(showsImports)"])
             // The search field sits hidden under the title until the library is pulled down
             // (Cover Flow's covers sit in a page that pulls down the same way).
             .searchable(

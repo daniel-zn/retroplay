@@ -115,6 +115,9 @@ enum RetroPlayNavigationBarChrome {
 @available(iOS 18.0, *)
 struct NavigationBarTitleChrome: UIViewControllerRepresentable {
     let colorScheme: ColorScheme
+    /// What the bar shows that SwiftUI rebuilds the item's appearance for (its subtitle, its
+    /// items): a change calls `updateUIViewController`, which patches the fonts in again.
+    let content: AnyHashable?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -174,8 +177,10 @@ struct NavigationBarTitleChrome: UIViewControllerRepresentable {
 extension View {
     /// The bar's look (`RetroPlayNavigationBarChrome`): no bar of its own on iOS 26; the title
     /// in the app's italic.
-    func retroPlayNavigationTitleChrome(for colorScheme: ColorScheme) -> some View {
-        background(NavigationBarTitleChrome(colorScheme: colorScheme))
+    /// `content`: what changes in the bar (its subtitle, an item coming and going); SwiftUI
+    /// rebuilds the item's appearance then, and the fonts are patched in again.
+    func retroPlayNavigationTitleChrome(for colorScheme: ColorScheme, content: AnyHashable? = nil) -> some View {
+        background(NavigationBarTitleChrome(colorScheme: colorScheme, content: content))
             .onAppear { RetroPlayNavigationBarChrome.apply(colorScheme: colorScheme) }
             .onChange(of: colorScheme) { _, scheme in
                 RetroPlayNavigationBarChrome.apply(colorScheme: scheme)
