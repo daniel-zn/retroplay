@@ -582,7 +582,10 @@ struct CoverFlowPageRest: ScrollTargetBehavior {
         // difference between that bar and the bar at rest (the search field's height while it
         // shows, the title's collapse if it has started).
         let end = tracker.barTop - restTop + max(0, context.contentSize.height - visibleHeight)
-        if target.rect.minY > end { target.rect.origin.y = end }
+        // Above the top only by what brings a collapsed bar back to rest: a target set above
+        // it while the bar collapsed is kept as the bar grows back (fast swipes, the search
+        // field showing with it), so the page would come to rest pulled down.
+        target.rect.origin.y = min(max(target.rect.minY, min(0, end)), end)
     }
 }
 
