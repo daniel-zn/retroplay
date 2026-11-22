@@ -86,6 +86,49 @@ final class PSPSlotListedEmptyTests: XCTestCase {
         XCTAssertTrue(reason.hasPrefix("PSP save folders must include PARAM.SFO. iOS listed"), reason)
     }
 
+    /// The ATV PARAM.SFO with an empty SAVEDATA_FILE_LIST, as many games write it
+    /// (LittleBigPlanet's profile lists none of its 18 data files).
+    static var paramSFONamingNoFiles: Data {
+        var sfo = paramSFO
+        let name = Data("PROFILE.BIN".utf8)
+        let range = sfo.range(of: name)!
+        sfo.replaceSubrange(range, with: Data(count: name.count))
+        return sfo
+    }
+
+    /// A slot whose PARAM.SFO names none of its data files, listed empty: only PARAM.SFO and
+    /// the icons can be found by name, so importing it would install a save without its data
+    /// (the game then starts fresh). It's refused, saying how to import it instead.
+    func testAnEmptyListedSlotWhosePARAMSFONamesNoFilesIsRefused() throws {
+        let slot = try makeSlot()
+        XCTAssertEqual(PSPParamSFO.saveDataFiles(from: Self.paramSFONamingNoFiles), [])
+        try Self.paramSFONamingNoFiles.write(to: slot.appendingPathComponent("PARAM.SFO"))
+        for name in ["STORY.SLV", "PLAYER.AUT"] {
+            try Data(repeating: 7, count: 4_000).write(to: slot.appendingPathComponent(name))
+        }
+        let importer = SaveGameImporter()
+        XCTAssertThrowsError(try importer.planImport(from: slot, for: atv, paths: paths, fileManager: fm)) { error in
+            XCTAssertEqual(error as? SaveGameImportError, .pspSlotUnnamedFiles("UCUS98648PROFILE00"))
+            let text = error.localizedDescription
+            XCTAssertTrue(text.contains("can't copy the whole save"), text)
+            XCTAssertTrue(text.contains("On My iPhone"), text)
+        }
+        let found = LibrarySaveImporter().plan(SaveFolderScanner.scan([slot]), games: [atv], paths: paths)
+        XCTAssertEqual(found.items, [])
+        let reason = try XCTUnwrap(found.skipped.first?.reason)
+        XCTAssertTrue(reason.contains("can't copy the whole save"), reason)
+        XCTAssertFalse(fm.fileExists(atPath: paths.pspSavedataDirectory.appendingPathComponent("UCUS98648PROFILE00").path))
+    }
+
+    /// A slot whose PARAM.SFO names a data file that can't be opened by name is refused too.
+    func testAnEmptyListedSlotMissingANamedFileIsRefused() throws {
+        let slot = try makeSlot()
+        try fm.removeItem(at: slot.appendingPathComponent("PROFILE.BIN"))
+        XCTAssertThrowsError(try SaveGameImporter.validatePSPFolderContents(slot, fileManager: fm)) { error in
+            XCTAssertEqual(error as? SaveGameImportError, .pspSlotUnnamedFiles("UCUS98648PROFILE00"))
+        }
+    }
+
     /// A real slot's PARAM.SFO (ATV Offroad Fury Pro's profile): SAVEDATA_FILE_LIST = PROFILE.BIN.
     static let paramSFO = Data(base64Encoded: """
         AFBTRgEBAACUAAAACAEAAAgAAAAAAAQCAwAAAAQAAAAAAAAACQAEBAQAAAAEAAAABAAAABgABAIPAAAAAAQAAAgAAAAoAAQCEwAA

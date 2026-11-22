@@ -10,6 +10,7 @@ public enum SaveGameImportError: LocalizedError, Equatable, Sendable {
     case missingPSPMetadata
     /// A slot every listing showed as empty whose PARAM.SFO couldn't be opened by name either.
     case pspSlotListedEmpty(String)
+    case pspSlotUnnamedFiles(String)
     case invalidPSPGameID(String)
     case pspTitleMismatch(expected: String, imported: String)
     case destinationExists(URL)
@@ -32,10 +33,12 @@ public enum SaveGameImportError: LocalizedError, Equatable, Sendable {
             return "PSP save folders must include PARAM.SFO."
         case .pspSlotListedEmpty(let name):
             return "PSP save folders must include PARAM.SFO. iOS listed “\(name)” as empty and its PARAM.SFO couldn't be opened by name. Copy the folder to On My iPhone in Files and import it from there."
+        case .pspSlotUnnamedFiles(let name):
+            return "iOS listed “\(name)” as empty, and its PARAM.SFO doesn't name all of its files, so RetroPlay can't copy the whole save from here. Copy the folder to On My iPhone in Files and import it from there."
         case .invalidPSPGameID(let id):
             return "“\(id)” is not a valid PSP SAVEDATA folder name."
         case .pspTitleMismatch(let expected, let imported):
-            return "Save folder “\(imported)” does not match this game's product ID (\(expected))."
+            return "“\(imported)” is a save for another game or region; this game is \(expected) and only reads its own saves (folders starting with \(expected))."
         case .destinationExists(let url):
             return "A save already exists at \(url.lastPathComponent). Confirm overwrite to replace it."
         case .securityScopedAccessFailed:
@@ -435,10 +438,15 @@ public struct SaveGameImporter: Sendable {
 
         let installName = Self.pspInstallName(originalName)
         let dest = paths.pspSavedataDirectory.appendingPathComponent(installName, isDirectory: true)
+        // A game whose ID its file doesn't give (a .chd) can't be checked against the save's.
+        let unchecked = game != nil && game?.pspProductID == nil
         return SaveGameImportPlan(
             sourceDescription: installName,
             destinationURL: dest,
             replacesExisting: Self.existingPSPSlot(for: dest, fileManager: fileManager) != nil,
+            warning: unchecked
+                ? "Imported \(installName), but RetroPlay couldn't check it's this game's: it can't read the game's ID from its file. If the game doesn't find the save, it's likely for another region."
+                : nil,
             check: .pspFolder
         )
     }

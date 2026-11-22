@@ -285,8 +285,11 @@ public enum SaveFolderScanner {
 
     static func readError(_ name: String, _ error: Error?) -> SkippedSave {
         // A slot that listed empty says so itself.
-        if case .pspSlotListedEmpty? = error as? SaveGameImportError {
+        switch error as? SaveGameImportError {
+        case .pspSlotListedEmpty?, .pspSlotUnnamedFiles?:
             return SkippedSave(name: name, reason: error!.localizedDescription)
+        default:
+            break
         }
         return SkippedSave(name: name, reason: "Couldn't read it: \(error?.localizedDescription ?? "its contents can't be looked at").")
     }
@@ -1534,7 +1537,10 @@ enum FolderWalk {
                 if slot {
                     // iOS's SMB client can list a save slot as empty though it holds the save:
                     // its files are opened by name, from what its PARAM.SFO lists.
-                    for next in pspSlotByName(url, fileManager: fileManager, cancellation: cancellation) {
+                    let byName: [URL]
+                    do { byName = try pspSlotByName(url, fileManager: fileManager, cancellation: cancellation) }
+                    catch let error as SaveGameImportError { return ([], false, error) }
+                    for next in byName {
                         if let early = try take(next) { return early }
                     }
                     if !children.isEmpty { return (children.sorted { $0.name < $1.name }, false, nil) }
@@ -1553,8 +1559,10 @@ enum FolderWalk {
 
     /// Files a PSP save slot holds, found by name rather than listed: its PARAM.SFO (read in a
     /// coordinated read), the data files that lists and the standard optional files that exist.
-    /// Empty if PARAM.SFO can't be read.
-    static func pspSlotByName(_ slot: URL, fileManager: FileManager, cancellation: ImportCancellation) -> [URL] {
+    /// Empty if PARAM.SFO can't be read. Throws when PARAM.SFO doesn't name every data file the
+    /// slot holds (many games, LittleBigPlanet among them, list none), as copying what can be
+    /// named would install a save without its data.
+    static func pspSlotByName(_ slot: URL, fileManager: FileManager, cancellation: ImportCancellation) throws -> [URL] {
         let param = slot.appendingPathComponent("PARAM.SFO")
         let sfo: Data
         do {
@@ -1563,8 +1571,14 @@ enum FolderWalk {
             scanLog.notice("RP_SCAN PARAM.SFO by name failed: \(shortReason(error), privacy: .public)")
             return []
         }
+        let dataFiles = PSPParamSFO.saveDataFiles(from: sfo)
+        let missing = dataFiles.filter { !fileManager.fileExists(atPath: slot.appendingPathComponent($0).path) }
+        guard !dataFiles.isEmpty, missing.isEmpty else {
+            scanLog.notice("RP_SCAN slot by name: PARAM.SFO names \(dataFiles.count, privacy: .public) data files, \(missing.count, privacy: .public) missing")
+            throw SaveGameImportError.pspSlotUnnamedFiles(slot.lastPathComponent)
+        }
         var seen: Set<String> = ["PARAM.SFO"]
-        let names = (PSPParamSFO.saveDataFiles(from: sfo) + ["ICON0.PNG", "ICON1.PMF", "ICON1.PNG", "PIC1.PNG", "SND0.AT3"])
+        let names = (dataFiles + ["ICON0.PNG", "ICON1.PMF", "ICON1.PNG", "PIC1.PNG", "SND0.AT3"])
             .filter { seen.insert($0.uppercased()).inserted }
         let found = names.map { slot.appendingPathComponent($0) }.filter { fileManager.fileExists(atPath: $0.path) }
         scanLog.notice("RP_SCAN slot read by name: PARAM.SFO and \(found.count, privacy: .public) of \(names.count, privacy: .public) files")
