@@ -185,14 +185,17 @@ struct PlayMenuView: View {
                         .id(MenuItem.fill)
                 }
                 .padding(.top, 8)
+                // Inside the group: it clips its rows to its own width, and a switch draws a
+                // little past its frame (its rounded end was sliced flat at the group's edge).
+                .padding(.horizontal, 4)
             } label: {
                 Label("Options", systemImage: "slider.horizontal.3")
                     .foregroundStyle(.white)
                     .controllerFocusRing(focus == .options, cornerRadius: 6)
                     .id(MenuItem.options)
+                    .padding(.leading, 4)
             }
             .font(RetroPlayFont.headline)
-            .padding(.horizontal, 4)
 
             if leaving {
                 HStack(spacing: 8) {
