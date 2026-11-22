@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import Compression
 import XCTest
 @testable import RetroPlayCore
 
@@ -74,12 +75,49 @@ final class PSPProductIDTests: XCTestCase {
         }
     }
 
-    func testCSOReportsUnsupportedFormat() {
-        let url = URL(fileURLWithPath: "/tmp/example.cso")
+    /// A CSO (an ISO in deflated 2 KB blocks, one block stored as is, as CSO tools leave a
+    /// block that doesn't shrink) gives its PARAM.SFO's ID as the ISO does.
+    func testCSOExtractorReadsEmbeddedProductID() throws {
+        let fm = FileManager.default
+        let root = tempRoot()
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        let iso = Self.makeISO(sfo: Self.makeParamSFO(discID: "UCUS-98744"))
+        let isoURL = root.appendingPathComponent("Game.iso")
+        try iso.write(to: isoURL)
+        XCTAssertEqual(PSPProductIDExtractor.extract(from: isoURL), .found("UCUS98744"))
+        for align: UInt8 in [0, 2] {
+            let csoURL = root.appendingPathComponent("Game-\(align).cso")
+            try Self.makeCSO(iso, align: align, storedBlocks: [21]).write(to: csoURL)
+            XCTAssertEqual(PSPProductIDExtractor.extract(from: csoURL), .found("UCUS98744"), "align \(align)")
+        }
+    }
+
+    func testCHDReportsUnsupportedFormat() {
+        let url = URL(fileURLWithPath: "/tmp/example.chd")
         guard case .unsupportedFormat(let reason) = PSPProductIDExtractor.extract(from: url) else {
             return XCTFail("expected unsupportedFormat")
         }
-        XCTAssertTrue(reason.contains("cso"))
+        XCTAssertTrue(reason.contains("chd"))
+    }
+
+    /// A save picked for a game whose ID can't be read is still placed, with a warning that it
+    /// couldn't be checked against the game, never as a plain "Imported".
+    func testPSPImportForGameWithUnknownIDWarnsItWasNotChecked() throws {
+        let fm = FileManager.default
+        let root = tempRoot()
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let paths = SavePaths(fileManager: fm, documentsURL: root)
+        try paths.ensureDirectories(fileManager: fm)
+        let folder = try Self.makeSavedataFolder(named: "UCES01264SAVE00", in: root)
+
+        let game = LibraryGame(displayName: "Game", systemID: .psp, relativePath: "Game.chd")
+        let plan = try SaveGameImporter().planImport(from: folder, for: game, paths: paths, fileManager: fm)
+        XCTAssertTrue(plan.destinationURL.path.hasSuffix("/psp-memstick/PSP/SAVEDATA/UCES01264SAVE00"))
+        let warning = try XCTUnwrap(plan.warning)
+        XCTAssertTrue(warning.contains("UCES01264SAVE00") && warning.contains("couldn't check"), warning)
     }
 
     // MARK: - ROM ownership validation
@@ -300,7 +338,88 @@ final class PSPProductIDTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    private static func makeParamSFO(discID: String) -> Data {
+    /// A save slot as a PSP writes it: PARAM.SFO (listing DATA.BIN), DATA.BIN and ICON0.PNG.
+    static func makeSavedataFolder(named name: String, in root: URL) throws -> URL {
+        let folder = root.appendingPathComponent("picked", isDirectory: true).appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try makeParamSFO(discID: String(name.prefix(9))).write(to: folder.appendingPathComponent("PARAM.SFO"))
+        try Data(repeating: 0xA5, count: 64 * 1024).write(to: folder.appendingPathComponent("DATA.BIN"))
+        try Data([0x89, 0x50, 0x4E, 0x47]).write(to: folder.appendingPathComponent("ICON0.PNG"))
+        return folder
+    }
+
+    /// PVD → root (sector 20) → PSP_GAME (sector 21) → PARAM.SFO (sector 22), padded to 32 sectors.
+    static func makeISO(sfo: Data) -> Data {
+        let sector = 2048
+        var iso = Data(repeating: 0, count: sector * 32)
+        let pvd = 16 * sector
+        iso[pvd] = 1
+        iso.replaceSubrange((pvd + 1)..<(pvd + 6), with: Data("CD001".utf8))
+        iso.replaceSubrange((pvd + 156 + 2)..<(pvd + 156 + 6), with: u32LE(20))
+        iso.replaceSubrange((pvd + 156 + 10)..<(pvd + 156 + 14), with: u32LE(UInt32(sector)))
+        let pspGame = directoryRecord(name: "PSP_GAME", lba: 21, size: UInt32(sector), isDir: true)
+        iso.replaceSubrange((20 * sector)..<(20 * sector + pspGame.count), with: pspGame)
+        let param = directoryRecord(name: "PARAM.SFO;1", lba: 22, size: UInt32(sfo.count), isDir: false)
+        iso.replaceSubrange((21 * sector)..<(21 * sector + param.count), with: param)
+        iso.replaceSubrange((22 * sector)..<(22 * sector + sfo.count), with: sfo)
+        return iso
+    }
+
+    private static func directoryRecord(name: String, lba: UInt32, size: UInt32, isDir: Bool) -> Data {
+        let nameBytes = Data(name.utf8)
+        var rec = Data(repeating: 0, count: 33)
+        rec.replaceSubrange(2..<6, with: u32LE(lba))
+        rec.replaceSubrange(10..<14, with: u32LE(size))
+        rec[25] = isDir ? 0x02 : 0x00
+        rec[32] = UInt8(nameBytes.count)
+        rec.append(nameBytes)
+        if rec.count % 2 == 1 { rec.append(0) }
+        rec[0] = UInt8(rec.count)
+        return rec
+    }
+
+    /// CISO v1: a 24-byte header, an index of block offsets (shifted right by `align`; the top
+    /// bit marks a block stored as is), then each block raw-deflated, padded to the alignment.
+    static func makeCSO(_ iso: Data, align: UInt8, storedBlocks: Set<Int>) -> Data {
+        let block = 2048
+        let blocks = iso.count / block
+        var body = Data()
+        var index: [UInt32] = []
+        let headerAndIndex = 24 + (blocks + 1) * 4
+        func pad() {
+            let unit = 1 << Int(align)
+            while (headerAndIndex + body.count) % unit != 0 { body.append(0) }
+        }
+        for b in 0..<blocks {
+            pad()
+            let offset = UInt32((headerAndIndex + body.count) >> Int(align))
+            let raw = iso.subdata(in: (b * block)..<((b + 1) * block))
+            if storedBlocks.contains(b) {
+                index.append(offset | 0x8000_0000)
+                body.append(raw)
+            } else {
+                index.append(offset)
+                var out = [UInt8](repeating: 0, count: block * 2)
+                let n = raw.withUnsafeBytes { src in
+                    compression_encode_buffer(&out, out.count, src.bindMemory(to: UInt8.self).baseAddress!, raw.count, nil, COMPRESSION_ZLIB)
+                }
+                body.append(contentsOf: out.prefix(n))
+            }
+        }
+        pad()
+        index.append(UInt32((headerAndIndex + body.count) >> Int(align)))
+        var cso = Data("CISO".utf8)
+        cso.append(u32LE(24))
+        cso.append(u32LE(UInt32(iso.count)))
+        cso.append(u32LE(0))
+        cso.append(u32LE(UInt32(block)))
+        cso.append(contentsOf: [1, align, 0, 0])
+        for entry in index { cso.append(u32LE(entry)) }
+        cso.append(body)
+        return cso
+    }
+
+    static func makeParamSFO(discID: String) -> Data {
         let key = Data("DISC_ID\0".utf8)
         let value = Data((discID + "\0").utf8)
         let indexCount = 1

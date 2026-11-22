@@ -77,6 +77,26 @@ final class LibraryStoreLoadTests: XCTestCase {
 
     private let fm = FileManager.default
 
+    /// A PSP game added from a .cso before RetroPlay could read a CSO's ID gets it on the next
+    /// load (and keeps it), so its saves can be matched and checked.
+    func testLoadReadsMissingIDsOfCSOGames() throws {
+        let root = fm.temporaryDirectory.appendingPathComponent("rp-cso-id-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: root) }
+        let documents = root.appendingPathComponent("Documents", isDirectory: true)
+        let support = root.appendingPathComponent("Support", isDirectory: true)
+        let games = documents.appendingPathComponent("Games", isDirectory: true)
+        try fm.createDirectory(at: games, withIntermediateDirectories: true)
+        let iso = PSPProductIDTests.makeISO(sfo: PSPProductIDTests.makeParamSFO(discID: "UCUS-98744"))
+        try PSPProductIDTests.makeCSO(iso, align: 0, storedBlocks: []).write(to: games.appendingPathComponent("Test Game.cso"))
+        let game = LibraryGame(displayName: "Test Game", systemID: .psp, relativePath: "Test Game.cso")
+        try writeLibrary([game], documents: documents, support: support)
+
+        let store = LibraryStore(fileManager: fm, documentsDirectoryURL: documents, supportDirectoryURL: support)
+        XCTAssertEqual(store.games.first?.pspProductID, "UCUS98744")
+        let reloaded = LibraryStore(fileManager: fm, documentsDirectoryURL: documents, supportDirectoryURL: support)
+        XCTAssertEqual(reloaded.games.first?.pspProductID, "UCUS98744")
+    }
+
     func testLoadCleansRawFileDerivedNamesAndKeepsCustomNames() throws {
         let root = fm.temporaryDirectory.appendingPathComponent("rp-names-\(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: root) }

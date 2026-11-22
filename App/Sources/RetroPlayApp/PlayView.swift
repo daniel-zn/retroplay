@@ -78,7 +78,8 @@ public struct PlayView: View {
     @State private var alertMessage: String?
     @State private var showSaveImporter = false
     @State private var pendingImport: PendingSaveImport?
-    @State private var saveImportError: String?
+    /// Why a save import failed, or what to know about one that worked.
+    @State private var saveImportMessage: String?
     @ObservedObject private var casting = CastingCoordinator.shared
     private let saveImporter = SaveGameImporter()
 
@@ -240,9 +241,9 @@ public struct PlayView: View {
         } message: {
             Text("Replace the existing save \($0.plan.destinationURL.lastPathComponent) with \($0.plan.sourceDescription)?")
         }
-        .alert("Import Save", isPresented: Binding(get: { saveImportError != nil }, set: { _ in }),
-               presenting: saveImportError) { _ in
-            Button("OK", role: .cancel) { saveImportError = nil }
+        .alert("Import Save", isPresented: Binding(get: { saveImportMessage != nil }, set: { _ in }),
+               presenting: saveImportMessage) { _ in
+            Button("OK", role: .cancel) { saveImportMessage = nil }
         } message: { Text($0) }
         .alert("Play", isPresented: Binding(get: { alertMessage != nil }, set: { _ in }),
                presenting: alertMessage) { _ in
@@ -883,7 +884,7 @@ public struct PlayView: View {
     private func handleSaveImportSelection(_ result: Result<[URL], Error>) {
         switch result {
         case .failure(let error):
-            saveImportError = error.localizedDescription
+            saveImportMessage = error.localizedDescription
         case .success(let urls):
             guard let picked = urls.first, !importingSave else { return }
             let scoped = picked.startAccessingSecurityScopedResource()
@@ -911,7 +912,7 @@ public struct PlayView: View {
                 case .failure(let error):
                     if scoped { picked.stopAccessingSecurityScopedResource() }
                     // Said when Files didn't grant access, so the alert tells the whole story.
-                    saveImportError = error.localizedDescription
+                    saveImportMessage = error.localizedDescription
                         + (scoped ? "" : " Files didn't give RetroPlay access to it.")
                 }
             }
@@ -937,7 +938,7 @@ public struct PlayView: View {
             if pending.securityScoped { pending.scopedURL.stopAccessingSecurityScopedResource() }
         }
         guard await BatterySaveReload.waitForSaveIdle(isSaveBusy: { busy }) else {
-            saveImportError = BatterySaveReload.saveIdleTimeoutNotice
+            saveImportMessage = BatterySaveReload.saveIdleTimeoutNotice
             return
         }
         // Stop the game first: its teardown flush would otherwise overwrite the imported file.
@@ -951,7 +952,7 @@ public struct PlayView: View {
                     busy = false
                 } catch {
                     busy = false
-                    saveImportError = "Couldn't save your progress before importing, so nothing was changed. \(error.localizedDescription)"
+                    saveImportMessage = "Couldn't save your progress before importing, so nothing was changed. \(error.localizedDescription)"
                     return
                 }
             }
@@ -975,9 +976,14 @@ public struct PlayView: View {
                 try LibrarySaveImporter.install(plan, from: source, overwrite: overwrite, gameIDs: [gameID])
             }.value
             imported = true
-            showToast(pending.plan.warning ?? "Imported \(pending.plan.sourceDescription)")
+            // A warning (a save RetroPlay couldn't check is this game's) stays until it's read.
+            if let warning = pending.plan.warning {
+                saveImportMessage = warning
+            } else {
+                showToast("Imported \(pending.plan.sourceDescription)")
+            }
         } catch {
-            saveImportError = error.localizedDescription
+            saveImportMessage = error.localizedDescription
         }
         // Rechecked: the player may have left while the save was written.
         if !didLeave {

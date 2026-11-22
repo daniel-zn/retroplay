@@ -125,8 +125,9 @@ public final class LibraryStore: ObservableObject {
             var loaded = try decoder.decode([LibraryGame].self, from: data)
                 .sorted { $0.dateAdded > $1.dateAdded }
             let renamed = Self.cleanLegacyDisplayNames(&loaded)
+            let identified = identifyCSOGames(&loaded)
             games = loaded
-            if renamed { try? save() }
+            if renamed || identified { try? save() }
         } catch {
             games = []
             libraryLoadFailureMessage = error.localizedDescription
@@ -168,6 +169,20 @@ public final class LibraryStore: ObservableObject {
         let cleaned = ROMImporter.displayName(fromFileName: originalFileName)
         guard !cleaned.isEmpty, cleaned != game.displayName else { return nil }
         return cleaned
+    }
+
+    /// PSP games added from .cso files before RetroPlay read their ID: reads it now (a few
+    /// sectors each), so their saves are matched and checked. Returns true when any changed.
+    private func identifyCSOGames(_ games: inout [LibraryGame]) -> Bool {
+        var changed = false
+        for index in games.indices where games[index].systemID == .psp && games[index].pspProductID == nil
+            && (games[index].relativePath as NSString).pathExtension.lowercased() == "cso" {
+            if case .found(let id) = PSPProductIDExtractor.extract(from: absoluteURL(for: games[index])) {
+                games[index].pspProductID = id
+                changed = true
+            }
+        }
+        return changed
     }
 
     /// Keeps the unreadable file as `library.json.corrupt-<timestamp>`; the next save replaces the original.
