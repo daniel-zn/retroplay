@@ -163,4 +163,88 @@ final class LibraryImportUITests: XCTestCase {
         XCTAssertFalse(app.alerts.firstMatch.exists, "an alert after the import: \(app.alerts.firstMatch.label)")
         app.terminate()
     }
+    /// The import status opens every time its button is tapped, however it was closed (a tap
+    /// outside, a swipe down), five times each; the import ending while it's open takes the
+    /// button away; and the top bar still answers: + opens its menu, the filter its menu,
+    /// Settings opens.
+    @MainActor
+    func testStatusOpensEveryTimeAndTheBarStaysAlive() {
+        let app = launch(["-RetroPlayTestImportStall", "YES"])
+        let button = importButton(app)
+        XCTAssertTrue(button.waitForExistence(timeout: 30), "no import button while a game imports")
+        let row = app.descendants(matching: .any)["library.imports.item"].firstMatch
+        let window = app.windows.firstMatch
+        for close in ["outside", "swipe"] {
+            for cycle in 1...5 {
+                XCTAssertTrue(waitFor("isHittable == true", button, timeout: 10), "\(close) \(cycle): the import button doesn't answer")
+                button.tap()
+                XCTAssertTrue(row.waitForExistence(timeout: 5), "\(close) \(cycle): tapping the button didn't open the status")
+                if cycle == 1 { attachScreen("import-status-\(close)") }
+                if close == "outside" {
+                    window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+                } else {
+                    let top = row.frame.minY - 30
+                    window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: window.frame.midX, dy: top))
+                        .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
+                }
+                XCTAssertTrue(row.waitForNonExistence(timeout: 5), "\(close) \(cycle): the status didn't close")
+            }
+        }
+        // Stopped with the status open: it says so, and the button goes.
+        button.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "the status didn't open after the cycles")
+        app.buttons["library.imports.cancel"].firstMatch.tap()
+        XCTAssertTrue(waitFor("label CONTAINS[c] 'Cancelled'", row, timeout: 15), "the import didn't stop: “\(row.label)”")
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+        XCTAssertTrue(button.waitForNonExistence(timeout: 10), "the button stays after the import stopped")
+        expectBarAnswers(app, "after the stalled import")
+        app.terminate()
+
+        // An import that finishes while its status is open (its system's filter showing).
+        let second = launch(importSeconds: 10)
+        let secondButton = importButton(second)
+        XCTAssertTrue(secondButton.waitForExistence(timeout: 30), "no import button for the second import")
+        secondButton.tap()
+        let secondRow = second.descendants(matching: .any)["library.imports.item"].firstMatch
+        XCTAssertTrue(secondRow.waitForExistence(timeout: 5), "the status didn't open")
+        XCTAssertTrue(waitFor("label CONTAINS[c] 'Imported'", secondRow, timeout: 40), "the import didn't finish: “\(secondRow.label)”")
+        attachScreen("import-status-finished")
+        second.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+        XCTAssertTrue(secondRow.waitForNonExistence(timeout: 5), "the finished status didn't close")
+        XCTAssertTrue(secondButton.waitForNonExistence(timeout: 5), "the button stays after the import finished")
+        XCTAssertTrue(importedTile(second).waitForExistence(timeout: 10), "the game isn't in the library")
+        expectBarAnswers(second, "after the import finished")
+        second.terminate()
+    }
+
+    /// Each of the bar's buttons does its job: + and the filter open their menus, Settings opens.
+    @MainActor
+    private func expectBarAnswers(_ app: XCUIApplication, _ context: String) {
+        let window = app.windows.firstMatch
+        let plus = app.navigationBars.buttons["library.import"].firstMatch
+        XCTAssertTrue(waitFor("isHittable == true", plus, timeout: 10), "\(context): + can't be tapped")
+        plus.tap()
+        let games = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH[c] %@", "library.import.games", "Games")).firstMatch
+        XCTAssertTrue(games.waitForExistence(timeout: 5), "\(context): + didn't open its menu")
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
+        XCTAssertTrue(games.waitForNonExistence(timeout: 5), "\(context): +'s menu didn't close")
+
+        let filter = app.navigationBars.buttons["library.filter"].firstMatch
+        XCTAssertTrue(waitFor("isHittable == true", filter, timeout: 10), "\(context): the filter can't be tapped")
+        filter.tap()
+        let all = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label BEGINSWITH[c] %@ AND elementType != %d", "All Games", XCUIElement.ElementType.staticText.rawValue)).firstMatch
+        XCTAssertTrue(all.waitForExistence(timeout: 5), "\(context): the filter didn't open its menu")
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
+        XCTAssertTrue(all.waitForNonExistence(timeout: 5), "\(context): the filter's menu didn't close")
+
+        let settings = app.navigationBars.buttons["library.settings"].firstMatch
+        XCTAssertTrue(waitFor("isHittable == true", settings, timeout: 10), "\(context): Settings can't be tapped")
+        settings.tap()
+        let bar = app.navigationBars.matching(NSPredicate(format: "identifier ==[c] %@", "Settings")).firstMatch
+        XCTAssertTrue(bar.waitForExistence(timeout: 10), "\(context): Settings didn't open")
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.085))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+        XCTAssertTrue(bar.waitForNonExistence(timeout: 10), "\(context): Settings didn't close")
+    }
 }

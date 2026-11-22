@@ -168,7 +168,10 @@ struct LibraryImportStatus: View {
 /// lists each copy with its progress, how it ended, and a cancel.
 struct LibraryImportsButton: View {
     @ObservedObject var imports: GameImports
-    @Binding var showsStatus: Bool
+    /// Its status is on screen, from showing until it has wholly gone: the button (the
+    /// popover's anchor) stays until then.
+    @Binding var statusOnScreen: Bool
+    @State private var showsStatus = false
 
     var body: some View {
         Button { showsStatus = true } label: {
@@ -181,6 +184,8 @@ struct LibraryImportsButton: View {
         .popover(isPresented: $showsStatus) {
             LibraryImportList(imports: imports)
                 .presentationCompactAdaptation(.popover)
+                .onAppear { statusOnScreen = true }
+                .onDisappear { statusOnScreen = false }
         }
     }
 

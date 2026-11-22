@@ -86,20 +86,30 @@ enum RetroPlayNavigationBarChrome {
     static func applyTitleFonts(to item: UINavigationItem, bar: UINavigationBar) {
         let titleFont = RetroPlayFont.uiTitleFont(.headline)
         let largeTitleFont = RetroPlayFont.uiLargeTitleFont()
+        let subtitleFont = RetroPlayFont.uiFont(.caption)
+        let largeSubtitleFont = RetroPlayFont.uiFont(.footnote)
+        /// A copy with the fonts, or nil if it has them already: a new appearance makes the bar
+        /// lay its items out again, which strands a popover shown from one of them.
         func patched(_ appearance: UINavigationBarAppearance?) -> UINavigationBarAppearance? {
-            guard let copy = appearance?.copy() else { return nil }
+            guard let appearance,
+                  appearance.titleTextAttributes[.font] as? UIFont != titleFont
+                    || appearance.largeTitleTextAttributes[.font] as? UIFont != largeTitleFont
+                    || appearance.subtitleTextAttributes[.font] as? UIFont != subtitleFont
+                    || appearance.largeSubtitleTextAttributes[.font] as? UIFont != largeSubtitleFont
+            else { return nil }
+            let copy = appearance.copy()
             copy.titleTextAttributes[.font] = titleFont
             copy.largeTitleTextAttributes[.font] = largeTitleFont
             copy.titleTextAttributes[.kern] = RetroPlayFont.uiKern
             copy.largeTitleTextAttributes[.kern] = RetroPlayFont.uiKern
-            copy.subtitleTextAttributes[.font] = RetroPlayFont.uiFont(.caption)
-            copy.largeSubtitleTextAttributes[.font] = RetroPlayFont.uiFont(.footnote)
+            copy.subtitleTextAttributes[.font] = subtitleFont
+            copy.largeSubtitleTextAttributes[.font] = largeSubtitleFont
             return copy
         }
-        item.standardAppearance = patched(item.standardAppearance ?? bar.standardAppearance)
-        item.scrollEdgeAppearance = patched(item.scrollEdgeAppearance ?? bar.scrollEdgeAppearance)
-        item.compactAppearance = patched(item.compactAppearance ?? bar.compactAppearance)
-        item.compactScrollEdgeAppearance = patched(item.compactScrollEdgeAppearance ?? bar.compactScrollEdgeAppearance)
+        if let new = patched(item.standardAppearance ?? bar.standardAppearance) { item.standardAppearance = new }
+        if let new = patched(item.scrollEdgeAppearance ?? bar.scrollEdgeAppearance) { item.scrollEdgeAppearance = new }
+        if let new = patched(item.compactAppearance ?? bar.compactAppearance) { item.compactAppearance = new }
+        if let new = patched(item.compactScrollEdgeAppearance ?? bar.compactScrollEdgeAppearance) { item.compactScrollEdgeAppearance = new }
     }
 
     private static func applyRecursively(in root: UIView, apply: (UINavigationBar) -> Void) {
