@@ -42,7 +42,9 @@ enum AccessibilityProbe {
     }
 }
 
-/// The probe's result, published once the smoke-opened pause menu is up.
+/// The probe's result, published once the game's controls are up, or with
+/// `-RetroPlaySmokeMenu YES` once the smoke-opened pause menu is (it opens a few seconds after
+/// the game starts, later on a busy Mac).
 struct AccessibilityProbeOverlay: View {
     @State private var result = ""
 
@@ -53,8 +55,15 @@ struct AccessibilityProbeOverlay: View {
             .allowsHitTesting(false)
             .accessibilityIdentifier("a11y.probe")
             .task {
-                // The smoke menu opens about 5 s after the game starts; looked at after that.
-                try? await Task.sleep(for: .seconds(12))
+                let menu = UserDefaults.standard.bool(forKey: "RetroPlaySmokeMenu")
+                var labels: [String] = []
+                for _ in 0..<120 {
+                    try? await Task.sleep(for: .seconds(1))
+                    labels = AccessibilityProbe.reachableLabels()
+                    if labels.contains(where: { menu ? $0.hasPrefix("Resume") : $0 == "Pause menu" }) { break }
+                }
+                // Read again once it has settled (the menu or the controls still coming in).
+                try? await Task.sleep(for: .seconds(1))
                 result = "PROBE|" + AccessibilityProbe.reachableLabels().joined(separator: "|")
             }
     }
