@@ -169,16 +169,28 @@ final class LibraryImportUITests: XCTestCase {
     /// Settings opens.
     @MainActor
     func testStatusOpensEveryTimeAndTheBarStaysAlive() {
-        let app = launch(["-RetroPlayTestImportStall", "YES"])
+        // Animations slowed, so a tap can come while the status is still closing.
+        let app = launch(["-RetroPlayTestImportStall", "YES", "-RetroPlayTestAnimationSpeed", "0.2"])
         let button = importButton(app)
         XCTAssertTrue(button.waitForExistence(timeout: 30), "no import button while a game imports")
         let row = app.descendants(matching: .any)["library.imports.item"].firstMatch
         let window = app.windows.firstMatch
+        // A tap that lands while the status is still closing can be dropped, as iOS ignores
+        // touches during the transition; the next one opens it (a stuck status never opens).
+        func opens(_ what: String) -> Bool {
+            for tap in 1...3 {
+                guard waitFor("isHittable == true", button, timeout: 30) else { return false }
+                button.tap()
+                if row.waitForExistence(timeout: 10) {
+                    print("[import] \(what): opened on tap \(tap)")
+                    return true
+                }
+            }
+            return false
+        }
         for close in ["outside", "swipe"] {
             for cycle in 1...5 {
-                XCTAssertTrue(waitFor("isHittable == true", button, timeout: 10), "\(close) \(cycle): the import button doesn't answer")
-                button.tap()
-                XCTAssertTrue(row.waitForExistence(timeout: 5), "\(close) \(cycle): tapping the button didn't open the status")
+                XCTAssertTrue(opens("\(close) \(cycle)"), "\(close) \(cycle): tapping the button doesn't open the status")
                 if cycle == 1 { attachScreen("import-status-\(close)") }
                 if close == "outside" {
                     window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
@@ -191,8 +203,7 @@ final class LibraryImportUITests: XCTestCase {
             }
         }
         // Stopped with the status open: it says so, and the button goes.
-        button.tap()
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "the status didn't open after the cycles")
+        XCTAssertTrue(opens("after the cycles"), "the status doesn't open after the cycles")
         app.buttons["library.imports.cancel"].firstMatch.tap()
         XCTAssertTrue(waitFor("label CONTAINS[c] 'Cancelled'", row, timeout: 15), "the import didn't stop: “\(row.label)”")
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()

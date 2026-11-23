@@ -204,6 +204,13 @@ public struct RetroPlayRootView: View {
                 }
                 handleImport(.success([file]))
             }
+            // `-RetroPlayTestAnimationSpeed 0.2`: the app's animations at a fifth of their speed,
+            // so a test acts while one is still running, as on a busy device.
+            if let speed = Float(UserDefaults.standard.string(forKey: "RetroPlayTestAnimationSpeed") ?? "") {
+                for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+                    scene.windows.forEach { $0.layer.speed = speed }
+                }
+            }
             // `-RetroPlayTestImportStall YES`: import "Stalled Test.gba", a pipe nothing writes,
             // so its copy waits forever, as from a share that stopped answering.
             if UserDefaults.standard.bool(forKey: "RetroPlayTestImportStall") {
