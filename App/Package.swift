@@ -13,9 +13,14 @@ let package = Package(
         .library(name: "RetroPlayCore", targets: ["RetroPlayCore"]),
         .library(name: "RetroPlayApp", targets: ["RetroPlayApp"]),
     ],
+    dependencies: [
+        // Unpacks the zipped copy iOS gives of a folder it lists as empty (a network share's).
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.21"),
+    ],
     targets: [
         .target(
             name: "RetroPlayCore",
+            dependencies: ["ZIPFoundation"],
             path: "Sources/RetroPlayCore"
         ),
         .target(

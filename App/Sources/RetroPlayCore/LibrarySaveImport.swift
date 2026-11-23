@@ -2,6 +2,7 @@
 import Foundation
 import Observation
 import os
+import ZIPFoundation
 
 // Library-level save import: the player picks save files and folders (a RetroArch `saves/`
 // tree, another app's export, a PSP `SAVEDATA` folder); the scanner finds what looks like a
@@ -286,7 +287,7 @@ public enum SaveFolderScanner {
     static func readError(_ name: String, _ error: Error?) -> SkippedSave {
         // A slot that listed empty says so itself.
         switch error as? SaveGameImportError {
-        case .pspSlotListedEmpty?, .pspSlotUnnamedFiles?:
+        case .listedEmpty?:
             return SkippedSave(name: name, reason: error!.localizedDescription)
         default:
             break
@@ -1179,11 +1180,14 @@ enum CoordinatedRead {
         var value: Result<T, Error>?
     }
 
-    static func run<T>(_ url: URL, _ cancellation: ImportCancellation = ImportCancellation(), _ body: @escaping (URL) throws -> T) throws -> T {
+    static func run<T>(
+        _ url: URL, _ cancellation: ImportCancellation = ImportCancellation(),
+        options: NSFileCoordinator.ReadingOptions = [], _ body: @escaping (URL) throws -> T
+    ) throws -> T {
         try cancellation.check()
         let outcome = Outcome<T>()
         let coordinator = NSFileCoordinator(filePresenter: nil)
-        let intent = NSFileAccessIntent.readingIntent(with: url, options: [])
+        let intent = NSFileAccessIntent.readingIntent(with: url, options: options)
         let done = DispatchSemaphore(value: 0)
         let box = UncheckedBox(body)
         coordinator.coordinate(with: [intent], queue: OperationQueue()) { [intent] error in
@@ -1323,26 +1327,8 @@ enum FolderWalk {
     /// included). Not set in the app.
     nonisolated(unsafe) static var listed: (@Sendable (URL, Int) -> Void)?
 
-    /// Tests: stand in for what the bulk listing (the enumerator) and the plain directory read
-    /// return for a folder (nil: the real listing). On a device, a provider's folder that isn't
-    /// on disk yet can list nothing through the first.
+    /// Tests: stands in for what the enumerator lists in a folder (nil: the real listing).
     nonisolated(unsafe) static var bulkListing: (@Sendable (URL) -> [URL]?)?
-    nonisolated(unsafe) static var plainListing: (@Sendable (URL) throws -> [URL]?)?
-    /// Tests: stand in for `contentsOfDirectory(atPath:)`, and for the listing of the picked URL
-    /// outside the coordinated read (nil: the real ones).
-    nonisolated(unsafe) static var pathListing: (@Sendable (URL) throws -> [URL]?)?
-    nonisolated(unsafe) static var uncoordinatedListing: (@Sendable (URL) throws -> [URL]?)?
-
-    /// A folder that listed nothing though its metadata says it holds entries.
-    struct EmptyListing: LocalizedError {
-        /// How many entries it holds (nil: its contents aren't on this device yet).
-        let heldEntries: Int?
-        var errorDescription: String? {
-            let held = heldEntries.map { $0 == 1 ? "it holds 1 item" : "it holds \($0) items" }
-                ?? "its contents aren't on this iPhone yet"
-            return "Files listed nothing in it, but \(held). Open it in Files so its contents download, then import again"
-        }
-    }
 
     /// Entries left to look at, shared by everything one import walks.
     struct Budget {
@@ -1405,26 +1391,6 @@ enum FolderWalk {
 
     /// One folder's children, at most `budget` of them (`exhausted` when there were more),
     /// read inside one coordinated read of that folder.
-    /// One way of listing a folder and how it went: entries, or the error it gave.
-    struct ListingAttempt: Sendable {
-        let method: String
-        let count: Int?
-        let error: String?
-
-        var summary: String { "\(method) \(error ?? String(count ?? 0))" }
-    }
-
-    /// A folder no listing could read: every method listed nothing and at least one failed.
-    /// Says what each did, so the cause shows on screen ("enumerator 0, contents: Operation not
-    /// permitted, …").
-    struct ListingFailed: LocalizedError {
-        let folder: String
-        let attempts: [ListingAttempt]
-        var errorDescription: String? {
-            "Couldn't list \(folder): " + attempts.map(\.summary).joined(separator: ", ")
-        }
-    }
-
     /// "Operation not permitted" rather than "The operation couldn't be completed. (…)": the
     /// POSIX reason when there is one.
     static func shortReason(_ error: Error) -> String {
@@ -1444,7 +1410,6 @@ enum FolderWalk {
         var children: [Child] = []
         var pulled = 0
         var failure: Error?
-        var attempts: [ListingAttempt] = []
         defer { listed?(url, pulled) }
         /// One more entry; non-nil when the listing has to stop there.
         func take(_ next: URL) throws -> (children: [Child], exhausted: Bool, error: Error?)? {
@@ -1458,23 +1423,7 @@ enum FolderWalk {
             children.append(Child(url: next, name: next.lastPathComponent, item: item))
             return nil
         }
-        /// A fallback listing, its result or error recorded (never taken for "empty").
-        func attempt(_ method: String, _ list: () throws -> [URL]) -> [URL] {
-            do {
-                let found = try list()
-                attempts.append(ListingAttempt(method: method, count: found.count, error: nil))
-                scanLog.notice("RP_SCAN \(method, privacy: .public) lists \(found.count, privacy: .public)")
-                return found
-            } catch {
-                let reason = shortReason(error)
-                attempts.append(ListingAttempt(method: method, count: nil, error: reason))
-                scanLog.notice("RP_SCAN \(method, privacy: .public) failed: \(reason, privacy: .public)")
-                return []
-            }
-        }
-        // Inside the folder's coordinated read: the enumerator, and when it lists nothing, the
-        // plain directory reads (a provider's folder, an SMB share, can list nothing through
-        // one and everything through another).
+        // Inside the folder's coordinated read (so a provider fills it when it's asked).
         let inside: (children: [Child], exhausted: Bool, error: Error?)? = try CoordinatedRead.run(url, cancellation) { readURL in
             if readURL != url {
                 scanLog.notice("RP_SCAN the coordinator gave another URL to read than the one picked")
@@ -1499,113 +1448,68 @@ enum FolderWalk {
                 if let early = try take(next) { return early }
             }
             if let failure { return ([], false, failure) }
-            guard pulled == 0 else { return nil }
-            attempts.append(ListingAttempt(method: "enumerator", count: 0, error: nil))
-            var again = attempt("contents") {
-                try plainListing.map { try $0(readURL) ?? [] }
-                    ?? fileManager.contentsOfDirectory(at: readURL, includingPropertiesForKeys: nil)
-            }
-            if again.isEmpty {
-                again = attempt("path") {
-                    try pathListing.map { try $0(readURL) ?? [] }
-                        ?? fileManager.contentsOfDirectory(atPath: readURL.path).map { readURL.appendingPathComponent($0) }
-                }
-            }
-            for next in again {
-                if let early = try take(next) { return early }
-            }
             return nil
         }
         if let inside { return inside }
         if pulled == 0 {
-            // Every listing in the coordinated read came back empty: the picked URL itself, as
-            // the picker handed it over (its security scope), outside the coordinator.
-            let outside = attempt("picked URL") {
-                try uncoordinatedListing.map { try $0(url) ?? [] }
-                    ?? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
-            }
-            for next in outside {
+            // Listed empty. iOS's SMB client lists a share's folder so however it holds files,
+            // though it gives the whole folder as a zip: its unpacked copy is the listing.
+            let snapshot: URL?
+            do { snapshot = try FolderSnapshot.unpacked(url, cancellation: cancellation) }
+            catch is CancellationError { throw CancellationError() }
+            catch { return ([], false, SaveGameImportError.listedEmpty(url.lastPathComponent)) }
+            let found = snapshot.flatMap { try? fileManager.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil) } ?? []
+            for next in found.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
                 if let early = try take(next) { return early }
-            }
-            if children.isEmpty {
-                // Empty only if no listing failed: a failure (no permission, the scope not
-                // active) isn't an empty folder.
-                if attempts.contains(where: { $0.error != nil }) {
-                    return ([], false, ListingFailed(folder: url.lastPathComponent, attempts: attempts))
-                }
-                let slot = SaveGameImporter.isValidPSPSaveFolderName(url.lastPathComponent.uppercased())
-                if slot {
-                    // iOS's SMB client can list a save slot as empty though it holds the save:
-                    // its files are opened by name, from what its PARAM.SFO lists.
-                    let byName: [URL]
-                    do { byName = try pspSlotByName(url, fileManager: fileManager, cancellation: cancellation) }
-                    catch let error as SaveGameImportError { return ([], false, error) }
-                    for next in byName {
-                        if let early = try take(next) { return early }
-                    }
-                    if !children.isEmpty { return (children.sorted { $0.name < $1.name }, false, nil) }
-                }
-                if let held = DirectoryMetadata.heldEntries(url) {
-                    // Nothing listed by any means, though the folder's metadata says it holds
-                    // entries (or that they aren't on disk yet): said, not taken for empty.
-                    scanLog.notice("RP_SCAN every listing is empty where the folder holds \(held.map { String($0) } ?? "unknown (dataless)", privacy: .public)")
-                    return ([], false, EmptyListing(heldEntries: held))
-                }
-                if slot { return ([], false, SaveGameImportError.pspSlotListedEmpty(url.lastPathComponent)) }
             }
         }
         return (children.sorted { $0.name < $1.name }, false, nil)
     }
-
-    /// Files a PSP save slot holds, found by name rather than listed: its PARAM.SFO (read in a
-    /// coordinated read), the data files that lists and the standard optional files that exist.
-    /// Empty if PARAM.SFO can't be read. Throws when PARAM.SFO doesn't name every data file the
-    /// slot holds (many games, LittleBigPlanet among them, list none), as copying what can be
-    /// named would install a save without its data.
-    static func pspSlotByName(_ slot: URL, fileManager: FileManager, cancellation: ImportCancellation) throws -> [URL] {
-        let param = slot.appendingPathComponent("PARAM.SFO")
-        let sfo: Data
-        do {
-            sfo = try CoordinatedRead.run(param, cancellation) { try Data(contentsOf: $0) }
-        } catch {
-            scanLog.notice("RP_SCAN PARAM.SFO by name failed: \(shortReason(error), privacy: .public)")
-            return []
-        }
-        let dataFiles = PSPParamSFO.saveDataFiles(from: sfo)
-        let missing = dataFiles.filter { !fileManager.fileExists(atPath: slot.appendingPathComponent($0).path) }
-        guard !dataFiles.isEmpty, missing.isEmpty else {
-            scanLog.notice("RP_SCAN slot by name: PARAM.SFO names \(dataFiles.count, privacy: .public) data files, \(missing.count, privacy: .public) missing")
-            throw SaveGameImportError.pspSlotUnnamedFiles(slot.lastPathComponent)
-        }
-        var seen: Set<String> = ["PARAM.SFO"]
-        let names = (dataFiles + ["ICON0.PNG", "ICON1.PMF", "ICON1.PNG", "PIC1.PNG", "SND0.AT3"])
-            .filter { seen.insert($0.uppercased()).inserted }
-        let found = names.map { slot.appendingPathComponent($0) }.filter { fileManager.fileExists(atPath: $0.path) }
-        scanLog.notice("RP_SCAN slot read by name: PARAM.SFO and \(found.count, privacy: .public) of \(names.count, privacy: .public) files")
-        return [param] + found
-    }
 }
 
-/// What a folder's own metadata says about its contents, without listing it.
-enum DirectoryMetadata {
-    /// Tests: stands in for the folder's metadata (nil: the real `stat`).
-    nonisolated(unsafe) static var stat: (@Sendable (URL) -> (links: Int, dataless: Bool)?)?
+/// The unpacked copy of a folder iOS lists as empty: the coordinator has its provider zip the
+/// folder (`.forUploading`; the system deletes the zip when the read ends), unpacked here into
+/// a temporary folder that stands in for it until the pick's access ends (`removeAll`).
+public enum FolderSnapshot {
+    /// Larger unpacked than this (a whole games folder on a share) is refused.
+    static let maxBytes: UInt64 = 512 << 20
+    static let root = FileManager.default.temporaryDirectory.appendingPathComponent("FolderSnapshots", isDirectory: true)
 
-    /// Entries the folder holds by its metadata: `.some(n)` with n > 0 from its link count (APFS
-    /// counts each entry), `.some(nil)` when it's a dataless folder (contents not on disk), and
-    /// nil when its metadata doesn't say it holds anything.
-    static func heldEntries(_ url: URL) -> Int?? {
-        guard let info = stat?(url) ?? statInfo(url) else { return nil }
-        if info.dataless { return .some(nil) }
-        // A folder's link count is 2 ("." and its entry in the parent) plus its entries on
-        // APFS; other file systems report 1 or 2 whatever it holds.
-        return info.links > 2 ? .some(info.links - 2) : nil
+    /// Tests: stands in for taking a snapshot (nil: the real one).
+    nonisolated(unsafe) static var take: (@Sendable (URL) throws -> URL?)?
+
+    /// The folder's unpacked copy, or nil when the zip holds no files (the folder is empty).
+    /// Throws when the provider gives no zip, or one too large or that can't be unpacked.
+    static func unpacked(_ folder: URL, cancellation: ImportCancellation) throws -> URL? {
+        if let take { return try take(folder) }
+        let fileManager = FileManager()
+        let destination = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        do {
+            let files = try CoordinatedRead.run(folder, cancellation, options: .forUploading) { zip in
+                let archive = try Archive(url: zip, accessMode: .read, pathEncoding: .utf8)
+                let files = archive.filter { $0.type == .file }
+                let bytes = files.reduce(UInt64(0)) { $0 + $1.uncompressedSize }
+                FolderWalk.scanLog.notice("RP_SCAN zipped copy: \(files.count, privacy: .public) files, \(bytes, privacy: .public) bytes")
+                guard !files.isEmpty else { return 0 }
+                guard bytes <= maxBytes else { throw CocoaError(.fileReadTooLarge) }
+                // Its names are UTF-8, though the zip doesn't flag them so (read as CP437 otherwise).
+                try fileManager.unzipItem(at: zip, to: destination, pathEncoding: .utf8)
+                return files.count
+            }
+            guard files > 0 else { return nil }
+        } catch {
+            FolderWalk.scanLog.notice("RP_SCAN zipped copy failed: \(FolderWalk.shortReason(error), privacy: .public)")
+            try? fileManager.removeItem(at: destination)
+            throw error
+        }
+        // The zip holds the folder under its own name.
+        let top = destination.appendingPathComponent(folder.lastPathComponent, isDirectory: true)
+        return fileManager.fileExists(atPath: top.path) ? top : destination
     }
 
-    private static func statInfo(_ url: URL) -> (links: Int, dataless: Bool)? {
-        var info = Darwin.stat()
-        guard lstat(url.path, &info) == 0 else { return nil }
-        return (Int(info.st_nlink), info.st_flags & UInt32(SF_DATALESS) != 0)
+    /// Every snapshot (the pick's access has ended, or at launch after a crash).
+    public static func removeAll() {
+        try? FileManager().removeItem(at: root)
     }
 }
 
@@ -1685,6 +1589,7 @@ public final class SecurityScopedAccess: @unchecked Sendable {
         started = []
         lock.unlock()
         for url in urls { url.stopAccessingSecurityScopedResource() }
+        FolderSnapshot.removeAll()
     }
 
     deinit { stop() }

@@ -88,6 +88,7 @@ public final class LibraryStore: ObservableObject {
         try? savePaths.migrateAppDataOutOfDocuments(fileManager: fileManager)
         try? ensureDirectories()
         removePartialCopies()
+        FolderSnapshot.removeAll()
         load()
     }
 

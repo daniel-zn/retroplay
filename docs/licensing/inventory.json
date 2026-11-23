@@ -1358,5 +1358,15 @@
     "licenseFile": "pcsx_rearmed/deps/libretro-common/streams/file_stream.c (per-file header)",
     "requiresNoticeText": true,
     "evidence": "compat_*, encoding_utf, features_cpu, file_path(_io), retro_dirent, file_stream(_transforms), rstrtod (+ generated rstrtod_pow5.inc table), stdstring, rtime, vfs_implementation, rthreads (via frontend/pcsxr-threads.c); libpcsxcore/memmap.h is also RetroArch MIT."
+  },
+  {
+    "project": "ZIPFoundation",
+    "component": "ZIPFoundation (Swift package, linked into RetroPlayCore)",
+    "version": "0.9.21 (git e7048f0569f0ba37df26f8357f560b9d25e9a284)",
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2017-2026 Thomas Zoechling (https://www.peakstep.com)",
+    "licenseFile": "retroplay/docs/licensing/ZIPFoundation-MIT.txt",
+    "requiresNoticeText": true,
+    "evidence": "App/Package.swift pins exact 0.9.21; RetroPlayCore imports it to unpack the zipped copy iOS gives of a share folder it lists as empty. MIT: the notice ships in the in-app licenses (ZIPFoundation-MIT.txt)."
   }
 ]

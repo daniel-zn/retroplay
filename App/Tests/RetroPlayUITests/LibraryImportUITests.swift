@@ -212,7 +212,8 @@ final class LibraryImportUITests: XCTestCase {
         app.terminate()
 
         // An import that finishes while its status is open (its system's filter showing).
-        let second = launch(importSeconds: 10)
+        // Long enough to outlast a slow first look-up of the button on a busy Mac (11 s seen).
+        let second = launch(importSeconds: 20)
         let secondButton = importButton(second)
         XCTAssertTrue(secondButton.waitForExistence(timeout: 30), "no import button for the second import")
         secondButton.tap()

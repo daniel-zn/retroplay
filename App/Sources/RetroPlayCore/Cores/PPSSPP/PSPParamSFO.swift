@@ -17,19 +17,6 @@ public enum PSPParamSFO: Sendable {
         return text.isEmpty ? nil : text
     }
 
-    /// The data files a save slot's PARAM.SFO lists (SAVEDATA_FILE_LIST: 32-byte entries, a
-    /// 13-byte NUL-padded name then a hash). Only plain names: nothing with a path in it.
-    static func saveDataFiles(from sfoData: Data) -> [String] {
-        guard let list = value(forKey: "SAVEDATA_FILE_LIST", in: sfoData) else { return [] }
-        let bytes = [UInt8](list)
-        return stride(from: 0, to: bytes.count, by: 32).compactMap { start in
-            let name = bytes[start..<min(start + 13, bytes.count)].prefix(while: { $0 != 0 })
-            guard let text = String(bytes: name, encoding: .ascii), !text.isEmpty,
-                  text != ".", text != "..", !text.contains("/") else { return nil }
-            return text
-        }
-    }
-
     /// The bytes stored under `key` (its used length), nil if absent or malformed.
     static func value(forKey wanted: String, in sfoData: Data) -> Data? {
         guard sfoData.count >= 20 else { return nil }

@@ -14,6 +14,7 @@ Top-level license texts:
 | MPL-2.0 | `mgba-MPL-2.0.txt` |
 | LGPL-2.1 | `ffmpeg-LGPL-2.1-or-later.txt` and `blip_buf-LGPL-2.1-or-later.txt` |
 | CC0-1.0 | `YoureGoneThin-CC0-1.0.txt` (the thin font's license, with the original's license record) |
+| MIT | `ZIPFoundation-MIT.txt` (ZIPFoundation 0.9.21, the Swift package RetroPlayCore uses to unpack a share folder's zipped copy; added 2026-11-23) |
 
 ## Per core: what is actually in the binaries
 

@@ -1141,5 +1141,14 @@
   "source": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
   "version": "v1.5.7",
   "licenseFile": "Zstandard-BSD-3-Clause.txt"
+ },
+ {
+  "name": "ZIPFoundation",
+  "usedBy": "App",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2017-2026 Thomas Zoechling (https://www.peakstep.com)",
+  "source": "https://github.com/weichsel/ZIPFoundation/tree/0.9.21",
+  "version": "0.9.21 (e7048f0569f0ba37df26f8357f560b9d25e9a284)",
+  "licenseFile": "ZIPFoundation-MIT.txt"
  }
 ]
