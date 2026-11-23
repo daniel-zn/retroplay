@@ -4,7 +4,8 @@ import XCTest
 /// Quick pulls down and pushes up, one after another before the last has settled (as a thumb
 /// flicking up and down), leave the library's top where one slow pull would: the title and
 /// its game count where they were at rest, one count, and the search field either away or
-/// fully shown under the count with its placeholder.
+/// fully shown under the count with its placeholder; and in Cover Flow a fast push up after
+/// a pull comes back to rest, five times over.
 final class LibraryFastSwipeUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
@@ -89,12 +90,18 @@ final class LibraryFastSwipeUITests: XCTestCase {
             attachScreen("fastswipe-\(name)-pulled")
             print("[fast] \(name) pulled: counts \(shown.counts) search \(shown.searchShows) \(shown.search) “\(shown.placeholder)”")
             check(name + " pulled", shown, against: rest)
+            // A fast push collapses the bar at once; it comes back to rest every time, not
+            // collapsed or pulled down.
             if layout == "coverFlow" {
-                flick(0.75, 0.25, 5000, hold: 0)
-                let back = settled(app)
-                attachScreen("fastswipe-\(name)-back")
-                check(name + " pushed back", back, against: rest)
-                XCTAssertFalse(back.searchShows, "\(name): a push up left search showing")
+                for round in 1...5 {
+                    if round > 1 { flick(0.35, 0.75, 5000, hold: 0); _ = settled(app) }
+                    flick(0.75, 0.25, 5000, hold: 0)
+                    let back = settled(app)
+                    print("[fast] \(name) back \(round): counts \(back.counts) search \(back.searchShows) \(back.search)")
+                    if round == 1 { attachScreen("fastswipe-\(name)-back") }
+                    check(name + " pushed back \(round)", back, against: rest)
+                    XCTAssertFalse(back.searchShows, "\(name) \(round): a push up left search showing")
+                }
             }
             app.terminate()
         }

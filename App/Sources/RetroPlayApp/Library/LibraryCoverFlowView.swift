@@ -196,8 +196,7 @@ struct LibraryCoverFlowView<Header: View>: View {
         // swipe only sideways, so a pull down that starts on them moves the page.
         .scrollBounceBehavior(.always, axes: .vertical)
         // Nothing past the page: a push up comes back to rest, so the big title stays big.
-        .scrollTargetBehavior(CoverFlowPageRest(restTop: page.top, visibleHeight: page.height + bottomRoom, tracker: tracker))
-        .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.top } action: { tracker.barTop = $1 }
+        .scrollTargetBehavior(CoverFlowPageRest(visibleHeight: page.height + bottomRoom))
         .onScrollPhaseChange { _, phase in pageHold.phase(phase) }
     }
 
@@ -564,24 +563,22 @@ final class CoverFlowScrollTracker: @unchecked Sendable {
     var offset: Double = 0
     /// The offset when the current swipe began.
     var start: Double = 0
-    /// The bar's height over the page right now, as the page's scroll view sees it.
-    var barTop: CGFloat = 0
 }
 
 /// Cover Flow's page ends where it's seen at rest: a push up lands back at rest (the bar
 /// would otherwise keep its big title collapsed there), past it only by what large text adds.
 /// Pulls down are left alone, so they show the search field and a push up hides it again.
 struct CoverFlowPageRest: ScrollTargetBehavior {
-    /// The bar's height at rest (the big title, no search field).
-    let restTop: CGFloat
+    /// The page's scroll view's height with the bar at rest (the big title, no search field).
     let visibleHeight: CGFloat
-    let tracker: CoverFlowScrollTracker
 
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
         // Targets count from the top under the bar as it is now: the page at rest is the
         // difference between that bar and the bar at rest (the search field's height while it
-        // shows, the title's collapse if it has started).
-        let end = tracker.barTop - restTop + max(0, context.contentSize.height - visibleHeight)
+        // shows, the title's collapse if it has started). The bar takes what the scroll view
+        // gives up, so its height is read from this context's, as it is now: the bar's height
+        // as reported after the frame lags a fast push, which collapses it at once.
+        let end = visibleHeight - context.containerSize.height + max(0, context.contentSize.height - visibleHeight)
         // Above the top only by what brings a collapsed bar back to rest: a target set above
         // it while the bar collapsed is kept as the bar grows back (fast swipes, the search
         // field showing with it), so the page would come to rest pulled down.
