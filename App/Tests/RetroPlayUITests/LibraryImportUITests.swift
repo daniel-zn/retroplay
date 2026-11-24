@@ -195,9 +195,10 @@ final class LibraryImportUITests: XCTestCase {
                 if close == "outside" {
                     window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
                 } else {
-                    let top = row.frame.minY - 30
-                    window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: window.frame.midX, dy: top))
-                        .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
+                    // Beside the status, level with it: a drag from the status bar's strip
+                    // above is the system's (it can leave the status open, or scroll the library).
+                    window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: window.frame.width * 0.1, dy: row.frame.midY))
+                        .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.98)))
                 }
                 XCTAssertTrue(row.waitForNonExistence(timeout: 5), "\(close) \(cycle): the status didn't close")
             }

@@ -24,7 +24,8 @@ final class LibraryTopBarUITests: XCTestCase {
         let settled = buttons.map {
             XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: $0)
         }
-        XCTAssertEqual(XCTWaiter().wait(for: settled, timeout: 10), .completed, "\(context): buttons not hittable")
+        // One look at all three took 9 s on a busy Mac: room for several.
+        XCTAssertEqual(XCTWaiter().wait(for: settled, timeout: 30), .completed, "\(context): buttons not hittable")
         // Exactly these: no Search button beside them.
         XCTAssertFalse(app.navigationBars.buttons["library.search"].exists, "\(context): the bar still has a Search button")
         return buttons
